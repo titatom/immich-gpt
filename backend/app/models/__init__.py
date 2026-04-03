@@ -8,6 +8,7 @@ from .review_decision import ReviewDecision
 from .job_run import JobRun
 from .audit_log import AuditLog
 from .provider_config import ProviderConfig
+from .app_setting import AppSetting
 
 __all__ = [
     "Asset",
@@ -20,4 +21,5 @@ __all__ = [
     "JobRun",
     "AuditLog",
     "ProviderConfig",
+    "AppSetting",
 ]

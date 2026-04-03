@@ -41,7 +41,7 @@ def init_db():
     from .models import (  # noqa: F401
         asset, bucket, prompt_template, prompt_run,
         suggested_classification, suggested_metadata,
-        review_decision, job_run, audit_log, provider_config,
+        review_decision, job_run, audit_log, provider_config, app_setting,
     )
 
     try:
