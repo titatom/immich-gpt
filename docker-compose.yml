@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: immich-gpt-api
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - immich_gpt_data:/data
+      - immich_gpt_logs:/logs
+    environment:
+      - DATABASE_URL=sqlite:////data/immich_gpt.db
+      - REDIS_URL=redis://redis:6379/0
+      - IMMICH_URL=${IMMICH_URL:-}
+      - IMMICH_API_KEY=${IMMICH_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - immich_gpt_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: immich-gpt-worker
+    restart: unless-stopped
+    volumes:
+      - immich_gpt_data:/data
+      - immich_gpt_logs:/logs
+    environment:
+      - DATABASE_URL=sqlite:////data/immich_gpt.db
+      - REDIS_URL=redis://redis:6379/0
+      - IMMICH_URL=${IMMICH_URL:-}
+      - IMMICH_API_KEY=${IMMICH_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - immich_gpt_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: immich-gpt-redis
+    restart: unless-stopped
+    volumes:
+      - immich_gpt_redis:/data
+    networks:
+      - immich_gpt_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  immich_gpt_data:
+    driver: local
+  immich_gpt_logs:
+    driver: local
+  immich_gpt_redis:
+    driver: local
+
+networks:
+  immich_gpt_net:
+    driver: bridge
