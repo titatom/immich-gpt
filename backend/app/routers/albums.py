@@ -1,14 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from ..database import get_db
+from ..dependencies import get_immich_client
 from ..services.immich_client import ImmichClient, ImmichError
 
 router = APIRouter(prefix="/api/albums", tags=["albums"])
 
 
 @router.get("")
-def list_albums():
+def list_albums(client: ImmichClient = Depends(get_immich_client)):
     """List Immich albums for bucket mapping."""
     try:
-        client = ImmichClient()
         albums = client.list_albums()
         return [
             {"id": a.get("id"), "albumName": a.get("albumName"), "assetCount": a.get("assetCount", 0)}

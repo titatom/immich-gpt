@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_immich_client
 from ..models.asset import Asset
 from ..services.immich_client import ImmichClient, ImmichError
 
@@ -18,6 +19,7 @@ def get_thumbnail(
     asset_id: str,
     size: str = "thumbnail",
     db: Session = Depends(get_db),
+    client: ImmichClient = Depends(get_immich_client),
 ):
     """
     Proxy thumbnail from Immich.
@@ -25,13 +27,11 @@ def get_thumbnail(
     """
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
     if not asset:
-        # Also try by immich_id directly
         asset = db.query(Asset).filter(Asset.immich_id == asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
     try:
-        client = ImmichClient()
         image_bytes = client.get_thumbnail(asset.immich_id, size=size)
         return Response(
             content=image_bytes,
@@ -46,10 +46,13 @@ def get_thumbnail(
 
 
 @router.get("/immich/{immich_id}")
-def get_thumbnail_by_immich_id(immich_id: str, size: str = "thumbnail"):
+def get_thumbnail_by_immich_id(
+    immich_id: str,
+    size: str = "thumbnail",
+    client: ImmichClient = Depends(get_immich_client),
+):
     """Proxy thumbnail directly by Immich asset ID."""
     try:
-        client = ImmichClient()
         image_bytes = client.get_thumbnail(immich_id, size=size)
         return Response(
             content=image_bytes,
