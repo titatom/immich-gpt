@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getBuckets, createBucket, updateBucket, deleteBucket, getAlbums } from "../services/api";
 import type { Bucket } from "../types";
-import { Plus, Trash2, Edit2, ChevronUp, ChevronDown, X } from "lucide-react";
+import { Plus, Trash2, Edit2 } from "lucide-react";
 
 const MAPPING_MODES = ["virtual", "immich_album", "parent_group"] as const;
 
@@ -26,7 +26,7 @@ function BucketForm({ initial, albums, onSave, onCancel, loading }: BucketFormPr
     confidence_threshold: initial?.confidence_threshold,
   });
 
-  const set = (k: keyof Bucket, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof Bucket, v: Bucket[keyof Bucket]) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div style={{

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getJobs, getJob, cancelJob, startSyncJob, startClassifyJob } from "../services/api";
-import type { JobRun } from "../types";
+// JobRun type is used by JobProgressBar and LogPanel via props
 import JobProgressBar from "../components/JobProgressBar";
 import LogPanel from "../components/LogPanel";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp } from "lucide-react";
