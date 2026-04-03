@@ -5,10 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from redis import Redis
-from rq import Queue
-from rq.job import Retry
-
 from ..database import get_db, SessionLocal
 from ..models.job_run import JobRun
 from ..schemas.job import JobRunOut, JobStartResponse
@@ -40,12 +36,26 @@ def _job_to_out(j: JobRun) -> JobRunOut:
     )
 
 
-def _get_queue():
-    try:
-        conn = Redis.from_url(settings.REDIS_URL)
-        return Queue(connection=conn)
-    except Exception:
-        return None
+def _enqueue(fn, *args):
+    """
+    Dispatch a background task.
+
+    - If REDIS_URL is set: use RQ (distributed worker process).
+    - Otherwise: run in the in-process ThreadPoolExecutor (single-container).
+    """
+    if settings.REDIS_URL:
+        try:
+            from redis import Redis
+            from rq import Queue
+            from rq.job import Retry
+            conn = Redis.from_url(settings.REDIS_URL)
+            q = Queue(connection=conn)
+            q.enqueue(fn, *args, retry=Retry(max=3, interval=[10, 30, 60]))
+            return
+        except Exception:
+            pass  # Redis unavailable — fall through to thread pool
+    from ..workers.executor import submit
+    submit(fn, *args)
 
 
 @router.get("", response_model=List[JobRunOut])
@@ -123,14 +133,7 @@ def start_sync_job(db: Session = Depends(get_db)):
     svc = JobProgressService(db)
     job = svc.create_job("asset_sync")
 
-    q = _get_queue()
-    if q:
-        q.enqueue(run_asset_sync, job.id, retry=Retry(max=3, interval=[10, 30, 60]))
-    else:
-        import threading
-        t = threading.Thread(target=run_asset_sync, args=(job.id,), daemon=True)
-        t.start()
-
+    _enqueue(run_asset_sync, job.id)
     return JobStartResponse(job_id=job.id, status="queued", message="Sync job started")
 
 
@@ -145,17 +148,7 @@ def start_classify_job(
     svc = JobProgressService(db)
     job = svc.create_job("classification", params={"asset_ids": asset_ids, "limit": limit, "force": force})
 
-    q = _get_queue()
-    if q:
-        q.enqueue(run_classification, job.id, asset_ids, limit, force,
-                  retry=Retry(max=3, interval=[10, 30, 60]))
-    else:
-        import threading
-        t = threading.Thread(
-            target=run_classification, args=(job.id, asset_ids, limit, force), daemon=True
-        )
-        t.start()
-
+    _enqueue(run_classification, job.id, asset_ids, limit, force)
     return JobStartResponse(job_id=job.id, status="queued", message="Classification job started")
 
 

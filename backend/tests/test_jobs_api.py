@@ -113,24 +113,17 @@ def test_get_job_fields(client, db):
 # ---------------------------------------------------------------------------
 
 def test_start_sync_job(client):
-    with (
-        patch("app.routers.jobs._get_queue", return_value=None),
-        patch("threading.Thread") as mock_thread,
-    ):
-        mock_thread.return_value.start = lambda: None
+    with patch("app.routers.jobs._enqueue") as mock_enqueue:
         r = client.post("/api/jobs/sync")
     assert r.status_code == 200
     data = r.json()
     assert "job_id" in data
     assert data["status"] == "queued"
+    mock_enqueue.assert_called_once()
 
 
 def test_start_sync_job_creates_db_record(client, db):
-    with (
-        patch("app.routers.jobs._get_queue", return_value=None),
-        patch("threading.Thread") as mock_thread,
-    ):
-        mock_thread.return_value.start = lambda: None
+    with patch("app.routers.jobs._enqueue"):
         r = client.post("/api/jobs/sync")
     job_id = r.json()["job_id"]
     job = db.query(JobRun).filter(JobRun.id == job_id).first()
@@ -143,24 +136,17 @@ def test_start_sync_job_creates_db_record(client, db):
 # ---------------------------------------------------------------------------
 
 def test_start_classify_job(client):
-    with (
-        patch("app.routers.jobs._get_queue", return_value=None),
-        patch("threading.Thread") as mock_thread,
-    ):
-        mock_thread.return_value.start = lambda: None
+    with patch("app.routers.jobs._enqueue") as mock_enqueue:
         r = client.post("/api/jobs/classify")
     assert r.status_code == 200
     data = r.json()
     assert "job_id" in data
     assert data["status"] == "queued"
+    mock_enqueue.assert_called_once()
 
 
 def test_start_classify_job_with_asset_ids(client):
-    with (
-        patch("app.routers.jobs._get_queue", return_value=None),
-        patch("threading.Thread") as mock_thread,
-    ):
-        mock_thread.return_value.start = lambda: None
+    with patch("app.routers.jobs._enqueue"):
         r = client.post(
             "/api/jobs/classify",
             params={"asset_ids": ["id1", "id2"], "limit": 10},
@@ -169,11 +155,7 @@ def test_start_classify_job_with_asset_ids(client):
 
 
 def test_start_classify_job_creates_db_record(client, db):
-    with (
-        patch("app.routers.jobs._get_queue", return_value=None),
-        patch("threading.Thread") as mock_thread,
-    ):
-        mock_thread.return_value.start = lambda: None
+    with patch("app.routers.jobs._enqueue"):
         r = client.post("/api/jobs/classify")
     job_id = r.json()["job_id"]
     job = db.query(JobRun).filter(JobRun.id == job_id).first()

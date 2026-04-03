@@ -12,7 +12,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./data/immich_gpt.db"
 
     # Redis / RQ
-    REDIS_URL: str = "redis://redis:6379/0"
+    # Set to empty string "" to disable Redis entirely and use the built-in
+    # in-process thread-pool executor (suitable for single-container deployments).
+    REDIS_URL: str = ""
+
+    # Worker concurrency for the in-process executor (ignored when Redis is used)
+    WORKER_CONCURRENCY: int = 2
 
     # Immich
     IMMICH_URL: str = ""
