@@ -111,6 +111,24 @@ export interface ImmichSettings {
   error?: string;
 }
 
+export interface AuditLog {
+  id: string;
+  asset_id?: string;
+  job_run_id?: string;
+  action: string;
+  status?: string;
+  details_json?: Record<string, unknown>;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface BucketStat {
+  bucket_name: string;
+  bucket_id?: string;
+  total: number;
+  by_status: Record<string, number>;
+}
+
 export type JobStatus =
   | "queued"
   | "starting"

@@ -2,11 +2,12 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getImmichSettings,
-  testImmichConnection,
+  saveImmichSettings,
   getProviders,
   upsertProvider,
   deleteProvider,
   testProvider,
+  getProviderModels,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
 import { CheckCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
@@ -45,15 +46,19 @@ interface AxiosLikeError {
 }
 
 function ImmichSection() {
+  const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ["immich-settings"], queryFn: getImmichSettings });
-  const [url, setUrl] = useState(settings?.immich_url || "");
-  const [apiKey, setApiKey] = useState("");
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [url, setUrl] = React.useState(settings?.immich_url || "");
+  const [apiKey, setApiKey] = React.useState("");
+  const [saveResult, setSaveResult] = React.useState<TestResult | null>(null);
 
-  const testMut = useMutation({
-    mutationFn: () => testImmichConnection(url, apiKey),
-    onSuccess: (data) => setTestResult(data),
-    onError: (e: AxiosLikeError) => setTestResult({ error: e.response?.data?.detail || e.message }),
+  const saveMut = useMutation({
+    mutationFn: () => saveImmichSettings(url, apiKey),
+    onSuccess: (data) => {
+      setSaveResult(data);
+      qc.invalidateQueries({ queryKey: ["immich-settings"] });
+    },
+    onError: (e: AxiosLikeError) => setSaveResult({ error: e.response?.data?.detail || e.message }),
   });
 
   return (
@@ -71,63 +76,97 @@ function ImmichSection() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>
-            Immich URL
-          </label>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="http://immich.local:2283"
-            style={inputStyle}
-          />
+          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Immich URL</label>
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://immich.local:2283" style={inputStyle} />
           <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
-            Set IMMICH_URL and IMMICH_API_KEY in your .env file for persistent configuration
+            Settings saved here are stored in the database and override env vars.
           </div>
         </div>
 
         <div>
-          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>
-            API Key
-          </label>
-          <input
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            type="password"
-            placeholder="Enter API key to test..."
-            style={inputStyle}
-          />
+          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>
+          <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="Leave blank to keep existing key" style={inputStyle} />
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => testMut.mutate()}
-            disabled={!url || testMut.isPending}
-            style={{
-              padding: "8px 20px", borderRadius: 8, border: "none",
-              background: "#1e40af", color: "white", fontSize: 13,
-              fontWeight: 600, cursor: "pointer",
-            }}
+            onClick={() => saveMut.mutate()}
+            disabled={!url || saveMut.isPending}
+            style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1e40af", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
-            {testMut.isPending ? "Testing..." : "Test Connection"}
+            {saveMut.isPending ? "Saving…" : "Save & Test"}
           </button>
         </div>
 
-        {testResult && (
+        {saveResult && (
           <div style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            background: testResult.connected ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
-            border: `1px solid ${testResult.connected ? "#16a34a30" : "#dc262630"}`,
+            padding: "10px 14px", borderRadius: 8,
+            background: saveResult.connected ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+            border: `1px solid ${saveResult.connected ? "#16a34a30" : "#dc262630"}`,
             fontSize: 13,
-            color: testResult.connected ? "#86efac" : "#fca5a5",
+            color: saveResult.connected ? "#86efac" : "#fca5a5",
           }}>
-            {testResult.connected
-              ? `✓ Connected — ${testResult.asset_count?.toLocaleString()} assets`
-              : `✗ ${testResult.error || "Connection failed"}`}
+            {saveResult.connected
+              ? `✓ Connected — ${saveResult.asset_count?.toLocaleString()} assets`
+              : `✗ ${saveResult.error || "Connection failed"}`}
           </div>
         )}
       </div>
     </Section>
+  );
+}
+
+interface ProviderForm {
+  provider_name: string;
+  api_key: string;
+  model_name: string;
+  base_url: string;
+  enabled: boolean;
+  is_default: boolean;
+}
+
+function ModelPickerForm({
+  form,
+  setForm,
+  inputStyle: _inputStyle,
+}: {
+  form: ProviderForm;
+  setForm: React.Dispatch<React.SetStateAction<ProviderForm>>;
+  inputStyle: React.CSSProperties;
+}) {
+  const { data: models } = useQuery({
+    queryKey: ["provider-models", form.provider_name, form.base_url],
+    queryFn: () => getProviderModels(form.provider_name),
+    enabled: form.provider_name === "ollama" || form.provider_name === "openrouter",
+    retry: false,
+  });
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div>
+        <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Provider</label>
+        <select value={form.provider_name} onChange={(e) => setForm((f) => ({ ...f, provider_name: e.target.value }))} style={_inputStyle}>
+          <option value="openai">OpenAI</option>
+          <option value="ollama">Ollama</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </div>
+      <div>
+        <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Model</label>
+        {models && models.length > 0 ? (
+          <select value={form.model_name} onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))} style={_inputStyle}>
+            {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        ) : (
+          <input
+            value={form.model_name}
+            onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))}
+            style={_inputStyle}
+            placeholder={form.provider_name === "ollama" ? "llava" : form.provider_name === "openrouter" ? "openai/gpt-4o" : "gpt-4o"}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -230,24 +269,7 @@ function ProvidersSection() {
 
       {showAdd ? (
         <div style={{ marginTop: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Provider</label>
-              <select
-                value={form.provider_name}
-                onChange={(e) => setForm((f) => ({ ...f, provider_name: e.target.value }))}
-                style={inputStyle}
-              >
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama</option>
-                <option value="openrouter">OpenRouter</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Model</label>
-              <input value={form.model_name} onChange={(e) => setForm((f) => ({ ...f, model_name: e.target.value }))} style={inputStyle} />
-            </div>
-          </div>
+          <ModelPickerForm form={form} setForm={setForm} inputStyle={inputStyle} />
 
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>

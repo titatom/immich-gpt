@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   getReviewQueue,
   getReviewCount,
@@ -251,10 +252,21 @@ function ReviewCard({ item, buckets, onApprove, onReject }: ReviewCardProps) {
 
 export default function Review() {
   const qc = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [selectedBucketFilter, setSelectedBucketFilter] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = parseInt(searchParams.get("page") || "1", 10);
+  const selectedBucketFilter = searchParams.get("bucket_id") || "";
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const pageSize = 20;
+
+  function setParam(key: string, value: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      if (key !== "page") next.set("page", "1");
+      return next;
+    });
+  }
 
   const { data: buckets = [] } = useQuery({
     queryKey: ["buckets"],
@@ -330,7 +342,7 @@ export default function Review() {
           {/* Bucket filter */}
           <select
             value={selectedBucketFilter}
-            onChange={(e) => { setSelectedBucketFilter(e.target.value); setPage(1); }}
+            onChange={(e) => setParam("bucket_id", e.target.value)}
             style={{
               background: "#1e293b",
               border: "1px solid #334155",
@@ -450,7 +462,7 @@ export default function Review() {
       {items.length === pageSize && (
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
           <button
-            onClick={() => setPage(Math.max(1, page - 1))}
+            onClick={() => setParam("page", String(Math.max(1, page - 1)))}
             disabled={page === 1}
             style={{
               padding: "8px 16px", borderRadius: 8, border: "1px solid #334155",
@@ -462,7 +474,7 @@ export default function Review() {
           </button>
           <span style={{ padding: "8px 16px", color: "#64748b", fontSize: 13 }}>Page {page}</span>
           <button
-            onClick={() => setPage(page + 1)}
+            onClick={() => setParam("page", String(page + 1))}
             style={{
               padding: "8px 16px", borderRadius: 8, border: "1px solid #334155",
               background: "transparent", color: "#94a3b8", cursor: "pointer",
