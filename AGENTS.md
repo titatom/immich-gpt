@@ -18,15 +18,40 @@ immich-gpt is a self-hosted web app with a Python/FastAPI backend and React/Type
 ### Running tests
 
 ```bash
+# Backend (134 tests — all use in-memory SQLite, no external services required)
 cd backend && python3 -m pytest tests/ -v
-```
 
-All 61 tests use in-memory SQLite and don't require Redis or any external services.
+# Frontend (46 tests — Vitest + React Testing Library, jsdom)
+cd frontend && npm test
+```
 
 ### Lint / type-check
 
-- **Backend**: No dedicated linter configured; tests cover validation.
-- **Frontend**: `cd frontend && npx tsc --noEmit` for TypeScript type-checking. The `npm run lint` script references ESLint but ESLint is not installed as a devDependency.
+```bash
+# Backend: no dedicated linter; test coverage validates API contracts
+cd backend && python3 -m pytest tests/ -v
+
+# Frontend ESLint (flat config, zero warnings enforced)
+cd frontend && npm run lint
+
+# Frontend TypeScript
+cd frontend && npx tsc --noEmit
+```
+
+### Database migrations (Alembic)
+
+The project uses Alembic for schema migrations. `init_db()` automatically applies all pending migrations on startup via `alembic upgrade head`. The initial migration covers all current tables.
+
+```bash
+# Apply migrations manually
+cd backend && alembic upgrade head
+
+# Generate a new migration after editing models
+cd backend && alembic revision --autogenerate -m "describe_change"
+
+# Override the target DB (e.g. for a test DB)
+ALEMBIC_DATABASE_URL="sqlite:///./data/test.db" alembic upgrade head
+```
 
 ### Build
 
@@ -38,7 +63,8 @@ cd frontend && npx vite build
 
 ### Key gotchas
 
-- The `pip install` bin directory (`~/.local/bin`) must be on `PATH` for `uvicorn`, `pytest`, etc. The update script handles this.
+- The `pip install` bin directory (`~/.local/bin`) must be on `PATH` for `uvicorn`, `pytest`, `alembic`, etc. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
 - Redis must be installed via `sudo apt-get install -y redis-server` and started with `redis-server --daemonize yes` before the API or worker can connect.
 - The backend `config.py` reads `.env` from CWD, so run the backend from `backend/` directory.
 - External services (Immich server, OpenAI API) require secrets (`IMMICH_URL`, `IMMICH_API_KEY`, `OPENAI_API_KEY`) but are not needed for tests or basic UI development.
+- Frontend devDependencies now include `eslint`, `@typescript-eslint/*`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, and `jsdom`.

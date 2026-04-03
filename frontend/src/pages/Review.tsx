@@ -13,12 +13,22 @@ import type { ReviewItem, Bucket } from "../types";
 import Thumbnail from "../components/Thumbnail";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 import TagList from "../components/TagList";
-import { CheckCircle, XCircle, ChevronDown, ChevronUp, Maximize2, Edit2 } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, Edit2 } from "lucide-react";
+
+interface ApproveData {
+  approved_bucket_id?: string;
+  approved_bucket_name?: string;
+  approved_description?: string;
+  approved_tags?: string[];
+  approved_subalbum?: string;
+  subalbum_approved?: boolean;
+  trigger_writeback?: boolean;
+}
 
 interface ReviewCardProps {
   item: ReviewItem;
   buckets: Bucket[];
-  onApprove: (assetId: string, data: any) => void;
+  onApprove: (assetId: string, data: ApproveData) => void;
   onReject: (assetId: string) => void;
 }
 
@@ -268,7 +278,7 @@ export default function Review() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: ({ assetId, data }: { assetId: string; data: any }) =>
+    mutationFn: ({ assetId, data }: { assetId: string; data: ApproveData }) =>
       approveAsset(assetId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["review-queue"] });

@@ -9,7 +9,7 @@ import {
   testProvider,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
-import { CheckCircle, XCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 const inputStyle: React.CSSProperties = {
   background: "#1e293b",
@@ -33,17 +33,27 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+interface TestResult {
+  connected?: boolean;
+  asset_count?: number;
+  error?: string;
+}
+
+interface AxiosLikeError {
+  response?: { data?: { detail?: string } };
+  message: string;
+}
+
 function ImmichSection() {
-  const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ["immich-settings"], queryFn: getImmichSettings });
   const [url, setUrl] = useState(settings?.immich_url || "");
   const [apiKey, setApiKey] = useState("");
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const testMut = useMutation({
     mutationFn: () => testImmichConnection(url, apiKey),
     onSuccess: (data) => setTestResult(data),
-    onError: (e: any) => setTestResult({ error: e.response?.data?.detail || e.message }),
+    onError: (e: AxiosLikeError) => setTestResult({ error: e.response?.data?.detail || e.message }),
   });
 
   return (
@@ -133,7 +143,7 @@ function ProvidersSection() {
     enabled: true,
     is_default: true,
   });
-  const [testResults, setTestResults] = useState<Record<string, any>>({});
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   const upsertMut = useMutation({
     mutationFn: upsertProvider,
@@ -152,7 +162,7 @@ function ProvidersSection() {
   const testMut = useMutation({
     mutationFn: testProvider,
     onSuccess: (data, name) => setTestResults((r) => ({ ...r, [name]: data })),
-    onError: (e: any, name) => setTestResults((r) => ({ ...r, [name]: { error: e.message } })),
+    onError: (e: AxiosLikeError, name) => setTestResults((r) => ({ ...r, [name]: { error: e.message } })),
   });
 
   return (

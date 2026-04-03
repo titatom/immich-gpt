@@ -40,7 +40,7 @@ function PromptForm({ initial, buckets, onSave, onCancel, loading }: PromptFormP
     bucket_id: initial?.bucket_id,
   });
 
-  const set = (k: keyof PromptTemplate, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof PromptTemplate, v: PromptTemplate[keyof PromptTemplate]) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div style={{
