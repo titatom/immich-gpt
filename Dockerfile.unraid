@@ -1,0 +1,84 @@
+# =============================================================================
+# Immich GPT — single-container image for Unraid Community Apps
+# =============================================================================
+#
+# What this image contains:
+#   - Built React SPA (served as static files by FastAPI)
+#   - FastAPI / Uvicorn API server
+#   - Built-in background job worker (ThreadPoolExecutor, no Redis required)
+#   - SQLite database (persisted via /data volume)
+#
+# Redis is NOT included.  Background jobs run in-process using Python threads.
+# For high-volume installations (1000+ assets/day) see docker-compose.yml
+# which uses a separate Redis + RQ worker container.
+#
+# Build:
+#   docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest .
+#
+# Run (quick test):
+#   docker run -p 8000:8000 -v immich_gpt_data:/data \
+#     -e IMMICH_URL=http://your-immich:2283 \
+#     -e IMMICH_API_KEY=your-key \
+#     ghcr.io/titatom/immich-gpt:latest
+# =============================================================================
+
+# ── Stage 1: build the React/Vite frontend ───────────────────────────────────
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /build/frontend
+
+# Install deps first (layer-cached unless package files change)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --ignore-scripts
+
+# Copy source and build; output goes to /build/backend/static
+COPY frontend/ ./
+RUN npx vite build --outDir /build/backend/static --emptyOutDir
+
+
+# ── Stage 2: Python runtime ──────────────────────────────────────────────────
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="Immich GPT" \
+      org.opencontainers.image.description="AI-first metadata enrichment and organisation for Immich" \
+      org.opencontainers.image.source="https://github.com/titatom/immich-gpt" \
+      org.opencontainers.image.licenses="MIT"
+
+# tini: proper PID-1 signal handling (reaps zombie threads)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tini curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./alembic.ini
+
+# Copy built frontend assets from stage 1
+COPY --from=frontend-builder /build/backend/static ./static
+
+# Persistent data directory (mount a named volume here in Unraid)
+RUN mkdir -p /data /logs
+VOLUME ["/data"]
+
+# Environment defaults — override via Unraid template variables
+ENV DATABASE_URL=sqlite:////data/immich_gpt.db \
+    REDIS_URL="" \
+    WORKER_CONCURRENCY=2 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# tini as PID-1 → clean shutdown, correct signal forwarding
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

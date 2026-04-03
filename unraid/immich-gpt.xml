@@ -1,0 +1,171 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <!--
+    Unraid Community Apps template for Immich GPT
+    Place this file in your Unraid Community Apps repository or import it
+    via the "Template repositories" setting in the CA plugin.
+
+    Plugin URL for manual import:
+      https://raw.githubusercontent.com/titatom/immich-gpt/main/unraid/immich-gpt.xml
+  -->
+
+  <Name>immich-gpt</Name>
+  <Repository>ghcr.io/titatom/immich-gpt:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/titatom/immich-gpt/issues</Support>
+  <Project>https://github.com/titatom/immich-gpt</Project>
+  <Overview>
+    AI-first metadata enrichment and organisation for Immich.
+
+    Immich GPT connects to your existing Immich photo server, classifies every
+    asset with an AI vision model (OpenAI, Ollama, or OpenRouter), and lets you
+    review and write AI-generated descriptions, tags, and album assignments back
+    to Immich — all from a clean web UI.
+
+    Single-container — no Redis, no separate worker process required.
+    All jobs run in-process using a lightweight thread pool.
+  </Overview>
+  <Category>MediaApp:Photos Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8000]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/titatom/immich-gpt/main/unraid/immich-gpt.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/titatom/immich-gpt/main/unraid/icon.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs/>
+  <DonateText>Buy me a coffee</DonateText>
+  <DonateLink/>
+  <Requires>
+    A running Immich instance reachable from this container.
+    An OpenAI API key OR a locally-running Ollama instance.
+  </Requires>
+
+  <!-- ── Ports ─────────────────────────────────────────────────────────── -->
+  <Config
+    Name="Web UI Port"
+    Target="8000"
+    Default="8000"
+    Mode="tcp"
+    Description="Port for the Immich GPT web interface. Change Host port only; keep container port at 8000."
+    Type="Port"
+    Display="always"
+    Required="true"
+    Mask="false"
+  >8000</Config>
+
+  <!-- ── Data volume ───────────────────────────────────────────────────── -->
+  <Config
+    Name="Data Directory"
+    Target="/data"
+    Default="/mnt/user/appdata/immich-gpt"
+    Mode="rw"
+    Description="Persistent storage for the SQLite database. All settings, job history, and AI suggestions are stored here. Back this up."
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false"
+  >/mnt/user/appdata/immich-gpt</Config>
+
+  <!-- ── Immich connection ─────────────────────────────────────────────── -->
+  <Config
+    Name="Immich URL"
+    Target="IMMICH_URL"
+    Default="http://192.168.1.x:2283"
+    Mode=""
+    Description="Full URL of your Immich server. Must be reachable from inside Docker (use your LAN IP, not localhost). Example: http://192.168.1.100:2283"
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false"
+  ></Config>
+
+  <Config
+    Name="Immich API Key"
+    Target="IMMICH_API_KEY"
+    Default=""
+    Mode=""
+    Description="Immich API key. Create one in Immich → Account Settings → API Keys. You can also set this in the web UI after first launch."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"
+  ></Config>
+
+  <!-- ── AI provider ───────────────────────────────────────────────────── -->
+  <Config
+    Name="OpenAI API Key"
+    Target="OPENAI_API_KEY"
+    Default=""
+    Mode=""
+    Description="OpenAI API key for GPT-4o vision classification. Leave blank if using Ollama or OpenRouter instead. Configure providers inside the web UI → Settings."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"
+  ></Config>
+
+  <Config
+    Name="OpenAI Model"
+    Target="OPENAI_MODEL"
+    Default="gpt-4o"
+    Mode=""
+    Description="Default OpenAI model. Only used when OPENAI_API_KEY is set and no provider has been configured in the UI. gpt-4o-mini is cheaper; gpt-4o is more accurate."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >gpt-4o</Config>
+
+  <!-- ── Worker ────────────────────────────────────────────────────────── -->
+  <Config
+    Name="Worker Threads"
+    Target="WORKER_CONCURRENCY"
+    Default="2"
+    Mode=""
+    Description="Number of background job threads (sync + classification). 2 is enough for most home servers. Increase if you have many assets and a fast AI provider."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >2</Config>
+
+  <!-- ── Redis (optional) ──────────────────────────────────────────────── -->
+  <Config
+    Name="Redis URL"
+    Target="REDIS_URL"
+    Default=""
+    Mode=""
+    Description="Leave blank to use the built-in thread-pool worker (recommended for Unraid). Set to redis://host:6379/0 only if you run a separate Redis container and want distributed workers."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  ></Config>
+
+  <!-- ── Auth ──────────────────────────────────────────────────────────── -->
+  <Config
+    Name="Enable Auth"
+    Target="AUTH_ENABLED"
+    Default="false"
+    Mode=""
+    Description="Set to true to require a Bearer token on all API calls. You must also set SECRET_KEY. Useful when exposing Immich GPT to the internet via a reverse proxy."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >false</Config>
+
+  <Config
+    Name="Secret Key"
+    Target="SECRET_KEY"
+    Default=""
+    Mode=""
+    Description="Bearer token / secret used for auth when AUTH_ENABLED=true. Generate a strong random string. No effect when AUTH_ENABLED=false."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="true"
+  ></Config>
+
+</Container>
