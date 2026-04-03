@@ -97,6 +97,24 @@ class JobProgressService:
         job.updated_at = _now()
         self.db.commit()
 
+    def reset_for_retry(self, job_id: str) -> None:
+        """Reset a failed job back to queued so it can be re-enqueued by RQ retry."""
+        job = self._get(job_id)
+        job.status = "queued"
+        job.progress_percent = 0.0
+        job.processed_count = 0
+        job.success_count = 0
+        job.error_count = 0
+        job.message = None
+        job.started_at = None
+        job.completed_at = None
+        job.current_step = None
+        # Preserve log history — append a separator line
+        lines = list(job.log_lines_json or [])
+        lines.append(f"[{_now().strftime('%H:%M:%S')}] --- retrying ---")
+        job.log_lines_json = lines[-500:]
+        self.db.commit()
+
     def cancel_job(self, job_id: str) -> None:
         job = self._get(job_id)
         job.status = "cancelled"

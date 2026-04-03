@@ -1,6 +1,8 @@
 """
 RQ background tasks.
+Decorated with rq.job so RQ can auto-retry on transient failures.
 """
+from rq.job import Retry
 from ..database import SessionLocal
 from ..services.job_progress import JobProgressService
 from ..services.asset_sync import AssetSyncService
@@ -15,6 +17,8 @@ def run_asset_sync(job_id: str) -> dict:
     db = SessionLocal()
     try:
         job_svc = JobProgressService(db)
+        # Reset counters in case this is a retry
+        job_svc.reset_for_retry(job_id)
         job_svc.start_job(job_id)
         job_svc.update_progress(
             job_id, status="syncing_assets",
@@ -40,8 +44,10 @@ def run_asset_sync(job_id: str) -> dict:
 
     except Exception as e:
         db.rollback()
-        job_svc = JobProgressService(db)
-        job_svc.fail_job(job_id, str(e))
+        try:
+            JobProgressService(db).fail_job(job_id, str(e))
+        except Exception:
+            pass
         raise
     finally:
         db.close()
@@ -51,6 +57,7 @@ def run_classification(
     job_id: str,
     asset_ids: Optional[List[str]] = None,
     limit: Optional[int] = None,
+    force: bool = False,
 ) -> dict:
     db = SessionLocal()
     try:
@@ -87,7 +94,7 @@ def run_classification(
             provider = build_provider(provider_cfg.provider_name, cfg_dict)
 
         orchestrator = ClassificationOrchestrator(db, provider)
-        orchestrator.run_classification_job(job_id, asset_ids=asset_ids, limit=limit)
+        orchestrator.run_classification_job(job_id, asset_ids=asset_ids, limit=limit, force=force)
         return {"status": "completed"}
 
     except Exception as e:
