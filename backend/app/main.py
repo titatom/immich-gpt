@@ -5,8 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .database import init_db
-from .routers import settings, buckets, prompts, assets, jobs, review, thumbnails, albums
+from .routers import (
+    settings, buckets, prompts, assets, jobs, review,
+    thumbnails, albums, audit_logs,
+)
 from .seeds import seed_defaults
+from .middleware.auth import BearerTokenMiddleware
 
 
 @asynccontextmanager
@@ -23,6 +27,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(BearerTokenMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,9 +44,11 @@ app.include_router(jobs.router)
 app.include_router(review.router)
 app.include_router(thumbnails.router)
 app.include_router(albums.router)
+app.include_router(audit_logs.router)
 
 
 @app.get("/api/health")
+@app.get("/health")
 def health():
     return {"status": "ok", "version": "0.1.0"}
 

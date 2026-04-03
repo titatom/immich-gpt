@@ -26,8 +26,9 @@ class Settings(BaseSettings):
     MAX_IMAGE_BYTES: int = 20 * 1024 * 1024  # 20 MB
     THUMBNAIL_SIZE: tuple = (512, 512)
 
-    # Auth (future)
+    # Auth — set AUTH_ENABLED=true and SECRET_KEY to require Bearer token
     SECRET_KEY: str = "change-me-in-production"
+    AUTH_ENABLED: bool = False
 
     class Config:
         env_file = ".env"
