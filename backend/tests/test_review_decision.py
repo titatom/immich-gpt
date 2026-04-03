@@ -57,7 +57,7 @@ def test_approve_writes_description(db):
 
     mock_immich = MagicMock()
     mock_immich.update_asset_description.return_value = {"id": asset.immich_id}
-    mock_immich.get_or_create_tag.return_value = {"id": "tag-1", "name": "birthday"}
+    mock_immich.get_or_create_tags.return_value = [{"id": "tag-1", "name": "birthday"}, {"id": "tag-2", "name": "party"}]
     mock_immich.tag_asset.return_value = None
 
     svc = ReviewDecisionService(db, immich_client=mock_immich)
@@ -83,7 +83,7 @@ def test_approve_writes_tags(db):
 
     mock_immich = MagicMock()
     mock_immich.update_asset_description.return_value = {}
-    mock_immich.get_or_create_tag.side_effect = lambda name: {"id": f"tid-{name}", "name": name}
+    mock_immich.get_or_create_tags.side_effect = lambda names: [{"id": f"tid-{n}", "name": n} for n in names]
     mock_immich.tag_asset.return_value = None
 
     svc = ReviewDecisionService(db, immich_client=mock_immich)
@@ -153,7 +153,7 @@ def test_tag_write_failure_reported(db):
 
     mock_immich = MagicMock()
     mock_immich.update_asset_description.return_value = {}
-    mock_immich.get_or_create_tag.side_effect = ImmichError("Tag API error", 500)
+    mock_immich.get_or_create_tags.side_effect = ImmichError("Tag API error", 500)
 
     svc = ReviewDecisionService(db, immich_client=mock_immich)
     result = svc.approve_asset(
@@ -189,7 +189,7 @@ def test_external_library_warning_in_errors(db):
 
     mock_immich = MagicMock()
     mock_immich.update_asset_description.return_value = {}
-    mock_immich.get_or_create_tag.return_value = {"id": "tid", "name": "tag"}
+    mock_immich.get_or_create_tags.return_value = [{"id": "tid", "name": "test"}]
     mock_immich.tag_asset.return_value = None
 
     svc = ReviewDecisionService(db, immich_client=mock_immich)
