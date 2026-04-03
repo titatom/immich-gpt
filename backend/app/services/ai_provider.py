@@ -55,6 +55,36 @@ class AIProvider(ABC):
         pass
 
 
+def _validate_result(data: dict, raw: str) -> AIClassificationResult:
+    """Shared validation for any provider returning the standard JSON shape."""
+    required_fields = [
+        "bucket_name", "confidence", "explanation",
+        "description_suggestion", "tags", "review_recommended"
+    ]
+    for field in required_fields:
+        if field not in data:
+            raise ValueError(f"Missing required field '{field}' in AI response. Raw: {raw[:500]}")
+
+    confidence = float(data["confidence"])
+    if not (0.0 <= confidence <= 1.0):
+        raise ValueError(f"confidence must be 0.0-1.0, got {confidence}")
+
+    tags = data["tags"]
+    if not isinstance(tags, list):
+        raise ValueError("tags must be a list")
+    tags = [str(t) for t in tags[:20]]
+
+    return AIClassificationResult(
+        bucket_name=str(data["bucket_name"]),
+        confidence=confidence,
+        explanation=str(data["explanation"]),
+        description_suggestion=str(data["description_suggestion"]),
+        tags=tags,
+        subalbum_suggestion=data.get("subalbum_suggestion"),
+        review_recommended=bool(data.get("review_recommended", True)),
+    )
+
+
 class OpenAIProvider(AIProvider):
     def __init__(
         self,
@@ -87,7 +117,6 @@ class OpenAIProvider(AIProvider):
     ) -> AIClassificationResult:
         import json
 
-        # Build messages list - inject image into last user message
         messages = list(prompt_messages)
         if image_payload and image_payload.get("data_url"):
             last_user = None
@@ -119,42 +148,23 @@ class OpenAIProvider(AIProvider):
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON from OpenAI: {e}\nRaw: {raw[:500]}")
 
-        return self._validate_result(data, raw)
-
-    def _validate_result(self, data: dict, raw: str) -> AIClassificationResult:
-        required_fields = [
-            "bucket_name", "confidence", "explanation",
-            "description_suggestion", "tags", "review_recommended"
-        ]
-        for field in required_fields:
-            if field not in data:
-                raise ValueError(f"Missing required field '{field}' in AI response. Raw: {raw[:500]}")
-
-        confidence = float(data["confidence"])
-        if not (0.0 <= confidence <= 1.0):
-            raise ValueError(f"confidence must be 0.0-1.0, got {confidence}")
-
-        tags = data["tags"]
-        if not isinstance(tags, list):
-            raise ValueError("tags must be a list")
-        tags = [str(t) for t in tags[:20]]
-
-        return AIClassificationResult(
-            bucket_name=str(data["bucket_name"]),
-            confidence=confidence,
-            explanation=str(data["explanation"]),
-            description_suggestion=str(data["description_suggestion"]),
-            tags=tags,
-            subalbum_suggestion=data.get("subalbum_suggestion"),
-            review_recommended=bool(data.get("review_recommended", True)),
-        )
+        return _validate_result(data, raw)
 
 
 class OllamaProvider(AIProvider):
-    """Stub for Ollama provider. Not yet implemented."""
+    """
+    Ollama provider via the OpenAI-compatible /v1 endpoint.
+
+    Requires Ollama >= 0.1.24 (ships the /v1 API).
+    Recommended vision models: llava, llava-phi3, moondream, bakllava.
+    Text-only models (llama3, mistral, etc.) also work but receive no image.
+
+    base_url should be the Ollama root, e.g. http://localhost:11434
+    The provider appends /v1 automatically.
+    """
 
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "llava"):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.model = model
 
     @property
@@ -169,16 +179,100 @@ class OllamaProvider(AIProvider):
         except Exception:
             return False
 
+    def _is_vision_model(self) -> bool:
+        """Heuristic: model names that support image input."""
+        vision_keywords = ("llava", "moondream", "bakllava", "minicpm", "qwen2-vl", "pixtral")
+        return any(kw in self.model.lower() for kw in vision_keywords)
+
     def classify_asset(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
     ) -> AIClassificationResult:
-        raise NotImplementedError("Ollama provider is not yet implemented")
+        import json
+        import httpx
+
+        messages = list(prompt_messages)
+
+        # Inject image into the last user message for vision-capable models.
+        # Ollama /v1 accepts the same OpenAI image_url format.
+        if image_payload and image_payload.get("data_url") and self._is_vision_model():
+            last_user = None
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i].get("role") == "user":
+                    last_user = i
+                    break
+            if last_user is not None:
+                content = messages[last_user]["content"]
+                if isinstance(content, str):
+                    content = [{"type": "text", "text": content}]
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image_payload["data_url"]},
+                })
+                messages[last_user] = {"role": "user", "content": content}
+
+        # Append a reminder to return JSON when the model is not instruction-tuned
+        # to do so by default.
+        messages_with_hint = list(messages)
+        if messages_with_hint and messages_with_hint[-1].get("role") == "user":
+            last = messages_with_hint[-1]
+            text_content = (
+                last["content"] if isinstance(last["content"], str)
+                else next((c["text"] for c in last["content"] if c.get("type") == "text"), "")
+            )
+            if "json" not in text_content.lower():
+                hint = "\n\nRespond ONLY with valid JSON matching the required schema."
+                if isinstance(last["content"], str):
+                    messages_with_hint[-1] = {"role": "user", "content": last["content"] + hint}
+                else:
+                    new_content = list(last["content"])
+                    for i, part in enumerate(new_content):
+                        if part.get("type") == "text":
+                            new_content[i] = {"type": "text", "text": part["text"] + hint}
+                            break
+                    messages_with_hint[-1] = {"role": "user", "content": new_content}
+
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages_with_hint,
+            "stream": False,
+            "options": {"temperature": 0.2},
+            "format": "json",  # Ollama native JSON mode (>= 0.1.24)
+        }
+
+        try:
+            with httpx.Client(timeout=120) as client:
+                r = client.post(f"{self.base_url}/v1/chat/completions", json=payload)
+                if r.status_code != 200:
+                    raise ValueError(f"Ollama returned HTTP {r.status_code}: {r.text[:400]}")
+                resp = r.json()
+        except httpx.ConnectError as e:
+            raise ValueError(f"Cannot connect to Ollama at {self.base_url}: {e}")
+        except httpx.TimeoutException:
+            raise ValueError(f"Ollama request timed out (model={self.model})")
+
+        raw = resp.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not raw:
+            raise ValueError(f"Empty response from Ollama (model={self.model})")
+
+        # Strip markdown code fences some models add even in JSON mode
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.lstrip("`").lstrip("json").strip()
+            if stripped.endswith("```"):
+                stripped = stripped[:-3].strip()
+
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from Ollama: {e}\nRaw: {raw[:500]}")
+
+        return _validate_result(data, raw)
 
 
 class OpenRouterProvider(AIProvider):
-    """Stub for OpenRouter provider. Uses OpenAI-compatible API."""
+    """OpenRouter — OpenAI-compatible API at openrouter.ai."""
 
     def __init__(self, api_key: str, model: str = "openai/gpt-4o"):
         self._inner = OpenAIProvider(
