@@ -9,7 +9,7 @@ class JobRun(Base):
     id = Column(String, primary_key=True)
     job_type = Column(String, nullable=False, index=True)
     # status: queued, starting, syncing_assets, preparing_image, classifying_ai,
-    #         validating_result, saving_suggestion, writing_results, completed, failed, cancelled
+    #         validating_result, saving_suggestion, writing_results, completed, failed, cancelled, paused
     status = Column(String, default="queued", index=True)
     current_step = Column(String, nullable=True)
     progress_percent = Column(Float, default=0.0)

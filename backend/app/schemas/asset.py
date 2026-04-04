@@ -16,6 +16,7 @@ class AssetOut(BaseModel):
     camera_model: Optional[str]
     description: Optional[str]
     tags: Optional[List[str]]
+    album_ids: Optional[List[str]]
     is_favorite: bool
     is_archived: bool
     is_external_library: bool

@@ -19,6 +19,7 @@ const statusColors: Record<string, string> = {
   completed: "#22c55e",
   failed: "#ef4444",
   cancelled: "#64748b",
+  paused: "#f59e0b",
 };
 
 const statusLabels: Record<string, string> = {
@@ -33,13 +34,14 @@ const statusLabels: Record<string, string> = {
   completed: "Completed",
   failed: "Failed",
   cancelled: "Cancelled",
+  paused: "Paused",
 };
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "completed") return <CheckCircle size={16} color="#22c55e" />;
   if (status === "failed") return <XCircle size={16} color="#ef4444" />;
   if (status === "cancelled") return <XCircle size={16} color="#64748b" />;
-  if (status === "queued") return <Clock size={16} color="#94a3b8" />;
+  if (status === "queued" || status === "paused") return <Clock size={16} color="#94a3b8" />;
   return <Loader size={16} color="#38bdf8" style={{ animation: "spin 1s linear infinite" }} />;
 }
 

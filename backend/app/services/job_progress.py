@@ -122,6 +122,23 @@ class JobProgressService:
         job.updated_at = _now()
         self.db.commit()
 
+    def pause_job(self, job_id: str) -> None:
+        job = self._get(job_id)
+        job.status = "paused"
+        job.updated_at = _now()
+        self.db.commit()
+
+    def resume_job(self, job_id: str) -> None:
+        job = self._get(job_id)
+        job.status = "queued"
+        job.updated_at = _now()
+        self.db.commit()
+
+    def delete_job(self, job_id: str) -> None:
+        job = self._get(job_id)
+        self.db.delete(job)
+        self.db.commit()
+
     def get_job(self, job_id: str) -> Optional[JobRun]:
         return self.db.query(JobRun).filter(JobRun.id == job_id).first()
 

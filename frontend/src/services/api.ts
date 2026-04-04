@@ -101,6 +101,18 @@ export const startClassifyJob = (params?: { asset_ids?: string[]; limit?: number
 export const cancelJob = (id: string) =>
   api.post(`/jobs/${id}/cancel`).then((r) => r.data);
 
+export const pauseJob = (id: string) =>
+  api.post(`/jobs/${id}/pause`).then((r) => r.data);
+
+export const resumeJob = (id: string) =>
+  api.post(`/jobs/${id}/resume`).then((r) => r.data);
+
+export const deleteJob = (id: string) =>
+  api.delete(`/jobs/${id}`).then((r) => r.data);
+
+export const clearTerminalJobs = () =>
+  api.delete("/jobs").then((r) => r.data as { deleted: number });
+
 // --- Review ---
 export const getReviewQueue = (params?: {
   status?: string;
@@ -148,6 +160,9 @@ export const getAuditLogs = (params?: {
   job_run_id?: string;
   action?: string;
   status?: string;
+  level?: string;
+  source?: string;
+  q?: string;
   page?: number;
   page_size?: number;
 }): Promise<AuditLog[]> =>
@@ -157,6 +172,7 @@ export const getAuditLogCount = (params?: {
   asset_id?: string;
   job_run_id?: string;
   status?: string;
+  level?: string;
 }) =>
   api.get("/audit-logs/count", { params }).then((r) => r.data as { count: number });
 
