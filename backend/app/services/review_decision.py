@@ -163,60 +163,61 @@ class ReviewDecisionService:
                     metadata_suggestion.writeback_status = "failed"
                     metadata_suggestion.writeback_error = msg
 
-        # Write tags
+        # Write tags — batch-resolve all names in one Immich round-trip
         if tags:
-            tag_errors = []
-            tag_ids = []
-            for tag_name in tags:
-                try:
-                    tag = self.immich.get_or_create_tag(tag_name)
-                    tag_ids.append(tag["id"])
-                except ImmichError as e:
-                    tag_errors.append(f"Tag '{tag_name}': {e}")
-
-            if tag_ids:
-                try:
-                    self.immich.tag_asset(asset.immich_id, tag_ids)
-                    result.tags_written = True
-                    self._audit(asset.id, "writeback_tags", "success", {"tags": tags})
-                except ImmichError as e:
-                    msg = f"Failed to apply tags: {e}"
-                    result.errors.append(msg)
-                    self._audit(asset.id, "writeback_tags", "failed", error=msg)
-            if tag_errors:
-                result.errors.extend(tag_errors)
+            try:
+                tag_objects = self.immich.get_or_create_tags(tags)
+                tag_ids = [t["id"] for t in tag_objects]
+                self.immich.tag_asset(asset.immich_id, tag_ids)
+                result.tags_written = True
+                self._audit(asset.id, "writeback_tags", "success", {"tags": tags})
+            except ImmichError as e:
+                msg = f"Failed to write tags: {e}"
+                result.errors.append(msg)
+                self._audit(asset.id, "writeback_tags", "failed", error=msg)
 
         # Album assignment
+        # Priority: subalbum name → bucket immich_album_id → create album from bucket name
+        target_album_id: Optional[str] = None
+        target_album_name: Optional[str] = None
+
         if subalbum:
-            bucket = (
-                self.db.query(Bucket).filter(Bucket.id == bucket_id).first()
-                if bucket_id else None
-            )
-            album_id = bucket.immich_album_id if bucket else None
-            if album_id:
-                try:
-                    self.immich.add_asset_to_album(album_id, [asset.immich_id])
-                    result.album_assigned = True
-                    self._audit(asset.id, "writeback_album", "success",
-                                {"album_id": album_id})
-                except ImmichError as e:
-                    msg = f"Failed to assign album: {e}"
-                    result.errors.append(msg)
-                    self._audit(asset.id, "writeback_album", "failed", error=msg)
-        elif bucket_id:
+            # subalbum_suggestion: try to find/create an album with that name
+            try:
+                album = self.immich.get_or_create_album(subalbum)
+                target_album_id = album.get("id")
+                target_album_name = subalbum
+            except ImmichError as e:
+                result.errors.append(f"Failed to resolve subalbum '{subalbum}': {e}")
+
+        if not target_album_id and bucket_id:
             bucket = self.db.query(Bucket).filter(Bucket.id == bucket_id).first()
-            if bucket and bucket.immich_album_id and bucket.mapping_mode == "immich_album":
-                try:
-                    self.immich.add_asset_to_album(
-                        bucket.immich_album_id, [asset.immich_id]
-                    )
-                    result.album_assigned = True
-                    self._audit(asset.id, "writeback_album", "success",
-                                {"album_id": bucket.immich_album_id})
-                except ImmichError as e:
-                    msg = f"Failed to assign bucket album: {e}"
-                    result.errors.append(msg)
-                    self._audit(asset.id, "writeback_album", "failed", error=msg)
+            if bucket and bucket.mapping_mode == "immich_album":
+                if bucket.immich_album_id:
+                    target_album_id = bucket.immich_album_id
+                    target_album_name = bucket.name
+                else:
+                    # Auto-create an album named after the bucket
+                    try:
+                        album = self.immich.get_or_create_album(bucket.name)
+                        target_album_id = album.get("id")
+                        target_album_name = bucket.name
+                        # Persist the created album id back to the bucket for next time
+                        bucket.immich_album_id = target_album_id
+                        self.db.commit()
+                    except ImmichError as e:
+                        result.errors.append(f"Failed to create album for bucket '{bucket.name}': {e}")
+
+        if target_album_id:
+            try:
+                self.immich.add_asset_to_album(target_album_id, [asset.immich_id])
+                result.album_assigned = True
+                self._audit(asset.id, "writeback_album", "success",
+                            {"album_id": target_album_id, "album_name": target_album_name})
+            except ImmichError as e:
+                msg = f"Failed to add asset to album '{target_album_name}': {e}"
+                result.errors.append(msg)
+                self._audit(asset.id, "writeback_album", "failed", error=msg)
 
         if metadata_suggestion:
             metadata_suggestion.writeback_status = (

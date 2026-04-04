@@ -64,7 +64,14 @@ cd frontend && npx vite build
 ### Key gotchas
 
 - The `pip install` bin directory (`~/.local/bin`) must be on `PATH` for `uvicorn`, `pytest`, `alembic`, etc. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
-- Redis must be installed via `sudo apt-get install -y redis-server` and started with `redis-server --daemonize yes` before the API or worker can connect.
+- Redis is **optional**. Set `REDIS_URL=""` (or leave unset) and jobs run in-process via `ThreadPoolExecutor`. Only set `REDIS_URL` when using the full multi-container stack.
 - The backend `config.py` reads `.env` from CWD, so run the backend from `backend/` directory.
 - External services (Immich server, OpenAI API) require secrets (`IMMICH_URL`, `IMMICH_API_KEY`, `OPENAI_API_KEY`) but are not needed for tests or basic UI development.
 - Frontend devDependencies now include `eslint`, `@typescript-eslint/*`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, and `jsdom`.
+
+### Docker / Unraid packaging
+
+- Single-container image: `docker build -f Dockerfile.unraid -t immich-gpt .`
+- Production GHCR image: `ghcr.io/titatom/immich-gpt:latest`
+- See `DOCKER.md` for full deployment docs and the Unraid CA template at `unraid/immich-gpt.xml`.
+- GitHub Actions at `.github/workflows/docker.yml` publishes to GHCR on version tags (`v*.*.*`).

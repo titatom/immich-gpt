@@ -1,10 +1,12 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 
 from ..database import get_db
 from ..models.bucket import Bucket
+from ..models.suggested_classification import SuggestedClassification
 from ..schemas.bucket import BucketCreate, BucketUpdate, BucketOut
 
 router = APIRouter(prefix="/api/buckets", tags=["buckets"])
@@ -55,6 +57,45 @@ def create_bucket(body: BucketCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(b)
     return _to_out(b)
+
+
+@router.get("/stats")
+def bucket_stats(db: Session = Depends(get_db)):
+    """
+    Returns per-bucket classification counts broken down by status.
+    Useful for prompt-tuning and confidence-threshold calibration.
+
+    IMPORTANT: must be registered before /{bucket_id} to avoid route shadowing.
+    """
+    rows = (
+        db.query(
+            SuggestedClassification.suggested_bucket_name,
+            SuggestedClassification.suggested_bucket_id,
+            SuggestedClassification.status,
+            func.count(SuggestedClassification.id).label("count"),
+        )
+        .group_by(
+            SuggestedClassification.suggested_bucket_name,
+            SuggestedClassification.suggested_bucket_id,
+            SuggestedClassification.status,
+        )
+        .all()
+    )
+
+    stats: dict = {}
+    for row in rows:
+        key = row.suggested_bucket_name or "unknown"
+        if key not in stats:
+            stats[key] = {
+                "bucket_name": key,
+                "bucket_id": row.suggested_bucket_id,
+                "total": 0,
+                "by_status": {},
+            }
+        stats[key]["by_status"][row.status] = row.count
+        stats[key]["total"] += row.count
+
+    return list(stats.values())
 
 
 @router.get("/{bucket_id}", response_model=BucketOut)
