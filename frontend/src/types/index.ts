@@ -39,6 +39,7 @@ export interface Asset {
   camera_model?: string;
   description?: string;
   tags?: string[];
+  album_ids?: string[];
   is_favorite: boolean;
   is_archived: boolean;
   is_external_library: boolean;
@@ -130,6 +131,8 @@ export interface AuditLog {
   job_run_id?: string;
   action: string;
   status?: string;
+  level?: string;
+  source?: string;
   details_json?: Record<string, unknown>;
   error_message?: string;
   created_at: string;
@@ -153,4 +156,5 @@ export type JobStatus =
   | "writing_results"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "paused";

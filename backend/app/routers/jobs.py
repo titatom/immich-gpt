@@ -58,6 +58,14 @@ def _enqueue(fn, *args):
     submit(fn, *args)
 
 
+@router.delete("")
+def clear_terminal_jobs(db: Session = Depends(get_db)):
+    """Delete all completed, failed, and cancelled jobs (dashboard history clear)."""
+    deleted = db.query(JobRun).filter(JobRun.status.in_(list(_TERMINAL))).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
+
+
 @router.get("", response_model=List[JobRunOut])
 def list_jobs(
     job_type: Optional[str] = None,
@@ -170,3 +178,60 @@ def cancel_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Job already in terminal state: {j.status}")
     svc.cancel_job(job_id)
     return {"cancelled": True}
+
+
+@router.post("/{job_id}/pause")
+def pause_job(job_id: str, db: Session = Depends(get_db)):
+    svc = JobProgressService(db)
+    j = svc.get_job(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if j.status in _TERMINAL or j.status == "paused":
+        raise HTTPException(status_code=400, detail=f"Cannot pause job in state: {j.status}")
+    svc.pause_job(job_id)
+    return {"paused": True}
+
+
+@router.post("/{job_id}/resume")
+def resume_job(job_id: str, db: Session = Depends(get_db)):
+    svc = JobProgressService(db)
+    j = svc.get_job(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if j.status != "paused":
+        raise HTTPException(status_code=400, detail=f"Job is not paused (status: {j.status})")
+    svc.resume_job(job_id)
+    _enqueue(_resume_job_task, job_id)
+    return {"resumed": True}
+
+
+@router.delete("/{job_id}")
+def delete_job(job_id: str, db: Session = Depends(get_db)):
+    svc = JobProgressService(db)
+    j = svc.get_job(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if j.status not in _TERMINAL:
+        raise HTTPException(status_code=400, detail="Can only delete completed, failed, or cancelled jobs")
+    svc.delete_job(job_id)
+    return {"deleted": True}
+
+
+def _resume_job_task(job_id: str) -> None:
+    """Re-dispatch a paused job. Reads params_json to reconstruct the original call."""
+    from ..database import SessionLocal
+    db = SessionLocal()
+    try:
+        from ..models.job_run import JobRun
+        j = db.query(JobRun).filter(JobRun.id == job_id).first()
+        if not j or j.status != "queued":
+            return
+        params = j.params_json or {}
+        if j.job_type == "asset_sync":
+            from ..workers.tasks import run_asset_sync
+            run_asset_sync(job_id, params.get("scope", "all"), params.get("album_ids"))
+        elif j.job_type == "classification":
+            from ..workers.tasks import run_classification
+            run_classification(job_id, params.get("asset_ids"), params.get("limit"), params.get("force", False))
+    finally:
+        db.close()

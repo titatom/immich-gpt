@@ -11,6 +11,8 @@ class AuditLog(Base):
     job_run_id = Column(String, nullable=True, index=True)
     action = Column(String, nullable=False)
     status = Column(String, nullable=True)
+    level = Column(String, nullable=True, default="info")  # info, warning, error
+    source = Column(String, nullable=True)                  # e.g. writeback, classification
     details_json = Column(JSON, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
