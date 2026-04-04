@@ -29,7 +29,7 @@ WORKDIR /build/frontend
 
 # Install deps first (layer-cached unless package files change)
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --legacy-peer-deps
 
 # Copy source and build; output goes to /build/backend/static
 COPY frontend/ ./
