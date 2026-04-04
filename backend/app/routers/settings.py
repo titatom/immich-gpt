@@ -8,25 +8,63 @@ from ..schemas.provider import (
     ProviderConfigCreate, ProviderConfigUpdate, ProviderConfigOut,
 )
 from ..models.provider_config import ProviderConfig
+from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
 from ..config import settings
 import uuid
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
+# Keys used in app_settings table for Immich credentials
+_KEY_IMMICH_URL = "immich_url"
+_KEY_IMMICH_API_KEY = "immich_api_key"
+
+
+def _get_immich_credentials(db: Session):
+    """Return (url, api_key) from DB overrides, falling back to env vars."""
+    url_row = db.query(AppSetting).filter(AppSetting.key == _KEY_IMMICH_URL).first()
+    key_row = db.query(AppSetting).filter(AppSetting.key == _KEY_IMMICH_API_KEY).first()
+    url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
+    api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
+    return url, api_key
+
+
+def _set_app_setting(db: Session, key: str, value: str) -> None:
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    if row:
+        row.value = value
+    else:
+        db.add(AppSetting(key=key, value=value))
+    db.commit()
+
 
 @router.get("/immich", response_model=ImmichSettingsOut)
-def get_immich_settings():
-    url = settings.IMMICH_URL
+def get_immich_settings(db: Session = Depends(get_db)):
+    url, api_key = _get_immich_credentials(db)
     if not url:
         return ImmichSettingsOut(immich_url="", connected=False, error="Not configured")
     try:
-        client = ImmichClient(url, settings.IMMICH_API_KEY)
-        info = client.check_connectivity()
+        client = ImmichClient(url, api_key)
+        client.check_connectivity()
         count = client.get_asset_count()
         return ImmichSettingsOut(immich_url=url, connected=True, asset_count=count)
     except ImmichError as e:
         return ImmichSettingsOut(immich_url=url, connected=False, error=str(e))
+
+
+@router.post("/immich", response_model=ImmichSettingsOut)
+def save_immich_settings(body: ImmichSettingsUpdate, db: Session = Depends(get_db)):
+    """Persist Immich URL and API key to the database."""
+    _set_app_setting(db, _KEY_IMMICH_URL, body.immich_url)
+    if body.immich_api_key:
+        _set_app_setting(db, _KEY_IMMICH_API_KEY, body.immich_api_key)
+    try:
+        client = ImmichClient(body.immich_url, body.immich_api_key)
+        client.check_connectivity()
+        count = client.get_asset_count()
+        return ImmichSettingsOut(immich_url=body.immich_url, connected=True, asset_count=count)
+    except ImmichError as e:
+        return ImmichSettingsOut(immich_url=body.immich_url, connected=False, error=str(e))
 
 
 @router.post("/immich/test")
@@ -116,6 +154,40 @@ def test_provider(provider_name: str, db: Session = Depends(get_db)):
         return {"connected": ok}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/providers/{provider_name}/models")
+def list_provider_models(provider_name: str, db: Session = Depends(get_db)):
+    """Fetch available models from the provider (OpenRouter/Ollama only)."""
+    row = db.query(ProviderConfig).filter(
+        ProviderConfig.provider_name == provider_name
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    try:
+        if provider_name == "openrouter":
+            import httpx
+            r = httpx.get(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {row.api_key_encrypted or ''}"},
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json().get("data", [])
+            return [{"id": m["id"], "name": m.get("name", m["id"])} for m in data]
+        elif provider_name == "ollama":
+            import httpx
+            base = row.base_url or "http://localhost:11434"
+            r = httpx.get(f"{base}/api/tags", timeout=10)
+            r.raise_for_status()
+            models = r.json().get("models", [])
+            return [{"id": m["name"], "name": m["name"]} for m in models]
+        else:
+            raise HTTPException(status_code=400, detail=f"Model listing not supported for {provider_name}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 def _provider_to_out(row: ProviderConfig) -> ProviderConfigOut:

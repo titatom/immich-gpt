@@ -6,12 +6,14 @@ import {
   getAssetCount,
   getReviewCount,
   getJobs,
+  getBucketStats,
   startSyncJob,
   startClassifyJob,
 } from "../services/api";
+import type { BucketStat } from "../types";
 import JobProgressBar from "../components/JobProgressBar";
 import SyncOptionsModal from "../components/SyncOptionsModal";
-import { Database, Eye, Play, RefreshCw, Zap, AlertTriangle, CheckCircle } from "lucide-react";
+import { Database, Eye, Play, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import type { SyncScope } from "../types";
 
 function StatCard({ label, value, color = "#f1f5f9", icon }: {
@@ -60,6 +62,12 @@ export default function Dashboard() {
     queryKey: ["jobs-recent"],
     queryFn: () => getJobs({ limit: 5 }),
     refetchInterval: 3_000,
+  });
+
+  const { data: bucketStats = [] } = useQuery({
+    queryKey: ["bucket-stats"],
+    queryFn: getBucketStats,
+    refetchInterval: 30_000,
   });
 
   const syncMutation = useMutation({
@@ -140,9 +148,9 @@ export default function Dashboard() {
           icon={<Eye size={16} color="#f59e0b" />}
         />
         <StatCard
-          label="Provider"
-          value="OpenAI"
-          icon={<Zap size={16} color="#a78bfa" />}
+          label="Classified"
+          value={bucketStats.reduce((s, b) => s + b.total, 0).toLocaleString()}
+          icon={<Database size={16} color="#a78bfa" />}
         />
       </div>
 
@@ -226,7 +234,7 @@ export default function Dashboard() {
 
       {/* Recent jobs */}
       {jobs.length > 0 && (
-        <div>
+        <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", margin: 0 }}>
               Recent Jobs
@@ -239,6 +247,49 @@ export default function Dashboard() {
             {jobs.slice(0, 3).map((job) => (
               <JobProgressBar key={job.id} job={job} compact />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bucket statistics */}
+      {bucketStats.length > 0 && (
+        <div>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 12 }}>
+            Classification by Bucket
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {bucketStats.sort((a, b) => b.total - a.total).map((stat: BucketStat) => {
+              const approved = stat.by_status["approved"] || 0;
+              const pending = stat.by_status["pending_review"] || 0;
+              const rejected = stat.by_status["rejected"] || 0;
+              const total = stat.total;
+              return (
+                <div key={stat.bucket_name} style={{
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9", width: 120, flexShrink: 0 }}>
+                    {stat.bucket_name}
+                  </span>
+                  <div style={{ flex: 1, height: 8, background: "#0f172a", borderRadius: 4, overflow: "hidden", display: "flex" }}>
+                    {approved > 0 && <div style={{ width: `${(approved / total) * 100}%`, background: "#22c55e", transition: "width 0.4s" }} />}
+                    {pending > 0 && <div style={{ width: `${(pending / total) * 100}%`, background: "#f59e0b", transition: "width 0.4s" }} />}
+                    {rejected > 0 && <div style={{ width: `${(rejected / total) * 100}%`, background: "#475569", transition: "width 0.4s" }} />}
+                  </div>
+                  <span style={{ fontSize: 12, color: "#64748b", width: 32, textAlign: "right" }}>{total}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11, color: "#475569" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "#22c55e", borderRadius: 2, display: "inline-block" }} /> Approved</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "#f59e0b", borderRadius: 2, display: "inline-block" }} /> Pending</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "#475569", borderRadius: 2, display: "inline-block" }} /> Rejected</span>
           </div>
         </div>
       )}

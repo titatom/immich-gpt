@@ -193,22 +193,40 @@ class ImmichClient:
                 )
             return r.json()
 
-    def get_or_create_tag(self, tag_name: str) -> Dict[str, Any]:
-        """Get existing tag or create new one in Immich."""
-        with self._client() as client:
-            # Try to find existing tag
-            r = client.get("/api/tags")
-            if r.status_code == 200:
-                tags = r.json()
-                for tag in tags:
-                    if tag.get("name", "").lower() == tag_name.lower():
-                        return tag
+    def get_or_create_tags(self, tag_names: List[str]) -> List[Dict[str, Any]]:
+        """
+        Batch-resolve tag names to Immich tag objects, creating missing ones.
 
-            # Create tag
-            r = client.post("/api/tags", json={"name": tag_name})
-            if r.status_code not in (200, 201):
-                raise ImmichError(f"Failed to create tag '{tag_name}': {r.text}")
-            return r.json()
+        Fetches the full tag list once per call to minimise round-trips.
+        Returns a list of tag dicts (with at least {"id": ..., "name": ...}).
+        """
+        with self._client() as client:
+            r = client.get("/api/tags")
+            existing: Dict[str, Dict[str, Any]] = {}
+            if r.status_code == 200:
+                for t in r.json():
+                    existing[t.get("name", "").lower()] = t
+
+            result: List[Dict[str, Any]] = []
+            for name in tag_names:
+                lower = name.lower()
+                if lower in existing:
+                    result.append(existing[lower])
+                else:
+                    cr = client.post("/api/tags", json={"name": name})
+                    if cr.status_code in (200, 201):
+                        tag = cr.json()
+                        existing[lower] = tag
+                        result.append(tag)
+                    else:
+                        raise ImmichError(f"Failed to create tag '{name}': {cr.text}")
+            return result
+
+    # Keep old single-tag helper as a thin wrapper for backwards compat
+    def get_or_create_tag(self, tag_name: str) -> Dict[str, Any]:
+        """Get existing tag or create new one in Immich. Single-tag convenience wrapper."""
+        results = self.get_or_create_tags([tag_name])
+        return results[0]
 
     def tag_asset(self, asset_id: str, tag_ids: List[str]) -> None:
         """Apply tags to an asset."""
@@ -221,6 +239,23 @@ class ImmichClient:
                 raise ImmichError(
                     f"Failed to tag asset {asset_id}: {r.text}", r.status_code
                 )
+
+    def get_or_create_album(self, album_name: str) -> Dict[str, Any]:
+        """
+        Return an existing Immich album by name, or create it.
+        Used for subalbum write-back when no explicit immich_album_id is set.
+        """
+        with self._client() as client:
+            r = client.get("/api/albums")
+            if r.status_code == 200:
+                for album in r.json():
+                    if album.get("albumName", "").lower() == album_name.lower():
+                        return album
+            # Create
+            cr = client.post("/api/albums", json={"albumName": album_name})
+            if cr.status_code not in (200, 201):
+                raise ImmichError(f"Failed to create album '{album_name}': {cr.text}")
+            return cr.json()
 
     def is_external_library_asset(self, asset: Dict[str, Any]) -> bool:
         """Detect if asset is from an external library (may restrict writes)."""

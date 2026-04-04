@@ -17,6 +17,7 @@ import app.models.review_decision  # noqa
 import app.models.job_run  # noqa
 import app.models.audit_log  # noqa
 import app.models.provider_config  # noqa
+import app.models.app_setting  # noqa
 
 from app.database import Base, get_db
 from app.main import app

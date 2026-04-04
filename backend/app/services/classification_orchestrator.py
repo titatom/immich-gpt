@@ -39,6 +39,7 @@ class ClassificationOrchestrator:
         job_id: str,
         asset_ids: Optional[List[str]] = None,
         limit: Optional[int] = None,
+        force: bool = False,
     ) -> None:
         """
         Main entry point for background classification job.
@@ -52,7 +53,7 @@ class ClassificationOrchestrator:
         )
 
         try:
-            assets = self._load_assets(asset_ids, limit)
+            assets = self._load_assets(asset_ids, limit, force=force)
             total = len(assets)
             self.job_service.update_progress(
                 job_id,
@@ -156,13 +157,16 @@ class ClassificationOrchestrator:
         self.db.commit()
 
     def _load_assets(
-        self, asset_ids: Optional[List[str]], limit: Optional[int]
+        self,
+        asset_ids: Optional[List[str]],
+        limit: Optional[int],
+        force: bool = False,
     ) -> List[Asset]:
         q = self.db.query(Asset)
         if asset_ids:
             q = q.filter(Asset.id.in_(asset_ids))
-        else:
-            # Only process assets without a pending/approved classification
+        elif not force:
+            # Skip assets that already have a pending or approved classification
             classified_ids = self.db.query(SuggestedClassification.asset_id).filter(
                 SuggestedClassification.status.in_(["pending_review", "approved"])
             ).subquery()

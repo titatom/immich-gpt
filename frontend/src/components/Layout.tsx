@@ -10,14 +10,18 @@ import {
   Settings,
   Activity,
   Zap,
+  Images,
+  ClipboardList,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { path: "/review", label: "Review", icon: Eye, badge: true },
+  { path: "/assets", label: "Assets", icon: Images },
   { path: "/buckets", label: "Buckets", icon: FolderKanban },
   { path: "/prompts", label: "Prompts", icon: MessageSquare },
   { path: "/jobs", label: "Jobs", icon: Activity },
+  { path: "/logs", label: "Audit Logs", icon: ClipboardList },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

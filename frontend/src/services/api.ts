@@ -9,6 +9,8 @@ import type {
   ImmichSettings,
   SyncJobRequest,
   ImmichAlbum,
+  AuditLog,
+  BucketStat,
 } from "../types";
 
 const api = axios.create({
@@ -22,6 +24,9 @@ export const getHealth = () => api.get("/health").then((r) => r.data);
 // --- Settings ---
 export const getImmichSettings = (): Promise<ImmichSettings> =>
   api.get("/settings/immich").then((r) => r.data);
+
+export const saveImmichSettings = (url: string, apiKey: string): Promise<ImmichSettings> =>
+  api.post("/settings/immich", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
 
 export const testImmichConnection = (url: string, apiKey: string) =>
   api.post("/settings/immich/test", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
@@ -43,6 +48,9 @@ export const deleteProvider = (name: string) =>
 
 export const testProvider = (name: string) =>
   api.get(`/settings/providers/${name}/test`).then((r) => r.data);
+
+export const getProviderModels = (name: string): Promise<Array<{ id: string; name: string }>> =>
+  api.get(`/settings/providers/${name}/models`).then((r) => r.data);
 
 // --- Buckets ---
 export const getBuckets = (): Promise<Bucket[]> =>
@@ -71,7 +79,7 @@ export const deletePrompt = (id: string) =>
   api.delete(`/prompts/${id}`).then((r) => r.data);
 
 // --- Assets ---
-export const getAssets = (params?: { page?: number; page_size?: number }) =>
+export const getAssets = (params?: { page?: number; page_size?: number; asset_type?: string }) =>
   api.get("/assets", { params }).then((r) => r.data as Asset[]);
 
 export const getAssetCount = () =>
@@ -87,7 +95,7 @@ export const getJob = (id: string): Promise<JobRun> =>
 export const startSyncJob = (params?: SyncJobRequest) =>
   api.post("/jobs/sync", params ?? {}).then((r) => r.data as { job_id: string; status: string });
 
-export const startClassifyJob = (params?: { asset_ids?: string[]; limit?: number }) =>
+export const startClassifyJob = (params?: { asset_ids?: string[]; limit?: number; force?: boolean }) =>
   api.post("/jobs/classify", null, { params }).then((r) => r.data as { job_id: string; status: string });
 
 export const cancelJob = (id: string) =>
@@ -133,6 +141,28 @@ export const bulkReview = (data: {
 // --- Albums ---
 export const getAlbums = () =>
   api.get("/albums").then((r) => r.data as ImmichAlbum[]);
+
+// --- Audit Logs ---
+export const getAuditLogs = (params?: {
+  asset_id?: string;
+  job_run_id?: string;
+  action?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<AuditLog[]> =>
+  api.get("/audit-logs", { params }).then((r) => r.data);
+
+export const getAuditLogCount = (params?: {
+  asset_id?: string;
+  job_run_id?: string;
+  status?: string;
+}) =>
+  api.get("/audit-logs/count", { params }).then((r) => r.data as { count: number });
+
+// --- Bucket stats ---
+export const getBucketStats = (): Promise<BucketStat[]> =>
+  api.get("/buckets/stats").then((r) => r.data);
 
 // --- Thumbnail URL helper ---
 export const getThumbnailUrl = (assetId: string, size = "thumbnail") =>

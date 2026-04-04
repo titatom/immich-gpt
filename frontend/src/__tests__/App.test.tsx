@@ -39,6 +39,11 @@ vi.mock("../services/api", async (importOriginal) => {
     rejectAsset: noop,
     bulkReview: noop,
     getAlbums: vi.fn().mockResolvedValue([]),
+    getAuditLogs: vi.fn().mockResolvedValue([]),
+    getAuditLogCount: vi.fn().mockResolvedValue({ count: 0 }),
+    getBucketStats: vi.fn().mockResolvedValue([]),
+    getProviderModels: vi.fn().mockResolvedValue([]),
+    saveImmichSettings: noop,
     getThumbnailUrl: (id: string, size = "thumbnail") =>
       `/api/thumbnails/${id}?size=${size}`,
   };
@@ -129,5 +134,23 @@ describe("App routing", () => {
       </Wrapper>
     );
     expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders assets page on /assets route", () => {
+    render(
+      <Wrapper path="/assets">
+        <App />
+      </Wrapper>
+    );
+    expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders logs page on /logs route", () => {
+    render(
+      <Wrapper path="/logs">
+        <App />
+      </Wrapper>
+    );
+    expect(screen.getAllByText("Audit Logs").length).toBeGreaterThanOrEqual(1);
   });
 });
