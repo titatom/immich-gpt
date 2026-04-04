@@ -21,8 +21,6 @@
 #   docker compose up -d
 # =============================================================================
 
-version: "3.9"
-
 # ── Shared environment fragment (YAML anchor) ──────────────────────────────
 x-common-env: &common-env
   DATABASE_URL: sqlite:////data/immich_gpt.db
@@ -36,11 +34,11 @@ x-common-env: &common-env
 services:
 
   # ── Single-container mode (default) ──────────────────────────────────────
+  # The image is built separately with:  docker build -f Dockerfile.unraid -t immich-gpt .
+  # Or pulled from GHCR when a release is published:
+  #   image: ghcr.io/titatom/immich-gpt:latest
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.unraid
-    image: ghcr.io/titatom/immich-gpt:latest
+    image: immich-gpt:latest
     container_name: immich-gpt
     restart: unless-stopped
     ports:
@@ -57,7 +55,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-    profiles: ["", "single"]              # default profile
 
   # ── Full-stack: API ───────────────────────────────────────────────────────
   api:

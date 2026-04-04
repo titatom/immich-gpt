@@ -1,0 +1,46 @@
+# Single-stage Dockerfile for local builds on Unraid / older Docker.
+# Use build.sh to build — it handles the frontend Node build separately,
+# then calls this Dockerfile for the final Python image.
+#
+# Requires: backend/static/ to exist (built by build.sh or Dockerfile.unraid stage 1)
+#
+# Plain docker build — no buildx, no BuildKit, no multi-stage needed.
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="Immich GPT" \
+      org.opencontainers.image.description="AI-first metadata enrichment for Immich" \
+      org.opencontainers.image.source="https://github.com/titatom/immich-gpt"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tini curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./alembic.ini
+
+# Pre-built frontend assets (populated by build.sh)
+COPY backend/static ./static
+
+RUN mkdir -p /data /logs
+VOLUME ["/data"]
+
+ENV DATABASE_URL=sqlite:////data/immich_gpt.db \
+    REDIS_URL="" \
+    WORKER_CONCURRENCY=2 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
