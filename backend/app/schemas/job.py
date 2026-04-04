@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, ConfigDict
-from typing import Optional, List, Any
+from pydantic import BaseModel, ConfigDict
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
@@ -27,3 +27,16 @@ class JobStartResponse(BaseModel):
     job_id: str
     status: str
     message: str
+
+
+class SyncJobRequest(BaseModel):
+    """Parameters controlling what gets synced from Immich.
+
+    scope:
+      - "all"       – every asset (current default behaviour)
+      - "favorites" – only assets marked as favourite
+      - "albums"    – only assets belonging to the albums listed in album_ids
+    """
+
+    scope: Literal["all", "favorites", "albums"] = "all"
+    album_ids: Optional[List[str]] = None

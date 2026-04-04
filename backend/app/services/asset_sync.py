@@ -3,7 +3,7 @@ Asset sync service: pulls assets from Immich and stores them locally.
 """
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 
 from ..models.asset import Asset
@@ -31,6 +31,66 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
     ) -> Dict[str, int]:
+        """Sync all assets from Immich."""
+        return self._sync_paged(
+            fetch_fn=lambda page: self.immich.list_assets(page=page, page_size=page_size),
+            job_progress_callback=job_progress_callback,
+            page_size=page_size,
+        )
+
+    def sync_favorites(
+        self,
+        job_progress_callback=None,
+        page_size: int = 100,
+    ) -> Dict[str, int]:
+        """Sync only favorited assets from Immich."""
+        return self._sync_paged(
+            fetch_fn=lambda page: self.immich.list_assets(
+                page=page, page_size=page_size, is_favorite=True
+            ),
+            job_progress_callback=job_progress_callback,
+            page_size=page_size,
+        )
+
+    def sync_album(
+        self,
+        album_id: str,
+        job_progress_callback=None,
+        page_size: int = 100,
+    ) -> Dict[str, int]:
+        """Sync assets from a specific album."""
+        return self._sync_paged(
+            fetch_fn=lambda page: self.immich.list_album_assets(
+                album_id=album_id, page=page, page_size=page_size
+            ),
+            job_progress_callback=job_progress_callback,
+            page_size=page_size,
+        )
+
+    def sync_albums(
+        self,
+        album_ids: List[str],
+        job_progress_callback=None,
+        page_size: int = 100,
+    ) -> Dict[str, int]:
+        """Sync assets from multiple albums."""
+        total_created = total_updated = total_errors = 0
+        for album_id in album_ids:
+            if job_progress_callback:
+                job_progress_callback(f"Syncing album {album_id}")
+            result = self.sync_album(album_id, job_progress_callback=job_progress_callback, page_size=page_size)
+            total_created += result["created"]
+            total_updated += result["updated"]
+            total_errors += result["errors"]
+        synced = total_created + total_updated
+        return {"synced": synced, "created": total_created, "updated": total_updated, "errors": total_errors}
+
+    def _sync_paged(
+        self,
+        fetch_fn,
+        job_progress_callback=None,
+        page_size: int = 100,
+    ) -> Dict[str, int]:
         created = updated = errors = 0
         page = 1
         synced_at = datetime.utcnow()
@@ -39,7 +99,7 @@ class AssetSyncService:
             if job_progress_callback:
                 job_progress_callback(f"Fetching page {page}")
             try:
-                raw_assets = self.immich.list_assets(page=page, page_size=page_size)
+                raw_assets = fetch_fn(page)
             except Exception as e:
                 if job_progress_callback:
                     job_progress_callback(f"Error fetching page {page}: {e}")

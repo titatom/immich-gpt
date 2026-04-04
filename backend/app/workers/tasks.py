@@ -11,15 +11,26 @@ from ..models.provider_config import ProviderConfig
 from typing import Optional, List
 
 
-def run_asset_sync(job_id: str) -> dict:
+def run_asset_sync(
+    job_id: str,
+    scope: str = "all",
+    album_ids: Optional[List[str]] = None,
+) -> dict:
     db = SessionLocal()
     try:
         job_svc = JobProgressService(db)
         job_svc.start_job(job_id)
+
+        scope_label = {
+            "all": "all assets",
+            "favorites": "favourited assets",
+            "albums": f"{len(album_ids or [])} album(s)",
+        }.get(scope, scope)
+
         job_svc.update_progress(
             job_id, status="syncing_assets",
-            current_step="Syncing assets from Immich",
-            log_line="Asset sync started",
+            current_step=f"Syncing {scope_label} from Immich",
+            log_line=f"Asset sync started (scope: {scope_label})",
         )
 
         def progress_cb(msg: str):
@@ -27,7 +38,13 @@ def run_asset_sync(job_id: str) -> dict:
 
         immich = ImmichClient()
         sync_svc = AssetSyncService(db, immich)
-        result = sync_svc.sync_all(job_progress_callback=progress_cb)
+
+        if scope == "favorites":
+            result = sync_svc.sync_favorites(job_progress_callback=progress_cb)
+        elif scope == "albums" and album_ids:
+            result = sync_svc.sync_albums(album_ids, job_progress_callback=progress_cb)
+        else:
+            result = sync_svc.sync_all(job_progress_callback=progress_cb)
 
         job_svc.complete_job(
             job_id,

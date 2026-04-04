@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getJobs, getJob, cancelJob, startSyncJob, startClassifyJob } from "../services/api";
-// JobRun type is used by JobProgressBar and LogPanel via props
 import JobProgressBar from "../components/JobProgressBar";
 import LogPanel from "../components/LogPanel";
+import SyncOptionsModal from "../components/SyncOptionsModal";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import type { SyncScope } from "../types";
 
 function JobDetail({ jobId }: { jobId: string }) {
   const { data: job } = useQuery({
@@ -36,6 +37,7 @@ export default function Jobs() {
   const qc = useQueryClient();
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("");
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ["jobs", typeFilter],
@@ -44,12 +46,18 @@ export default function Jobs() {
   });
 
   const syncMut = useMutation({
-    mutationFn: startSyncJob,
+    mutationFn: (params: { scope: SyncScope; album_ids?: string[] }) =>
+      startSyncJob(params),
     onSuccess: (d) => {
+      setShowSyncModal(false);
       qc.invalidateQueries({ queryKey: ["jobs"] });
       setExpandedJobId(d.job_id);
     },
   });
+
+  const handleSyncConfirm = (scope: SyncScope, albumIds?: string[]) => {
+    syncMut.mutate({ scope, album_ids: albumIds });
+  };
 
   const classifyMut = useMutation({
     mutationFn: () => startClassifyJob(),
@@ -75,7 +83,7 @@ export default function Jobs() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => syncMut.mutate()}
+            onClick={() => setShowSyncModal(true)}
             disabled={syncMut.isPending}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, border: "none", background: "#1e40af", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
@@ -153,6 +161,14 @@ export default function Jobs() {
             </div>
           ))}
         </div>
+      )}
+
+      {showSyncModal && (
+        <SyncOptionsModal
+          onClose={() => setShowSyncModal(false)}
+          onConfirm={handleSyncConfirm}
+          isLoading={syncMut.isPending}
+        />
       )}
     </div>
   );

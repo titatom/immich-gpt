@@ -7,6 +7,8 @@ import type {
   JobRun,
   ProviderConfig,
   ImmichSettings,
+  SyncJobRequest,
+  ImmichAlbum,
 } from "../types";
 
 const api = axios.create({
@@ -82,8 +84,8 @@ export const getJobs = (params?: { job_type?: string; status?: string; limit?: n
 export const getJob = (id: string): Promise<JobRun> =>
   api.get(`/jobs/${id}`).then((r) => r.data);
 
-export const startSyncJob = () =>
-  api.post("/jobs/sync").then((r) => r.data as { job_id: string; status: string });
+export const startSyncJob = (params?: SyncJobRequest) =>
+  api.post("/jobs/sync", params ?? {}).then((r) => r.data as { job_id: string; status: string });
 
 export const startClassifyJob = (params?: { asset_ids?: string[]; limit?: number }) =>
   api.post("/jobs/classify", null, { params }).then((r) => r.data as { job_id: string; status: string });
@@ -130,7 +132,7 @@ export const bulkReview = (data: {
 
 // --- Albums ---
 export const getAlbums = () =>
-  api.get("/albums").then((r) => r.data as Array<{ id: string; albumName: string; assetCount: number }>);
+  api.get("/albums").then((r) => r.data as ImmichAlbum[]);
 
 // --- Thumbnail URL helper ---
 export const getThumbnailUrl = (assetId: string, size = "thumbnail") =>

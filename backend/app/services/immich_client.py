@@ -55,16 +55,47 @@ class ImmichClient:
         page: int = 1,
         page_size: int = 100,
         asset_type: Optional[str] = None,
+        is_favorite: Optional[bool] = None,
+        is_archived: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
         """List assets with pagination."""
         params: Dict[str, Any] = {"page": page, "size": page_size, "withExif": True}
         if asset_type:
             params["type"] = asset_type
+        if is_favorite is not None:
+            params["isFavorite"] = is_favorite
+        if is_archived is not None:
+            params["isArchived"] = is_archived
         with self._client() as client:
             r = client.get("/api/assets", params=params)
             if r.status_code != 200:
                 raise ImmichError(f"Failed to list assets: {r.text}", r.status_code)
             return r.json()
+
+    def list_album_assets(
+        self,
+        album_id: str,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """List assets in a specific album with pagination."""
+        with self._client() as client:
+            r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": False})
+            if r.status_code != 200:
+                raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
+            data = r.json()
+            assets = data.get("assets", [])
+            # Return paginated slice
+            start = (page - 1) * page_size
+            return assets[start : start + page_size]
+
+    def get_album_asset_count(self, album_id: str) -> int:
+        """Get asset count for a specific album."""
+        with self._client() as client:
+            r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": True})
+            if r.status_code != 200:
+                raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
+            return r.json().get("assetCount", 0)
 
     def get_asset(self, asset_id: str) -> Dict[str, Any]:
         """Get full asset metadata."""

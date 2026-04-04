@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -10,7 +10,9 @@ import {
   startClassifyJob,
 } from "../services/api";
 import JobProgressBar from "../components/JobProgressBar";
+import SyncOptionsModal from "../components/SyncOptionsModal";
 import { Database, Eye, Play, RefreshCw, Zap, AlertTriangle, CheckCircle } from "lucide-react";
+import type { SyncScope } from "../types";
 
 function StatCard({ label, value, color = "#f1f5f9", icon }: {
   label: string; value: string | number; color?: string; icon?: React.ReactNode;
@@ -35,6 +37,7 @@ function StatCard({ label, value, color = "#f1f5f9", icon }: {
 
 export default function Dashboard() {
   const qc = useQueryClient();
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   const { data: immich } = useQuery({
     queryKey: ["immich-settings"],
@@ -60,8 +63,10 @@ export default function Dashboard() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: startSyncJob,
+    mutationFn: (params: { scope: SyncScope; album_ids?: string[] }) =>
+      startSyncJob(params),
     onSuccess: () => {
+      setShowSyncModal(false);
       qc.invalidateQueries({ queryKey: ["jobs-recent"] });
       qc.invalidateQueries({ queryKey: ["asset-count"] });
     },
@@ -77,6 +82,10 @@ export default function Dashboard() {
   const activeJob = jobs.find((j) =>
     !["completed", "failed", "cancelled"].includes(j.status)
   );
+
+  const handleSyncConfirm = (scope: SyncScope, albumIds?: string[]) => {
+    syncMutation.mutate({ scope, album_ids: albumIds });
+  };
 
   return (
     <div style={{ padding: "32px 40px", maxWidth: 1100 }}>
@@ -140,7 +149,7 @@ export default function Dashboard() {
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
         <button
-          onClick={() => syncMutation.mutate()}
+          onClick={() => setShowSyncModal(true)}
           disabled={syncMutation.isPending || !!activeJob}
           style={{
             display: "flex",
@@ -232,6 +241,14 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+      )}
+
+      {showSyncModal && (
+        <SyncOptionsModal
+          onClose={() => setShowSyncModal(false)}
+          onConfirm={handleSyncConfirm}
+          isLoading={syncMutation.isPending}
+        />
       )}
     </div>
   );

@@ -7,7 +7,7 @@ from rq import Queue
 
 from ..database import get_db
 from ..models.job_run import JobRun
-from ..schemas.job import JobRunOut, JobStartResponse
+from ..schemas.job import JobRunOut, JobStartResponse, SyncJobRequest
 from ..services.job_progress import JobProgressService
 from ..config import settings
 
@@ -63,18 +63,28 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/sync", response_model=JobStartResponse)
-def start_sync_job(db: Session = Depends(get_db)):
+def start_sync_job(
+    body: Optional[SyncJobRequest] = None,
+    db: Session = Depends(get_db),
+):
     from ..workers.tasks import run_asset_sync
+    req = body or SyncJobRequest()
     svc = JobProgressService(db)
-    job = svc.create_job("asset_sync")
+    job = svc.create_job(
+        "asset_sync",
+        params={"scope": req.scope, "album_ids": req.album_ids},
+    )
 
     q = _get_queue()
     if q:
-        q.enqueue(run_asset_sync, job.id)
+        q.enqueue(run_asset_sync, job.id, req.scope, req.album_ids)
     else:
-        # Run synchronously if Redis not available
         import threading
-        t = threading.Thread(target=run_asset_sync, args=(job.id,), daemon=True)
+        t = threading.Thread(
+            target=run_asset_sync,
+            args=(job.id, req.scope, req.album_ids),
+            daemon=True,
+        )
         t.start()
 
     return JobStartResponse(job_id=job.id, status="queued", message="Sync job started")
