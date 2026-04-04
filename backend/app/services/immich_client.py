@@ -55,16 +55,84 @@ class ImmichClient:
         page: int = 1,
         page_size: int = 100,
         asset_type: Optional[str] = None,
+        is_favorite: Optional[bool] = None,
+        is_archived: Optional[bool] = None,
     ) -> List[Dict[str, Any]]:
-        """List assets with pagination."""
-        params: Dict[str, Any] = {"page": page, "size": page_size, "withExif": True}
+        """List assets with pagination.
+
+        Newer Immich versions (≥ v1.106) removed GET /api/assets in favour of
+        POST /api/search/metadata (renamed POST /api/search/assets in v1.118+).
+        We try the search endpoint first, then fall back to the legacy GET.
+        """
+        body: Dict[str, Any] = {
+            "page": page,
+            "size": page_size,
+            "withExif": True,
+            "withArchived": True,
+        }
         if asset_type:
-            params["type"] = asset_type
+            body["type"] = asset_type
+        if is_favorite is not None:
+            body["isFavorite"] = is_favorite
+        if is_archived is not None:
+            body["isArchived"] = is_archived
+
         with self._client() as client:
-            r = client.get("/api/assets", params=params)
+            # Try POST /api/search/metadata (v1.106–v1.117)
+            r = client.post("/api/search/metadata", json=body)
+            if r.status_code == 404:
+                # Try POST /api/search/assets (v1.118+)
+                r = client.post("/api/search/assets", json=body)
+            if r.status_code == 404:
+                # Fall back to legacy GET /api/assets (pre-v1.106)
+                params: Dict[str, Any] = {"page": page, "size": page_size, "withExif": True}
+                if asset_type:
+                    params["type"] = asset_type
+                if is_favorite is not None:
+                    params["isFavorite"] = is_favorite
+                if is_archived is not None:
+                    params["isArchived"] = is_archived
+                r = client.get("/api/assets", params=params)
+                if r.status_code != 200:
+                    raise ImmichError(f"Failed to list assets: {r.text}", r.status_code)
+                data = r.json()
+                # Legacy endpoint returns a plain list
+                return data if isinstance(data, list) else []
+
             if r.status_code != 200:
                 raise ImmichError(f"Failed to list assets: {r.text}", r.status_code)
-            return r.json()
+
+            data = r.json()
+            # Search endpoints return { items: [...], total: N } or { assets: { items: [...] } }
+            if isinstance(data, dict):
+                items = data.get("items") or data.get("assets", {}).get("items", [])
+                return items if isinstance(items, list) else []
+            return data if isinstance(data, list) else []
+
+    def list_album_assets(
+        self,
+        album_id: str,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """List assets in a specific album with pagination."""
+        with self._client() as client:
+            r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": False})
+            if r.status_code != 200:
+                raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
+            data = r.json()
+            assets = data.get("assets", [])
+            # Return paginated slice
+            start = (page - 1) * page_size
+            return assets[start : start + page_size]
+
+    def get_album_asset_count(self, album_id: str) -> int:
+        """Get asset count for a specific album."""
+        with self._client() as client:
+            r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": True})
+            if r.status_code != 200:
+                raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
+            return r.json().get("assetCount", 0)
 
     def get_asset(self, asset_id: str) -> Dict[str, Any]:
         """Get full asset metadata."""

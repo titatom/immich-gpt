@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..database import get_db, SessionLocal
 from ..models.job_run import JobRun
-from ..schemas.job import JobRunOut, JobStartResponse
+from ..schemas.job import JobRunOut, JobStartResponse, SyncJobRequest
 from ..services.job_progress import JobProgressService
 from ..config import settings
 
@@ -128,12 +128,20 @@ async def stream_job(job_id: str):
 
 
 @router.post("/sync", response_model=JobStartResponse)
-def start_sync_job(db: Session = Depends(get_db)):
+def start_sync_job(
+    body: Optional[SyncJobRequest] = None,
+    db: Session = Depends(get_db),
+):
     from ..workers.tasks import run_asset_sync
+    req = body or SyncJobRequest()
     svc = JobProgressService(db)
-    job = svc.create_job("asset_sync")
+    job = svc.create_job(
+        "asset_sync",
+        params={"scope": req.scope, "album_ids": req.album_ids},
+    )
 
-    _enqueue(run_asset_sync, job.id)
+    _enqueue(run_asset_sync, job.id, req.scope, req.album_ids)
+
     return JobStartResponse(job_id=job.id, status="queued", message="Sync job started")
 
 

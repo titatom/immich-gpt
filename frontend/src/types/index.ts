@@ -111,6 +111,19 @@ export interface ImmichSettings {
   error?: string;
 }
 
+export type SyncScope = "all" | "favorites" | "albums";
+
+export interface SyncJobRequest {
+  scope: SyncScope;
+  album_ids?: string[];
+}
+
+export interface ImmichAlbum {
+  id: string;
+  albumName: string;
+  assetCount: number;
+}
+
 export interface AuditLog {
   id: string;
   asset_id?: string;
