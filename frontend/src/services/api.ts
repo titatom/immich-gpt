@@ -3,6 +3,7 @@ import type {
   Bucket,
   PromptTemplate,
   Asset,
+  AssetDetail,
   ReviewItem,
   JobRun,
   ProviderConfig,
@@ -84,6 +85,9 @@ export const getAssets = (params?: { page?: number; page_size?: number; asset_ty
 
 export const getAssetCount = () =>
   api.get("/assets/count").then((r) => r.data as { count: number });
+
+export const getAssetDetail = (id: string): Promise<AssetDetail> =>
+  api.get(`/assets/${id}/detail`).then((r) => r.data);
 
 // --- Jobs ---
 export const getJobs = (params?: { job_type?: string; status?: string; limit?: number }): Promise<JobRun[]> =>
