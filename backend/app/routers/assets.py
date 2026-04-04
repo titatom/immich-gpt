@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 from ..database import get_db
 from ..models.asset import Asset
+from ..models.suggested_classification import SuggestedClassification
+from ..models.suggested_metadata import SuggestedMetadata
 from ..schemas.asset import AssetOut
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -52,9 +56,100 @@ def count_assets(db: Session = Depends(get_db)):
     return {"count": db.query(Asset).count()}
 
 
+class ClassificationDetail(BaseModel):
+    id: str
+    suggested_bucket_id: Optional[str]
+    suggested_bucket_name: Optional[str]
+    confidence: Optional[float]
+    explanation: Optional[str]
+    subalbum_suggestion: Optional[str]
+    status: Optional[str]
+    provider_name: Optional[str]
+    override_bucket_id: Optional[str]
+    override_bucket_name: Optional[str]
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MetadataDetail(BaseModel):
+    id: str
+    description_suggestion: Optional[str]
+    tags: Optional[List[str]]
+    approved_description: Optional[str]
+    approved_tags: Optional[List[str]]
+    writeback_status: Optional[str]
+    provider_name: Optional[str]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AssetDetailOut(AssetOut):
+    classification: Optional[ClassificationDetail] = None
+    metadata_suggestion: Optional[MetadataDetail] = None
+
+
 @router.get("/{asset_id}", response_model=AssetOut)
 def get_asset(asset_id: str, db: Session = Depends(get_db)):
     a = db.query(Asset).filter(Asset.id == asset_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Asset not found")
     return _to_out(a)
+
+
+@router.get("/{asset_id}/detail", response_model=AssetDetailOut)
+def get_asset_detail(asset_id: str, db: Session = Depends(get_db)):
+    """Full asset detail including latest classification and metadata suggestion."""
+    a = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    base = _to_out(a)
+
+    # Latest classification (most recent by created_at)
+    cls = (
+        db.query(SuggestedClassification)
+        .filter(SuggestedClassification.asset_id == asset_id)
+        .order_by(SuggestedClassification.created_at.desc())
+        .first()
+    )
+
+    # Latest metadata suggestion
+    meta = (
+        db.query(SuggestedMetadata)
+        .filter(SuggestedMetadata.asset_id == asset_id)
+        .order_by(SuggestedMetadata.created_at.desc())
+        .first()
+    )
+
+    classification = None
+    if cls:
+        classification = ClassificationDetail(
+            id=cls.id,
+            suggested_bucket_id=cls.suggested_bucket_id,
+            suggested_bucket_name=cls.suggested_bucket_name,
+            confidence=cls.confidence,
+            explanation=cls.explanation,
+            subalbum_suggestion=cls.subalbum_suggestion,
+            status=cls.status,
+            provider_name=cls.provider_name,
+            override_bucket_id=cls.override_bucket_id,
+            override_bucket_name=cls.override_bucket_name,
+            created_at=cls.created_at,
+        )
+
+    metadata_suggestion = None
+    if meta:
+        metadata_suggestion = MetadataDetail(
+            id=meta.id,
+            description_suggestion=meta.description_suggestion,
+            tags=meta.tags_json,
+            approved_description=meta.approved_description,
+            approved_tags=meta.approved_tags_json,
+            writeback_status=meta.writeback_status,
+            provider_name=meta.provider_name,
+        )
+
+    return AssetDetailOut(
+        **base.model_dump(),
+        classification=classification,
+        metadata_suggestion=metadata_suggestion,
+    )

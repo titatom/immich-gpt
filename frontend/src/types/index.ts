@@ -47,6 +47,35 @@ export interface Asset {
   created_at: string;
 }
 
+export interface AssetClassification {
+  id: string;
+  suggested_bucket_id?: string;
+  suggested_bucket_name?: string;
+  confidence?: number;
+  explanation?: string;
+  subalbum_suggestion?: string;
+  status?: string;
+  provider_name?: string;
+  override_bucket_id?: string;
+  override_bucket_name?: string;
+  created_at: string;
+}
+
+export interface AssetMetadataSuggestion {
+  id: string;
+  description_suggestion?: string;
+  tags?: string[];
+  approved_description?: string;
+  approved_tags?: string[];
+  writeback_status?: string;
+  provider_name?: string;
+}
+
+export interface AssetDetail extends Asset {
+  classification?: AssetClassification;
+  metadata_suggestion?: AssetMetadataSuggestion;
+}
+
 export interface ReviewItem {
   asset_id: string;
   immich_id: string;
