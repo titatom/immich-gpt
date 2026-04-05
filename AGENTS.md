@@ -18,10 +18,10 @@ immich-gpt is a self-hosted web app with a Python/FastAPI backend and React/Type
 ### Running tests
 
 ```bash
-# Backend (134 tests — all use in-memory SQLite, no external services required)
+# Backend (155 tests — all use in-memory SQLite, no external services required)
 cd backend && python3 -m pytest tests/ -v
 
-# Frontend (46 tests — Vitest + React Testing Library, jsdom)
+# Frontend (48 tests — Vitest + React Testing Library, jsdom)
 cd frontend && npm test
 ```
 
@@ -67,6 +67,7 @@ cd frontend && npx vite build
 - Redis is **optional**. Set `REDIS_URL=""` (or leave unset) and jobs run in-process via `ThreadPoolExecutor`. Only set `REDIS_URL` when using the full multi-container stack.
 - The backend `config.py` reads `.env` from CWD, so run the backend from `backend/` directory.
 - External services (Immich server, OpenAI API) require secrets (`IMMICH_URL`, `IMMICH_API_KEY`, `OPENAI_API_KEY`) but are not needed for tests or basic UI development.
+- Frontend `npm install` requires the `--legacy-peer-deps` flag due to peer dependency conflicts between ESLint 9 and `@eslint/js`.
 - Frontend devDependencies now include `eslint`, `@typescript-eslint/*`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, and `jsdom`.
 
 ### Docker / Unraid packaging
