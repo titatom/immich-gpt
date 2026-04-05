@@ -20,6 +20,8 @@ def run_asset_sync(
 ) -> dict:
     db = SessionLocal()
     try:
+        from ..models.job_run import JobRun as _JobRun
+
         job_svc = JobProgressService(db)
         # Reset counters in case this is a retry
         job_svc.reset_for_retry(job_id)
@@ -40,23 +42,31 @@ def run_asset_sync(
         def progress_cb(msg: str):
             job_svc.update_progress(job_id, log_line=msg)
 
+        def should_stop() -> bool:
+            db.expire_all()
+            j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
+            return j is not None and j.status in ("paused", "cancelled")
+
         immich = ImmichClient()
         sync_svc = AssetSyncService(db, immich)
 
         if scope == "favorites":
-            result = sync_svc.sync_favorites(job_progress_callback=progress_cb)
+            result = sync_svc.sync_favorites(job_progress_callback=progress_cb, should_stop=should_stop)
         elif scope == "albums" and album_ids:
-            result = sync_svc.sync_albums(album_ids, job_progress_callback=progress_cb)
+            result = sync_svc.sync_albums(album_ids, job_progress_callback=progress_cb, should_stop=should_stop)
         else:
-            result = sync_svc.sync_all(job_progress_callback=progress_cb)
+            result = sync_svc.sync_all(job_progress_callback=progress_cb, should_stop=should_stop)
 
-        job_svc.complete_job(
-            job_id,
-            message=(
-                f"Sync complete. Created: {result['created']}, "
-                f"Updated: {result['updated']}, Errors: {result['errors']}"
-            ),
-        )
+        # Only mark complete if not paused/cancelled
+        j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
+        if j and j.status not in ("paused", "cancelled"):
+            job_svc.complete_job(
+                job_id,
+                message=(
+                    f"Sync complete. Created: {result['created']}, "
+                    f"Updated: {result['updated']}, Errors: {result['errors']}"
+                ),
+            )
         return result
 
     except Exception as e:
@@ -112,7 +122,8 @@ def run_classification(
 
         orchestrator = ClassificationOrchestrator(db, provider)
         orchestrator.run_classification_job(job_id, asset_ids=asset_ids, limit=limit, force=force)
-        return {"status": "completed"}
+        # Status is set inside the orchestrator (complete or paused/cancelled)
+        return {"status": "done"}
 
     except Exception as e:
         db.rollback()

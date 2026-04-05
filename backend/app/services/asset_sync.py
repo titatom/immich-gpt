@@ -3,7 +3,7 @@ Asset sync service: pulls assets from Immich and stores them locally.
 """
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 from sqlalchemy.orm import Session
 
 from ..models.asset import Asset
@@ -30,18 +30,21 @@ class AssetSyncService:
         self,
         job_progress_callback=None,
         page_size: int = 100,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, int]:
         """Sync all assets from Immich."""
         return self._sync_paged(
             fetch_fn=lambda page: self.immich.list_assets(page=page, page_size=page_size),
             job_progress_callback=job_progress_callback,
             page_size=page_size,
+            should_stop=should_stop,
         )
 
     def sync_favorites(
         self,
         job_progress_callback=None,
         page_size: int = 100,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, int]:
         """Sync only favorited assets from Immich."""
         return self._sync_paged(
@@ -50,6 +53,7 @@ class AssetSyncService:
             ),
             job_progress_callback=job_progress_callback,
             page_size=page_size,
+            should_stop=should_stop,
         )
 
     def sync_album(
@@ -57,6 +61,7 @@ class AssetSyncService:
         album_id: str,
         job_progress_callback=None,
         page_size: int = 100,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, int]:
         """Sync assets from a specific album."""
         return self._sync_paged(
@@ -65,6 +70,7 @@ class AssetSyncService:
             ),
             job_progress_callback=job_progress_callback,
             page_size=page_size,
+            should_stop=should_stop,
         )
 
     def sync_albums(
@@ -72,13 +78,23 @@ class AssetSyncService:
         album_ids: List[str],
         job_progress_callback=None,
         page_size: int = 100,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, int]:
         """Sync assets from multiple albums."""
         total_created = total_updated = total_errors = 0
         for album_id in album_ids:
+            if should_stop and should_stop():
+                if job_progress_callback:
+                    job_progress_callback("Sync stopped due to pause/cancel request.")
+                break
             if job_progress_callback:
                 job_progress_callback(f"Syncing album {album_id}")
-            result = self.sync_album(album_id, job_progress_callback=job_progress_callback, page_size=page_size)
+            result = self.sync_album(
+                album_id,
+                job_progress_callback=job_progress_callback,
+                page_size=page_size,
+                should_stop=should_stop,
+            )
             total_created += result["created"]
             total_updated += result["updated"]
             total_errors += result["errors"]
@@ -90,12 +106,19 @@ class AssetSyncService:
         fetch_fn,
         job_progress_callback=None,
         page_size: int = 100,
+        should_stop: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, int]:
         created = updated = errors = 0
         page = 1
         synced_at = datetime.utcnow()
 
         while True:
+            # Cooperative stop check (pause/cancel)
+            if should_stop and should_stop():
+                if job_progress_callback:
+                    job_progress_callback("Sync stopped due to pause/cancel request.")
+                break
+
             if job_progress_callback:
                 job_progress_callback(f"Fetching page {page}")
             try:

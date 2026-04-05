@@ -206,9 +206,9 @@ export default function Dashboard() {
     refetchInterval: 30_000,
   });
 
-  const { data: assetCount } = useQuery({
+  const { data: assetCount } = useQuery<{ count: number }>({
     queryKey: ["asset-count"],
-    queryFn: getAssetCount,
+    queryFn: () => getAssetCount(),
   });
 
   const { data: reviewCount } = useQuery<{ count: number }>({

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..schemas.provider import (
@@ -15,9 +16,11 @@ import uuid
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-# Keys used in app_settings table for Immich credentials
+# Keys used in app_settings table
 _KEY_IMMICH_URL = "immich_url"
 _KEY_IMMICH_API_KEY = "immich_api_key"
+_KEY_ALLOW_NEW_TAGS = "allow_new_tags"
+_KEY_ALLOW_NEW_ALBUMS = "allow_new_albums"
 
 
 def _get_immich_credentials(db: Session):
@@ -188,6 +191,34 @@ def list_provider_models(provider_name: str, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+class BehaviourSettings(BaseModel):
+    allow_new_tags: bool = True
+    allow_new_albums: bool = True
+
+
+@router.get("/behaviour", response_model=BehaviourSettings)
+def get_behaviour_settings(db: Session = Depends(get_db)):
+    """Return AI behaviour settings (tag/album creation)."""
+    def _get(key: str, default: bool) -> bool:
+        row = db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row is None:
+            return default
+        return row.value.lower() not in ("false", "0", "no")
+
+    return BehaviourSettings(
+        allow_new_tags=_get(_KEY_ALLOW_NEW_TAGS, True),
+        allow_new_albums=_get(_KEY_ALLOW_NEW_ALBUMS, True),
+    )
+
+
+@router.post("/behaviour", response_model=BehaviourSettings)
+def save_behaviour_settings(body: BehaviourSettings, db: Session = Depends(get_db)):
+    """Persist AI behaviour settings."""
+    _set_app_setting(db, _KEY_ALLOW_NEW_TAGS, "true" if body.allow_new_tags else "false")
+    _set_app_setting(db, _KEY_ALLOW_NEW_ALBUMS, "true" if body.allow_new_albums else "false")
+    return body
 
 
 def _provider_to_out(row: ProviderConfig) -> ProviderConfigOut:
