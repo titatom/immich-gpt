@@ -39,9 +39,7 @@ def _make_provider(db, name="openai", enabled=True, is_default=False) -> Provide
 
 def test_get_immich_settings_not_configured(client):
     # No DB row and empty env vars → not configured
-    with patch("app.routers.settings.settings") as mock_settings:
-        mock_settings.IMMICH_URL = ""
-        mock_settings.IMMICH_API_KEY = ""
+    with patch("app.routers.settings._get_immich_credentials", return_value=("", "")):
         r = client.get("/api/settings/immich")
     assert r.status_code == 200
     data = r.json()

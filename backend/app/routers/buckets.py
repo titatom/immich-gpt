@@ -89,12 +89,9 @@ def bucket_stats(
     IMPORTANT: must be registered before /{bucket_id} to avoid route shadowing.
     """
     from ..models.asset import Asset as AssetModel
+    from sqlalchemy import select as sa_select
 
-    user_asset_ids = (
-        db.query(AssetModel.id)
-        .filter(AssetModel.user_id == current_user.id)
-        .subquery()
-    )
+    user_asset_ids_stmt = sa_select(AssetModel.id).where(AssetModel.user_id == current_user.id)
 
     rows = (
         db.query(
@@ -103,7 +100,7 @@ def bucket_stats(
             SuggestedClassification.status,
             func.count(SuggestedClassification.id).label("count"),
         )
-        .filter(SuggestedClassification.asset_id.in_(user_asset_ids))
+        .filter(SuggestedClassification.asset_id.in_(user_asset_ids_stmt))
         .group_by(
             SuggestedClassification.suggested_bucket_name,
             SuggestedClassification.suggested_bucket_id,

@@ -58,11 +58,12 @@ def get_review_queue(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    user_asset_ids = db.query(Asset.id).filter(Asset.user_id == current_user.id).subquery()
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
 
     q = db.query(SuggestedClassification).filter(
         SuggestedClassification.status == status,
-        SuggestedClassification.asset_id.in_(user_asset_ids),
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     )
     if bucket_id:
         q = q.filter(SuggestedClassification.suggested_bucket_id == bucket_id)
@@ -91,10 +92,11 @@ def get_review_count(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    user_asset_ids = db.query(Asset.id).filter(Asset.user_id == current_user.id).subquery()
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     count = db.query(SuggestedClassification).filter(
         SuggestedClassification.status == status,
-        SuggestedClassification.asset_id.in_(user_asset_ids),
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     ).count()
     return {"count": count, "status": status}
 
@@ -106,10 +108,11 @@ def get_review_queue_ids(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    user_asset_ids = db.query(Asset.id).filter(Asset.user_id == current_user.id).subquery()
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     q = db.query(SuggestedClassification.asset_id).filter(
         SuggestedClassification.status == status,
-        SuggestedClassification.asset_id.in_(user_asset_ids),
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     )
     if bucket_id:
         q = q.filter(SuggestedClassification.suggested_bucket_id == bucket_id)
