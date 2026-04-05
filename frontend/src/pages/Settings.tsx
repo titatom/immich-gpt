@@ -12,7 +12,7 @@ import {
   saveBehaviourSettings,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
-import { CheckCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 
 const inputStyle: React.CSSProperties = {
   background: "#1e293b",
@@ -131,10 +131,12 @@ function ModelPickerForm({
   form,
   setForm,
   inputStyle: _inputStyle,
+  isEditing,
 }: {
   form: ProviderForm;
   setForm: React.Dispatch<React.SetStateAction<ProviderForm>>;
   inputStyle: React.CSSProperties;
+  isEditing?: boolean;
 }) {
   const { data: models } = useQuery({
     queryKey: ["provider-models", form.provider_name, form.base_url],
@@ -143,23 +145,36 @@ function ModelPickerForm({
     retry: false,
   });
 
+  const providerLabels: Record<string, string> = {
+    openai: "OpenAI",
+    ollama: "Ollama",
+    openrouter: "OpenRouter",
+  };
+
   return (
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
       <div>
         <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Provider</label>
-        <select
-          value={form.provider_name}
-          onChange={(e) => {
-            const p = e.target.value;
-            const defaultModel = p === "ollama" ? "llava" : p === "openrouter" ? "openai/gpt-4o" : "gpt-4o";
-            setForm((f) => ({ ...f, provider_name: p, model_name: defaultModel, api_key: "" }));
-          }}
-          style={_inputStyle}
-        >
-          <option value="openai">OpenAI</option>
-          <option value="ollama">Ollama</option>
-          <option value="openrouter">OpenRouter</option>
-        </select>
+        {isEditing ? (
+          <div style={{ ..._inputStyle, display: "flex", alignItems: "center", gap: 6, opacity: 0.7, cursor: "not-allowed" }}>
+            <span style={{ fontSize: 13, color: "#94a3b8" }}>{providerLabels[form.provider_name] ?? form.provider_name}</span>
+            <span style={{ fontSize: 11, color: "#475569", marginLeft: "auto" }}>locked</span>
+          </div>
+        ) : (
+          <select
+            value={form.provider_name}
+            onChange={(e) => {
+              const p = e.target.value;
+              const defaultModel = p === "ollama" ? "llava" : p === "openrouter" ? "openai/gpt-4o" : "gpt-4o";
+              setForm((f) => ({ ...f, provider_name: p, model_name: defaultModel, api_key: "" }));
+            }}
+            style={_inputStyle}
+          >
+            <option value="openai">OpenAI</option>
+            <option value="ollama">Ollama</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        )}
       </div>
       <div>
         <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Model</label>
@@ -180,26 +195,132 @@ function ModelPickerForm({
   );
 }
 
+const EMPTY_FORM: ProviderForm = {
+  provider_name: "openai",
+  api_key: "",
+  model_name: "gpt-4o",
+  base_url: "",
+  enabled: true,
+  is_default: true,
+};
+
+function ProviderFormPanel({
+  form,
+  setForm,
+  isEditing,
+  isPending,
+  onSave,
+  onCancel,
+}: {
+  form: ProviderForm;
+  setForm: React.Dispatch<React.SetStateAction<ProviderForm>>;
+  isEditing: boolean;
+  isPending: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div style={{ marginTop: 20 }}>
+      <ModelPickerForm form={form} setForm={setForm} inputStyle={inputStyle} isEditing={isEditing} />
+
+      {form.provider_name !== "ollama" && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>
+          <input
+            type="password"
+            value={form.api_key}
+            onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+            style={inputStyle}
+            placeholder={isEditing ? "Leave blank to keep existing key" : form.provider_name === "openrouter" ? "sk-or-..." : "sk-..."}
+          />
+        </div>
+      )}
+
+      {form.provider_name === "ollama" && (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Base URL</label>
+          <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder="http://localhost:11434" />
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+            Ollama is self-hosted and does not require an API key.
+          </div>
+        </div>
+      )}
+      {form.provider_name === "openrouter" && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", background: "#0f172a", borderRadius: 8, border: "1px solid #334155" }}>
+          <div style={{ fontSize: 12, color: "#64748b" }}>
+            OpenRouter uses <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>https://openrouter.ai/api/v1</code> automatically — no Base URL needed.
+          </div>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
+            After saving, the model picker will load all available OpenRouter models. You can type a model ID (e.g. <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>openai/gpt-4o</code>, <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>anthropic/claude-3.5-sonnet</code>) or save first to browse.
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <input type="checkbox" checked={form.is_default} onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))} />
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>Set as default</span>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} />
+          <span style={{ fontSize: 13, color: "#94a3b8" }}>Enabled</span>
+        </label>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onSave}
+          disabled={isPending}
+          style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1e40af", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+        >
+          {isPending ? "Saving..." : isEditing ? "Update Provider" : "Save Provider"}
+        </button>
+        <button onClick={onCancel} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProvidersSection() {
   const qc = useQueryClient();
   const { data: providers = [] } = useQuery({ queryKey: ["providers"], queryFn: getProviders });
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({
-    provider_name: "openai",
-    api_key: "",
-    model_name: "gpt-4o",
-    base_url: "",
-    enabled: true,
-    is_default: true,
-  });
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [form, setForm] = useState<ProviderForm>(EMPTY_FORM);
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
+
+  function openAdd() {
+    setEditingName(null);
+    setForm(EMPTY_FORM);
+    setShowAdd(true);
+  }
+
+  function openEdit(p: ProviderConfig) {
+    setEditingName(p.provider_name);
+    setForm({
+      provider_name: p.provider_name,
+      api_key: "",
+      model_name: p.model_name || "",
+      base_url: p.base_url || "",
+      enabled: p.enabled,
+      is_default: p.is_default,
+    });
+    setShowAdd(true);
+  }
+
+  function closeForm() {
+    setShowAdd(false);
+    setEditingName(null);
+    setForm(EMPTY_FORM);
+  }
 
   const upsertMut = useMutation({
     mutationFn: upsertProvider,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["providers"] });
-      setShowAdd(false);
-      setForm({ provider_name: "openai", api_key: "", model_name: "gpt-4o", base_url: "", enabled: true, is_default: true });
+      closeForm();
     },
   });
 
@@ -213,6 +334,8 @@ function ProvidersSection() {
     onSuccess: (data, name) => setTestResults((r) => ({ ...r, [name]: data })),
     onError: (e: AxiosLikeError, name) => setTestResults((r) => ({ ...r, [name]: { error: e.message } })),
   });
+
+  const isEditing = editingName !== null;
 
   return (
     <Section title="AI Providers">
@@ -262,6 +385,13 @@ function ProvidersSection() {
               Test
             </button>
             <button
+              onClick={() => openEdit(p)}
+              title="Edit provider"
+              style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #334155", background: "transparent", color: "#38bdf8", cursor: "pointer" }}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
               onClick={() => {
                 if (confirm(`Remove ${p.provider_name}?`)) deleteMut.mutate(p.provider_name);
               }}
@@ -280,69 +410,17 @@ function ProvidersSection() {
       )}
 
       {showAdd ? (
-        <div style={{ marginTop: 20 }}>
-          <ModelPickerForm form={form} setForm={setForm} inputStyle={inputStyle} />
-
-          {form.provider_name !== "ollama" && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>
-              <input
-                type="password"
-                value={form.api_key}
-                onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
-                style={inputStyle}
-                placeholder={form.provider_name === "openrouter" ? "sk-or-..." : "sk-..."}
-              />
-            </div>
-          )}
-
-          {form.provider_name === "ollama" && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Base URL</label>
-              <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder="http://localhost:11434" />
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
-                Ollama is self-hosted and does not require an API key.
-              </div>
-            </div>
-          )}
-          {form.provider_name === "openrouter" && (
-            <div style={{ marginBottom: 12, padding: "10px 14px", background: "#0f172a", borderRadius: 8, border: "1px solid #334155" }}>
-              <div style={{ fontSize: 12, color: "#64748b" }}>
-                OpenRouter uses <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>https://openrouter.ai/api/v1</code> automatically — no Base URL needed.
-              </div>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
-                After saving, the model picker will load all available OpenRouter models. You can type a model ID (e.g. <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>openai/gpt-4o</code>, <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>anthropic/claude-3.5-sonnet</code>) or save first to browse.
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.is_default} onChange={(e) => setForm((f) => ({ ...f, is_default: e.target.checked }))} />
-              <span style={{ fontSize: 13, color: "#94a3b8" }}>Set as default</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} />
-              <span style={{ fontSize: 13, color: "#94a3b8" }}>Enabled</span>
-            </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => upsertMut.mutate(form)}
-              disabled={upsertMut.isPending}
-              style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "#1e40af", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-            >
-              {upsertMut.isPending ? "Saving..." : "Save Provider"}
-            </button>
-            <button onClick={() => setShowAdd(false)} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        <ProviderFormPanel
+          form={form}
+          setForm={setForm}
+          isEditing={isEditing}
+          isPending={upsertMut.isPending}
+          onSave={() => upsertMut.mutate(form)}
+          onCancel={closeForm}
+        />
       ) : (
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={openAdd}
           style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, border: "1px dashed #334155", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}
         >
           <Plus size={14} /> Add Provider
