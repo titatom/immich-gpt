@@ -102,6 +102,42 @@ def count_assets(
     return {"count": query.count()}
 
 
+@router.get("/ids")
+def list_asset_ids(
+    asset_type: Optional[str] = None,
+    bucket_name: Optional[str] = None,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Return all asset IDs matching the given filters (no pagination).
+
+    Used by the frontend to implement cross-page 'select all' without
+    fetching full asset objects.
+    """
+    query = db.query(Asset.id)
+    if asset_type:
+        query = query.filter(Asset.asset_type == asset_type)
+    if bucket_name:
+        classified_ids = (
+            db.query(SuggestedClassification.asset_id)
+            .filter(SuggestedClassification.suggested_bucket_name == bucket_name)
+            .subquery()
+        )
+        query = query.filter(Asset.id.in_(classified_ids))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Asset.original_filename.ilike(like),
+                Asset.description.ilike(like),
+                Asset.city.ilike(like),
+                Asset.country.ilike(like),
+            )
+        )
+    rows = query.order_by(Asset.file_created_at.desc()).all()
+    return {"ids": [r[0] for r in rows]}
+
+
 class ClassificationDetail(BaseModel):
     id: str
     suggested_bucket_id: Optional[str]

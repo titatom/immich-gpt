@@ -104,6 +104,12 @@ export const getAssetCount = (params?: {
   q?: string;
 }) => api.get("/assets/count", { params }).then((r) => r.data as { count: number });
 
+export const getAllAssetIds = (params?: {
+  asset_type?: string;
+  bucket_name?: string;
+  q?: string;
+}) => api.get("/assets/ids", { params }).then((r) => r.data as { ids: string[] });
+
 export const getAssetDetail = (id: string): Promise<AssetDetail> =>
   api.get(`/assets/${id}/detail`).then((r) => r.data);
 

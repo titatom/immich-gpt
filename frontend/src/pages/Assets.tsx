@@ -2,7 +2,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
-  getAssets, getAssetCount, getAssetDetail, getThumbnailUrl,
+  getAssets, getAssetCount, getAllAssetIds, getAssetDetail, getThumbnailUrl,
   getBuckets, reclassifyAssets,
 } from "../services/api";
 import type { Asset, AssetDetail, Bucket } from "../types";
@@ -415,6 +415,8 @@ export default function Assets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssetId, setSelectedAssetId] = React.useState<string | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [selectAllPages, setSelectAllPages] = React.useState(false);
+  const [loadingAllIds, setLoadingAllIds] = React.useState(false);
   const [reclassifyMessage, setReclassifyMessage] = React.useState<string | null>(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -435,6 +437,7 @@ export default function Assets() {
       return next;
     });
     setSelectedIds(new Set());
+    setSelectAllPages(false);
   }
 
   function handleSort(key: SortKey) {
@@ -483,6 +486,7 @@ export default function Assets() {
         `Re-classification job started for ${ids.length} asset${ids.length !== 1 ? "s" : ""}. Job ID: ${data.job_id}`
       );
       setSelectedIds(new Set());
+      setSelectAllPages(false);
       qc.invalidateQueries({ queryKey: ["jobs"] });
       setTimeout(() => setReclassifyMessage(null), 5000);
     },
@@ -502,6 +506,7 @@ export default function Assets() {
 
   function toggleSelect(id: string, e: React.MouseEvent) {
     e.stopPropagation();
+    setSelectAllPages(false);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -510,14 +515,30 @@ export default function Assets() {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === sorted.length) {
+    if (selectAllPages || selectedIds.size === sorted.length) {
       setSelectedIds(new Set());
+      setSelectAllPages(false);
     } else {
       setSelectedIds(new Set(sorted.map((a) => a.id)));
     }
   }
 
-  const allSelected = sorted.length > 0 && selectedIds.size === sorted.length;
+  async function selectAcrossAllPages() {
+    setLoadingAllIds(true);
+    try {
+      const result = await getAllAssetIds({
+        asset_type: assetType || undefined,
+        bucket_name: bucketFilter || undefined,
+        q: search || undefined,
+      });
+      setSelectedIds(new Set(result.ids));
+      setSelectAllPages(true);
+    } finally {
+      setLoadingAllIds(false);
+    }
+  }
+
+  const allPageSelected = sorted.length > 0 && sorted.every((a) => selectedIds.has(a.id));
   const someSelected = selectedIds.size > 0;
 
   return (
@@ -547,7 +568,7 @@ export default function Assets() {
               {reclassifyMut.isPending ? "Starting…" : `Re-classify ${selectedIds.size}`}
             </button>
             <button
-              onClick={() => setSelectedIds(new Set())}
+              onClick={() => { setSelectedIds(new Set()); setSelectAllPages(false); }}
               style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}
             >
               Clear
@@ -624,10 +645,45 @@ export default function Assets() {
               borderRadius: 6, padding: "4px 10px", cursor: "pointer",
             }}
           >
-            {allSelected ? "Deselect all" : `Select all ${sorted.length}`}
+            {(selectAllPages || allPageSelected) ? "Deselect all" : `Select all ${sorted.length}`}
           </button>
         )}
       </div>
+
+      {/* Cross-page select-all banner */}
+      {allPageSelected && !selectAllPages && countData && countData.count > sorted.length && (
+        <div style={{
+          marginBottom: 12, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
+          fontSize: 13, color: "#7dd3fc",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <span>All {sorted.length} assets on this page are selected.</span>
+          <button
+            onClick={selectAcrossAllPages}
+            disabled={loadingAllIds}
+            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}
+          >
+            {loadingAllIds ? "Loading…" : `Select all ${countData.count.toLocaleString()} assets`}
+          </button>
+        </div>
+      )}
+      {selectAllPages && countData && (
+        <div style={{
+          marginBottom: 12, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
+          fontSize: 13, color: "#7dd3fc",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <span>All {selectedIds.size.toLocaleString()} matching assets are selected.</span>
+          <button
+            onClick={() => { setSelectedIds(new Set()); setSelectAllPages(false); }}
+            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div style={{ color: "#64748b", textAlign: "center", padding: 64 }}>Loading…</div>
