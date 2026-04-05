@@ -12,10 +12,12 @@ from .routers import (
 )
 from .seeds import seed_defaults
 from .middleware.auth import BearerTokenMiddleware
+from .config import warn_if_auth_disabled
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_if_auth_disabled()
     init_db()
     seed_defaults()
     yield
@@ -51,7 +53,12 @@ app.include_router(audit_logs.router)
 @app.get("/api/health")
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    from .config import settings as _settings
+    return {
+        "status": "ok",
+        "version": "0.1.0",
+        "auth_enabled": _settings.AUTH_ENABLED,
+    }
 
 
 # Serve frontend static files in production

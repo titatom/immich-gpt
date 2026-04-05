@@ -2,20 +2,28 @@
 Optional Bearer-token auth middleware.
 
 Activated by setting AUTH_ENABLED=true in .env / environment.
-When enabled every request must include:
+When enabled every request to /api/* must include:
     Authorization: Bearer <SECRET_KEY>
 
-Requests to /api/health and the SSE job-stream endpoint bypass auth so
-healthchecks and EventSource (which cannot set headers) still work.
+Bypassed routes (no auth required):
+  - GET /health and GET /api/health  — health-check probes
+  - GET /api/jobs/<id>/stream        — Server-Sent Events; EventSource cannot
+                                       set custom request headers, so auth must
+                                       be enforced at the client/proxy layer for
+                                       this endpoint when AUTH_ENABLED=true.
+  - Any non-/api path                — static SPA assets served by FastAPI
 """
+import re
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..config import settings
 
-_BYPASS_PREFIXES = ("/api/health", "/health", "/api/jobs/")
-_BYPASS_SUFFIXES = ("/stream",)
+_HEALTH_PATHS = frozenset({"/api/health", "/health"})
+
+# Matches exactly /api/jobs/<job-id>/stream — nothing else under /api/jobs/
+_SSE_STREAM_RE = re.compile(r"^/api/jobs/[^/]+/stream$")
 
 
 class BearerTokenMiddleware(BaseHTTPMiddleware):
@@ -25,12 +33,15 @@ class BearerTokenMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
 
-        # Allow health probes and SSE streams (EventSource can't send auth headers)
-        if any(path.startswith(p) for p in _BYPASS_PREFIXES):
-            if path.endswith("/stream") or path in ("/api/health", "/health"):
-                return await call_next(request)
+        # Health probes
+        if path in _HEALTH_PATHS:
+            return await call_next(request)
 
-        # Allow unauthenticated access to the static SPA assets
+        # SSE stream — EventSource API cannot attach Authorization headers
+        if _SSE_STREAM_RE.match(path):
+            return await call_next(request)
+
+        # Static SPA assets served from /  (non-/api paths)
         if not path.startswith("/api"):
             return await call_next(request)
 

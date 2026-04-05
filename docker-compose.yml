@@ -28,7 +28,9 @@ x-common-env: &common-env
   IMMICH_API_KEY: ${IMMICH_API_KEY:-}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-  SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+  # Leave SECRET_KEY unset to let the app auto-generate a secure random key.
+  # Provide your own value here or via a .env file if you want a stable token.
+  SECRET_KEY: ${SECRET_KEY:-}
   AUTH_ENABLED: ${AUTH_ENABLED:-false}
 
 services:
