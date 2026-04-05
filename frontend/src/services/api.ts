@@ -153,6 +153,11 @@ export const getReviewQueue = (params?: {
 }): Promise<ReviewItem[]> =>
   api.get("/review/queue", { params }).then((r) => r.data);
 
+export const getReviewQueueIds = (params?: {
+  status?: string;
+  bucket_id?: string;
+}) => api.get("/review/queue/ids", { params }).then((r) => r.data as { ids: string[] });
+
 export const getReviewCount = (status = "pending_review") =>
   api.get("/review/queue/count", { params: { status } }).then((r) => r.data as { count: number });
 

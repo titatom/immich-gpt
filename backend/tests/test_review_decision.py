@@ -205,3 +205,61 @@ def test_external_library_warning_in_errors(db):
     )
 
     assert any("external library" in e.lower() for e in result.errors)
+
+
+def test_approve_immich_trash_bucket_calls_trash(db):
+    """Approving an asset assigned to an immich_trash bucket should call trash_assets."""
+    asset, cls, meta = make_full_suggestion(db)
+
+    # Use the seeded Trash bucket, updating its mapping_mode to immich_trash
+    trash_bucket = db.query(Bucket).filter(Bucket.name == "Trash").first()
+    assert trash_bucket is not None
+    trash_bucket.mapping_mode = "immich_trash"
+    db.commit()
+
+    mock_immich = MagicMock()
+    mock_immich.trash_assets.return_value = {}
+
+    svc = ReviewDecisionService(db, immich_client=mock_immich)
+    result = svc.approve_asset(
+        asset_id=asset.id,
+        approved_bucket_id=trash_bucket.id,
+        approved_bucket_name="Trash",
+        approved_description=None,
+        approved_tags=None,
+        approved_subalbum=None,
+        subalbum_approved=False,
+        trigger_writeback=True,
+    )
+
+    mock_immich.trash_assets.assert_called_once_with([asset.immich_id])
+    assert result.album_assigned is True
+    assert len(result.errors) == 0
+
+
+def test_approve_immich_trash_bucket_error_reported(db):
+    """Immich trash failures are surfaced in result.errors."""
+    asset, cls, meta = make_full_suggestion(db)
+
+    trash_bucket = db.query(Bucket).filter(Bucket.name == "Trash").first()
+    assert trash_bucket is not None
+    trash_bucket.mapping_mode = "immich_trash"
+    db.commit()
+
+    mock_immich = MagicMock()
+    mock_immich.trash_assets.side_effect = ImmichError("Immich trash failed", 500)
+
+    svc = ReviewDecisionService(db, immich_client=mock_immich)
+    result = svc.approve_asset(
+        asset_id=asset.id,
+        approved_bucket_id=trash_bucket.id,
+        approved_bucket_name="Trash",
+        approved_description=None,
+        approved_tags=None,
+        approved_subalbum=None,
+        subalbum_approved=False,
+        trigger_writeback=True,
+    )
+
+    assert result.album_assigned is False
+    assert any("trash" in e.lower() for e in result.errors)

@@ -4,7 +4,7 @@ import { getBuckets, createBucket, updateBucket, deleteBucket, getAlbums, getBuc
 import type { Bucket, BucketStat } from "../types";
 import { Plus, Trash2, Edit2, Info } from "lucide-react";
 
-const MAPPING_MODES = ["virtual", "immich_album", "parent_group"] as const;
+const MAPPING_MODES = ["virtual", "immich_album", "parent_group", "immich_trash"] as const;
 
 const MAPPING_MODE_INFO: Record<string, { label: string; description: string }> = {
   virtual: {
@@ -21,6 +21,11 @@ const MAPPING_MODE_INFO: Record<string, { label: string; description: string }> 
     label: "Parent Group",
     description:
       "Assets approved for this bucket are placed in a sub-album under the bucket name as a parent group. Useful for organising into a hierarchy like 'Travel / Paris', 'Travel / Tokyo'. The sub-album name comes from the AI suggestion or the review override.",
+  },
+  immich_trash: {
+    label: "Immich Trash",
+    description:
+      "When a classification is approved, the asset is moved to the Immich trash. Immich handles permanent deletion according to its own retention policy. Use this for buckets like 'Trash', 'Duplicates', or 'Unwanted' where you want AI to flag photos for deletion.",
   },
 };
 

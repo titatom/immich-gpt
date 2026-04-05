@@ -10,12 +10,15 @@ import {
   rejectAsset,
   bulkReview,
   getThumbnailUrl,
+  reclassifyAssets,
+  getReviewQueueIds,
 } from "../services/api";
 import type { ReviewItem, Bucket } from "../types";
 import Thumbnail from "../components/Thumbnail";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 import TagList from "../components/TagList";
-import { CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface ApproveData {
   approved_bucket_id?: string;
@@ -33,9 +36,10 @@ interface ReviewCardProps {
   albums: Array<{ id: string; albumName: string }>;
   onApprove: (assetId: string, data: ApproveData) => void;
   onReject: (assetId: string) => void;
+  onReanalyse: (assetId: string) => void;
 }
 
-function ReviewCard({ item, buckets, albums, onApprove, onReject }: ReviewCardProps) {
+function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse }: ReviewCardProps) {
   const [showMeta, setShowMeta] = useState(false);
   const [editDescription, setEditDescription] = useState(item.description_suggestion ?? item.current_description ?? "");
   const [editTags, setEditTags] = useState<string[]>(item.tags_suggestion ?? item.current_tags ?? []);
@@ -216,6 +220,17 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject }: ReviewCardPr
           >
             <XCircle size={14} /> Reject
           </button>
+          <button
+            onClick={() => onReanalyse(item.asset_id)}
+            title="Re-run AI analysis on this asset"
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 8, border: "1px solid #334155",
+              background: "transparent", color: "#7c3aed", fontSize: 13, fontWeight: 500, cursor: "pointer",
+            }}
+          >
+            <RefreshCw size={14} /> Re-analyse
+          </button>
         </div>
       </div>
 
@@ -243,10 +258,14 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject }: ReviewCardPr
 
 export default function Review() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parseInt(searchParams.get("page") || "1", 10);
   const selectedBucketFilter = searchParams.get("bucket_id") || "";
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectAllPages, setSelectAllPages] = useState(false);
+  const [loadingAllIds, setLoadingAllIds] = useState(false);
+  const [reanalyseMessage, setReanalyseMessage] = useState<string | null>(null);
   const pageSize = 20;
 
   function setParam(key: string, value: string) {
@@ -256,6 +275,8 @@ export default function Review() {
       if (key !== "page") next.set("page", "1");
       return next;
     });
+    setSelected(new Set());
+    setSelectAllPages(false);
   }
 
   const { data: buckets = [] } = useQuery({ queryKey: ["buckets"], queryFn: getBuckets });
@@ -294,16 +315,55 @@ export default function Review() {
       bulkReview({ asset_ids: Array.from(selected), action, trigger_writeback: true }),
     onSuccess: () => {
       setSelected(new Set());
+      setSelectAllPages(false);
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
     },
   });
 
+  const reclassifyMut = useMutation({
+    mutationFn: (ids: string[]) => reclassifyAssets(ids, true),
+    onSuccess: (data, ids) => {
+      setReanalyseMessage(
+        `Re-analysis job started for ${ids.length} asset${ids.length !== 1 ? "s" : ""}. Job ID: ${data.job_id}`
+      );
+      setSelected(new Set());
+      setSelectAllPages(false);
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      setTimeout(() => setReanalyseMessage(null), 5000);
+    },
+  });
+
   const toggleSelect = (id: string) => {
+    setSelectAllPages(false);
     const s = new Set(selected);
     if (s.has(id)) { s.delete(id); } else { s.add(id); }
     setSelected(s);
   };
+
+  const allPageSelected = items.length > 0 && items.every((i) => selected.has(i.asset_id));
+
+  function toggleSelectAll() {
+    if (selectAllPages || allPageSelected) {
+      setSelected(new Set());
+      setSelectAllPages(false);
+    } else {
+      setSelected(new Set(items.map((i) => i.asset_id)));
+    }
+  }
+
+  async function selectAcrossAllPages() {
+    setLoadingAllIds(true);
+    try {
+      const result = await getReviewQueueIds({
+        bucket_id: selectedBucketFilter || undefined,
+      });
+      setSelected(new Set(result.ids));
+      setSelectAllPages(true);
+    } finally {
+      setLoadingAllIds(false);
+    }
+  }
 
   return (
     <div style={{ padding: "32px 40px", maxWidth: 960 }}>
@@ -324,12 +384,27 @@ export default function Review() {
         </select>
       </div>
 
+      {/* Re-analyse message */}
+      {reanalyseMessage && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)",
+          fontSize: 13, color: "#c4b5fd",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>{reanalyseMessage}</span>
+          <button onClick={() => navigate("/jobs")} style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
+            View Jobs
+          </button>
+        </div>
+      )}
+
       {/* Bulk actions */}
       {selected.size > 0 && (
         <div style={{
           display: "flex", alignItems: "center", gap: 12,
           padding: "10px 16px", background: "#1e293b", border: "1px solid #334155",
-          borderRadius: 8, marginBottom: 16,
+          borderRadius: 8, marginBottom: 16, flexWrap: "wrap",
         }}>
           <span style={{ fontSize: 13, color: "#94a3b8" }}>{selected.size} selected</span>
           <button onClick={() => bulkMutation.mutate("approve_all")} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#16a34a", color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
@@ -338,7 +413,21 @@ export default function Review() {
           <button onClick={() => bulkMutation.mutate("reject_all")} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #334155", background: "transparent", color: "#94a3b8", fontSize: 12, cursor: "pointer" }}>
             Reject All
           </button>
-          <button onClick={() => setSelected(new Set())} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer" }}>
+          <button
+            onClick={() => reclassifyMut.mutate(Array.from(selected))}
+            disabled={reclassifyMut.isPending}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "6px 14px", borderRadius: 6, border: "1px solid #334155",
+              background: "transparent", color: "#7c3aed", fontSize: 12,
+              cursor: reclassifyMut.isPending ? "not-allowed" : "pointer",
+              opacity: reclassifyMut.isPending ? 0.6 : 1,
+            }}
+          >
+            <RefreshCw size={12} />
+            {reclassifyMut.isPending ? "Starting…" : "Re-analyse All"}
+          </button>
+          <button onClick={() => { setSelected(new Set()); setSelectAllPages(false); }} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer" }}>
             Clear
           </button>
         </div>
@@ -346,9 +435,46 @@ export default function Review() {
 
       {items.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <button onClick={() => selected.size === items.length ? setSelected(new Set()) : setSelected(new Set(items.map((i) => i.asset_id)))}
-            style={{ background: "transparent", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", padding: "4px 0" }}>
-            {selected.size === items.length ? "Deselect all" : "Select all on page"}
+          <button
+            onClick={toggleSelectAll}
+            style={{ background: "transparent", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", padding: "4px 0" }}
+          >
+            {(selectAllPages || allPageSelected) ? "Deselect all" : "Select all on page"}
+          </button>
+        </div>
+      )}
+
+      {/* Cross-page select-all banner */}
+      {allPageSelected && !selectAllPages && countData && countData.count > items.length && (
+        <div style={{
+          marginBottom: 12, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
+          fontSize: 13, color: "#7dd3fc",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <span>All {items.length} items on this page are selected.</span>
+          <button
+            onClick={selectAcrossAllPages}
+            disabled={loadingAllIds}
+            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}
+          >
+            {loadingAllIds ? "Loading…" : `Select all ${countData.count.toLocaleString()} items`}
+          </button>
+        </div>
+      )}
+      {selectAllPages && countData && (
+        <div style={{
+          marginBottom: 12, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.25)",
+          fontSize: 13, color: "#7dd3fc",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+        }}>
+          <span>All {selected.size.toLocaleString()} matching items are selected.</span>
+          <button
+            onClick={() => { setSelected(new Set()); setSelectAllPages(false); }}
+            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+          >
+            Clear selection
           </button>
         </div>
       )}
@@ -373,6 +499,7 @@ export default function Review() {
               albums={albums}
               onApprove={(assetId, data) => approveMutation.mutate({ assetId, data })}
               onReject={(assetId) => rejectMutation.mutate(assetId)}
+              onReanalyse={(assetId) => reclassifyMut.mutate([assetId])}
             />
           </div>
         ))

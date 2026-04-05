@@ -281,6 +281,25 @@ class ImmichClient:
                 raise ImmichError(f"Failed to create album '{album_name}': {cr.text}")
             return cr.json()
 
+    def trash_assets(self, asset_ids: List[str]) -> Dict[str, Any]:
+        """Move assets to Immich trash.
+
+        Immich uses DELETE /api/assets with a JSON body of asset IDs.
+        This moves assets to the Immich recycle bin (soft delete); Immich
+        then handles permanent deletion according to its own retention policy.
+        """
+        with self._client() as client:
+            r = client.request(
+                "DELETE",
+                "/api/assets",
+                json={"ids": asset_ids},
+            )
+            if r.status_code not in (200, 204):
+                raise ImmichError(
+                    f"Failed to trash assets: {r.text}", r.status_code
+                )
+            return r.json() if r.content else {}
+
     def is_external_library_asset(self, asset: Dict[str, Any]) -> bool:
         """Detect if asset is from an external library (may restrict writes)."""
         lib = asset.get("library", {}) or {}
