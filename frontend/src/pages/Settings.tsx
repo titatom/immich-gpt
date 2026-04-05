@@ -142,10 +142,18 @@ function ModelPickerForm({
   });
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
       <div>
         <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Provider</label>
-        <select value={form.provider_name} onChange={(e) => setForm((f) => ({ ...f, provider_name: e.target.value }))} style={_inputStyle}>
+        <select
+          value={form.provider_name}
+          onChange={(e) => {
+            const p = e.target.value;
+            const defaultModel = p === "ollama" ? "llava" : p === "openrouter" ? "openai/gpt-4o" : "gpt-4o";
+            setForm((f) => ({ ...f, provider_name: p, model_name: defaultModel, api_key: "" }));
+          }}
+          style={_inputStyle}
+        >
           <option value="openai">OpenAI</option>
           <option value="ollama">Ollama</option>
           <option value="openrouter">OpenRouter</option>
@@ -263,7 +271,7 @@ function ProvidersSection() {
 
       {providers.length === 0 && !showAdd && (
         <div style={{ fontSize: 14, color: "#64748b", textAlign: "center", padding: 16 }}>
-          No providers configured. Add OpenAI to get started.
+          No providers configured. Add OpenAI or Ollama to get started.
         </div>
       )}
 
@@ -271,21 +279,28 @@ function ProvidersSection() {
         <div style={{ marginTop: 20 }}>
           <ModelPickerForm form={form} setForm={setForm} inputStyle={inputStyle} />
 
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>
-            <input
-              type="password"
-              value={form.api_key}
-              onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
-              style={inputStyle}
-              placeholder="sk-..."
-            />
-          </div>
+          {form.provider_name !== "ollama" && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>API Key</label>
+              <input
+                type="password"
+                value={form.api_key}
+                onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+                style={inputStyle}
+                placeholder={form.provider_name === "openrouter" ? "sk-or-..." : "sk-..."}
+              />
+            </div>
+          )}
 
           {(form.provider_name === "ollama" || form.provider_name === "openrouter") && (
             <div style={{ marginBottom: 12 }}>
               <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Base URL</label>
-              <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder="http://..." />
+              <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder={form.provider_name === "ollama" ? "http://localhost:11434" : "http://..."} />
+              {form.provider_name === "ollama" && (
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+                  Ollama is self-hosted and does not require an API key.
+                </div>
+              )}
             </div>
           )}
 
