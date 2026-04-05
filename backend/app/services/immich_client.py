@@ -193,6 +193,30 @@ class ImmichClient:
                 )
             return r.json()
 
+    def get_existing_tags_only(self, tag_names: List[str]) -> List[Dict[str, Any]]:
+        """
+        Return only tags that already exist in Immich — never creates new ones.
+        Silently skips tag names not found.
+        """
+        with self._client() as client:
+            r = client.get("/api/tags")
+            existing: Dict[str, Dict[str, Any]] = {}
+            if r.status_code == 200:
+                for t in r.json():
+                    existing[t.get("name", "").lower()] = t
+
+            return [existing[name.lower()] for name in tag_names if name.lower() in existing]
+
+    def get_existing_album(self, album_name: str) -> Optional[Dict[str, Any]]:
+        """Return an existing album by name, or None if it doesn't exist. Never creates."""
+        with self._client() as client:
+            r = client.get("/api/albums")
+            if r.status_code == 200:
+                for album in r.json():
+                    if album.get("albumName", "").lower() == album_name.lower():
+                        return album
+        return None
+
     def get_or_create_tags(self, tag_names: List[str]) -> List[Dict[str, Any]]:
         """
         Batch-resolve tag names to Immich tag objects, creating missing ones.

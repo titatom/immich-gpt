@@ -274,11 +274,21 @@ class OllamaProvider(AIProvider):
 class OpenRouterProvider(AIProvider):
     """OpenRouter — OpenAI-compatible API at openrouter.ai."""
 
+    BASE_URL = "https://openrouter.ai/api/v1"
+
     def __init__(self, api_key: str, model: str = "openai/gpt-4o"):
-        self._inner = OpenAIProvider(
+        self._api_key = api_key
+        self._model = model
+        # Extra headers recommended by OpenRouter for attribution and routing.
+        self._extra_headers = {
+            "HTTP-Referer": "https://github.com/titatom/immich-gpt",
+            "X-Title": "immich-gpt",
+        }
+        from openai import OpenAI
+        self._client = OpenAI(
             api_key=api_key,
-            model=model,
-            base_url="https://openrouter.ai/api/v1",
+            base_url=self.BASE_URL,
+            default_headers=self._extra_headers,
         )
 
     @property
@@ -286,14 +296,81 @@ class OpenRouterProvider(AIProvider):
         return "openrouter"
 
     def health_check(self) -> bool:
-        return self._inner.health_check()
+        """Lightweight connectivity check against OpenRouter's auth endpoint."""
+        try:
+            import httpx
+            r = httpx.get(
+                f"{self.BASE_URL}/auth/key",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    **self._extra_headers,
+                },
+                timeout=10,
+            )
+            return r.status_code in (200, 401)
+        except Exception:
+            return False
 
     def classify_asset(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
     ) -> AIClassificationResult:
-        return self._inner.classify_asset(prompt_messages, image_payload)
+        import json
+
+        messages = list(prompt_messages)
+        if image_payload and image_payload.get("data_url"):
+            last_user = None
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i].get("role") == "user":
+                    last_user = i
+                    break
+            if last_user is not None:
+                content = messages[last_user]["content"]
+                if isinstance(content, str):
+                    content = [{"type": "text", "text": content}]
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image_payload["data_url"], "detail": "low"},
+                })
+                messages[last_user] = {"role": "user", "content": content}
+
+        # Try with JSON mode first; fall back without it for models that don't support it.
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,  # type: ignore
+                response_format={"type": "json_object"},
+                temperature=0.2,
+                max_tokens=1024,
+            )
+        except Exception as e:
+            err_str = str(e).lower()
+            if "response_format" in err_str or "json_object" in err_str or "unsupported" in err_str:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,  # type: ignore
+                    temperature=0.2,
+                    max_tokens=1024,
+                )
+            else:
+                raise
+
+        raw = response.choices[0].message.content or "{}"
+
+        # Strip markdown fences some models include
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.lstrip("`").lstrip("json").strip()
+            if stripped.endswith("```"):
+                stripped = stripped[:-3].strip()
+
+        try:
+            data = json.loads(stripped)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from OpenRouter ({self._model}): {e}\nRaw: {raw[:500]}")
+
+        return _validate_result(data, raw)
 
 
 def build_provider(provider_name: str, config: dict) -> AIProvider:

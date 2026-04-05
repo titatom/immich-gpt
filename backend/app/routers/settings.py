@@ -154,7 +154,9 @@ def test_provider(provider_name: str, db: Session = Depends(get_db)):
             "base_url": row.base_url,
         })
         ok = p.health_check()
-        return {"connected": ok}
+        if not ok:
+            return {"connected": False, "error": "Provider unreachable or invalid API key"}
+        return {"connected": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

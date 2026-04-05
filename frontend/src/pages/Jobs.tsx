@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  getJobs, getJob, cancelJob, pauseJob, resumeJob, deleteJob,
+  getJobs, cancelJob, pauseJob, resumeJob, deleteJob,
   startSyncJob, startClassifyJob,
 } from "../services/api";
 import JobProgressBar from "../components/JobProgressBar";
-import LogPanel from "../components/LogPanel";
+import JobDetail from "../components/JobDetail";
 import SyncOptionsModal from "../components/SyncOptionsModal";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp, Pause, RotateCcw, Trash2 } from "lucide-react";
 import type { SyncScope } from "../types";
@@ -13,29 +13,6 @@ import type { SyncScope } from "../types";
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 const ACTIVE = new Set(["queued", "starting", "syncing_assets", "preparing_image", "classifying_ai", "validating_result", "saving_suggestion", "writing_results"]);
 
-function JobDetail({ jobId }: { jobId: string }) {
-  const { data: job } = useQuery({
-    queryKey: ["job", jobId],
-    queryFn: () => getJob(jobId),
-    refetchInterval: (q) => {
-      const d = q.state.data;
-      if (!d) return 2000;
-      return TERMINAL.has(d.status) || d.status === "paused" ? false : 2000;
-    },
-  });
-  if (!job) return null;
-  return (
-    <div style={{ padding: "12px 0" }}>
-      <JobProgressBar job={job} />
-      {job.log_lines && job.log_lines.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Log</div>
-          <LogPanel lines={job.log_lines} maxHeight={250} />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function Jobs() {
   const qc = useQueryClient();
