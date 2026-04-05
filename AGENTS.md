@@ -18,10 +18,10 @@ immich-gpt is a self-hosted web app with a Python/FastAPI backend and React/Type
 ### Running tests
 
 ```bash
-# Backend (134 tests — all use in-memory SQLite, no external services required)
+# Backend (155 tests — all use in-memory SQLite, no external services required)
 cd backend && python3 -m pytest tests/ -v
 
-# Frontend (46 tests — Vitest + React Testing Library, jsdom)
+# Frontend (48 tests — Vitest + React Testing Library, jsdom)
 cd frontend && npm test
 ```
 
