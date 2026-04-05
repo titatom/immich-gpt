@@ -13,17 +13,36 @@ from ..models.provider_config import ProviderConfig
 from typing import Optional, List
 
 
+def _get_user_immich_client(db, user_id: Optional[str]) -> ImmichClient:
+    """Resolve Immich credentials for a specific user."""
+    from ..models.app_setting import AppSetting
+    from ..config import settings
+    if user_id:
+        url_row = db.query(AppSetting).filter(
+            AppSetting.user_id == user_id, AppSetting.key == "immich_url"
+        ).first()
+        key_row = db.query(AppSetting).filter(
+            AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
+        ).first()
+        url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
+        api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
+    else:
+        url = settings.IMMICH_URL
+        api_key = settings.IMMICH_API_KEY
+    return ImmichClient(url, api_key)
+
+
 def run_asset_sync(
     job_id: str,
     scope: str = "all",
     album_ids: Optional[List[str]] = None,
+    user_id: Optional[str] = None,
 ) -> dict:
     db = SessionLocal()
     try:
         from ..models.job_run import JobRun as _JobRun
 
         job_svc = JobProgressService(db)
-        # Reset counters in case this is a retry
         job_svc.reset_for_retry(job_id)
         job_svc.start_job(job_id)
 
@@ -47,8 +66,8 @@ def run_asset_sync(
             j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
             return j is not None and j.status in ("paused", "cancelled")
 
-        immich = ImmichClient()
-        sync_svc = AssetSyncService(db, immich)
+        immich = _get_user_immich_client(db, user_id)
+        sync_svc = AssetSyncService(db, immich, user_id=user_id)
 
         if scope == "favorites":
             result = sync_svc.sync_favorites(job_progress_callback=progress_cb, should_stop=should_stop)
@@ -57,7 +76,6 @@ def run_asset_sync(
         else:
             result = sync_svc.sync_all(job_progress_callback=progress_cb, should_stop=should_stop)
 
-        # Only mark complete if not paused/cancelled
         j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
         if j and j.status not in ("paused", "cancelled"):
             job_svc.complete_job(
@@ -85,18 +103,22 @@ def run_classification(
     asset_ids: Optional[List[str]] = None,
     limit: Optional[int] = None,
     force: bool = False,
+    user_id: Optional[str] = None,
 ) -> dict:
     db = SessionLocal()
     try:
-        provider_cfg = db.query(ProviderConfig).filter(
+        # Find the user's default provider config
+        q = db.query(ProviderConfig)
+        if user_id:
+            q = q.filter(ProviderConfig.user_id == user_id)
+
+        provider_cfg = q.filter(
             ProviderConfig.is_default == True,
             ProviderConfig.enabled == True,
         ).first()
 
         if not provider_cfg:
-            provider_cfg = db.query(ProviderConfig).filter(
-                ProviderConfig.enabled == True
-            ).first()
+            provider_cfg = q.filter(ProviderConfig.enabled == True).first()
 
         if not provider_cfg:
             from ..config import settings
@@ -120,9 +142,9 @@ def run_classification(
                 cfg_dict.update(provider_cfg.extra_config_json)
             provider = build_provider(provider_cfg.provider_name, cfg_dict)
 
-        orchestrator = ClassificationOrchestrator(db, provider)
+        immich = _get_user_immich_client(db, user_id)
+        orchestrator = ClassificationOrchestrator(db, provider, immich_client=immich, user_id=user_id)
         orchestrator.run_classification_job(job_id, asset_ids=asset_ids, limit=limit, force=force)
-        # Status is set inside the orchestrator (complete or paused/cancelled)
         return {"status": "done"}
 
     except Exception as e:

@@ -15,8 +15,10 @@ from app.models.bucket import Bucket
 
 def make_full_suggestion(db):
     """Create asset + classification + metadata suggestion."""
+    from tests.conftest import TEST_USER_ID
     asset = Asset(
         id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
         immich_id="immich-test-001",
         original_filename="test.jpg",
         is_favorite=False,

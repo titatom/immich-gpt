@@ -44,11 +44,15 @@ DEFAULT_BUCKET_PROMPTS = {
 
 
 class PromptAssemblyService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: Optional[str] = None):
         self.db = db
+        self.user_id = user_id
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
-        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
+        q = self.db.query(AppSetting).filter(AppSetting.key == key)
+        if self.user_id:
+            q = q.filter(AppSetting.user_id == self.user_id)
+        row = q.first()
         if row is None:
             return default
         return row.value.lower() not in ("false", "0", "no")
@@ -58,6 +62,8 @@ class PromptAssemblyService:
             PromptTemplate.prompt_type == prompt_type,
             PromptTemplate.enabled == True,
         )
+        if self.user_id:
+            q = q.filter(PromptTemplate.user_id == self.user_id)
         if bucket_id:
             q = q.filter(PromptTemplate.bucket_id == bucket_id)
         template = q.order_by(PromptTemplate.version.desc()).first()

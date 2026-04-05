@@ -7,6 +7,7 @@ class JobRun(Base):
     __tablename__ = "job_runs"
 
     id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=True, index=True)  # nullable for backward compat
     job_type = Column(String, nullable=False, index=True)
     # status: queued, starting, syncing_assets, preparing_image, classifying_ai,
     #         validating_result, saving_suggestion, writing_results, completed, failed, cancelled, paused

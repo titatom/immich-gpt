@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, JSON
+from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, JSON, UniqueConstraint
 from sqlalchemy.sql import func
 from ..database import Base
 
@@ -7,7 +7,8 @@ class Bucket(Base):
     __tablename__ = "buckets"
 
     id = Column(String, primary_key=True)
-    name = Column(String, unique=True, nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
     enabled = Column(Boolean, default=True)
     priority = Column(Integer, default=100)
@@ -20,3 +21,7 @@ class Bucket(Base):
     confidence_threshold = Column(Float, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_buckets_user_name"),
+    )

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Optional
@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 from ..database import get_db
+from ..dependencies import require_active_user
 from ..models.asset import Asset
 from ..models.suggested_classification import SuggestedClassification
 from ..models.suggested_metadata import SuggestedMetadata
@@ -37,6 +38,10 @@ def _to_out(a: Asset) -> AssetOut:
     )
 
 
+def _user_asset_query(db: Session, user_id: str):
+    return db.query(Asset).filter(Asset.user_id == user_id)
+
+
 @router.get("", response_model=List[AssetOut])
 def list_assets(
     page: int = 1,
@@ -45,12 +50,12 @@ def list_assets(
     bucket_name: Optional[str] = None,
     q: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    query = db.query(Asset)
+    query = _user_asset_query(db, current_user.id)
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
     if bucket_name:
-        # Filter assets that have an approved or pending classification for this bucket
         classified_ids = (
             db.query(SuggestedClassification.asset_id)
             .filter(SuggestedClassification.suggested_bucket_name == bucket_name)
@@ -78,8 +83,9 @@ def count_assets(
     bucket_name: Optional[str] = None,
     q: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    query = db.query(Asset)
+    query = _user_asset_query(db, current_user.id)
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
     if bucket_name:
@@ -108,13 +114,9 @@ def list_asset_ids(
     bucket_name: Optional[str] = None,
     q: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    """Return all asset IDs matching the given filters (no pagination).
-
-    Used by the frontend to implement cross-page 'select all' without
-    fetching full asset objects.
-    """
-    query = db.query(Asset.id)
+    query = db.query(Asset.id).filter(Asset.user_id == current_user.id)
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
     if bucket_name:
@@ -170,23 +172,35 @@ class AssetDetailOut(AssetOut):
 
 
 @router.get("/{asset_id}", response_model=AssetOut)
-def get_asset(asset_id: str, db: Session = Depends(get_db)):
-    a = db.query(Asset).filter(Asset.id == asset_id).first()
+def get_asset(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    a = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id,
+    ).first()
     if not a:
         raise HTTPException(status_code=404, detail="Asset not found")
     return _to_out(a)
 
 
 @router.get("/{asset_id}/detail", response_model=AssetDetailOut)
-def get_asset_detail(asset_id: str, db: Session = Depends(get_db)):
-    """Full asset detail including latest classification and metadata suggestion."""
-    a = db.query(Asset).filter(Asset.id == asset_id).first()
+def get_asset_detail(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    a = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id,
+    ).first()
     if not a:
         raise HTTPException(status_code=404, detail="Asset not found")
 
     base = _to_out(a)
 
-    # Latest classification (most recent by created_at)
     cls = (
         db.query(SuggestedClassification)
         .filter(SuggestedClassification.asset_id == asset_id)
@@ -194,7 +208,6 @@ def get_asset_detail(asset_id: str, db: Session = Depends(get_db)):
         .first()
     )
 
-    # Latest metadata suggestion
     meta = (
         db.query(SuggestedMetadata)
         .filter(SuggestedMetadata.asset_id == asset_id)
@@ -243,8 +256,18 @@ class ReclassifyRequest(BaseModel):
 
 
 @router.post("/reclassify", response_model=dict)
-def reclassify_assets(body: ReclassifyRequest, db: Session = Depends(get_db)):
-    """Trigger reclassification for a list of assets (single or batch)."""
+def reclassify_assets(
+    body: ReclassifyRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    # Verify all requested assets belong to current user
+    owned = db.query(Asset.id).filter(
+        Asset.id.in_(body.asset_ids),
+        Asset.user_id == current_user.id,
+    ).all()
+    owned_ids = [r[0] for r in owned]
+
     from ..services.job_progress import JobProgressService
     from ..routers.jobs import _enqueue
     from ..workers.tasks import run_classification
@@ -253,7 +276,8 @@ def reclassify_assets(body: ReclassifyRequest, db: Session = Depends(get_db)):
     svc = JobProgressService(db)
     job = svc.create_job(
         "classification",
-        params={"asset_ids": body.asset_ids, "limit": None, "force": body.force},
+        params={"asset_ids": owned_ids, "limit": None, "force": body.force},
+        user_id=current_user.id,
     )
-    _enqueue(run_classification, job.id, body.asset_ids, None, body.force)
-    return {"job_id": job.id, "status": "queued", "asset_count": len(body.asset_ids)}
+    _enqueue(run_classification, job.id, owned_ids, None, body.force, current_user.id)
+    return {"job_id": job.id, "status": "queued", "asset_count": len(owned_ids)}

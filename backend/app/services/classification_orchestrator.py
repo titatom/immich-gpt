@@ -26,17 +26,22 @@ class ClassificationOrchestrator:
         db: Session,
         provider: AIProvider,
         immich_client: Optional[ImmichClient] = None,
+        user_id: Optional[str] = None,
     ):
         self.db = db
         self.provider = provider
         self.immich = immich_client or ImmichClient()
+        self.user_id = user_id
         self.image_service = ImagePreparationService(self.immich)
-        self.prompt_service = PromptAssemblyService(db)
+        self.prompt_service = PromptAssemblyService(db, user_id=user_id)
         self.job_service = JobProgressService(db)
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
         from ..models.app_setting import AppSetting
-        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
+        q = self.db.query(AppSetting).filter(AppSetting.key == key)
+        if self.user_id:
+            q = q.filter(AppSetting.user_id == self.user_id)
+        row = q.first()
         if row is None:
             return default
         return row.value.lower() not in ("false", "0", "no")
@@ -88,7 +93,10 @@ class ClassificationOrchestrator:
                 log_line=f"Found {total} assets to process",
             )
 
-            buckets = self.db.query(Bucket).filter(Bucket.enabled == True).order_by(Bucket.priority).all()
+            q = self.db.query(Bucket).filter(Bucket.enabled == True)
+            if self.user_id:
+                q = q.filter(Bucket.user_id == self.user_id)
+            buckets = q.order_by(Bucket.priority).all()
             if not buckets:
                 self.job_service.fail_job(job_id, "No enabled buckets configured")
                 return
@@ -243,6 +251,8 @@ class ClassificationOrchestrator:
         force: bool = False,
     ) -> List[Asset]:
         q = self.db.query(Asset)
+        if self.user_id:
+            q = q.filter(Asset.user_id == self.user_id)
         if asset_ids:
             q = q.filter(Asset.id.in_(asset_ids))
         elif not force:
@@ -328,6 +338,7 @@ class ClassificationOrchestrator:
     ) -> None:
         log = AuditLog(
             id=str(uuid.uuid4()),
+            user_id=self.user_id,
             asset_id=asset_id,
             job_run_id=job_id,
             action=action,

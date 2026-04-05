@@ -16,8 +16,10 @@ from app.models.prompt_template import PromptTemplate
 
 def _make_prompt(db, prompt_type="global_classification", name="Test", enabled=True,
                  bucket_id=None) -> PromptTemplate:
+    from tests.conftest import TEST_USER_ID
     pt = PromptTemplate(
         id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
         prompt_type=prompt_type,
         name=name,
         content="Do something useful.",

@@ -17,8 +17,10 @@ from app.models.job_run import JobRun
 # ---------------------------------------------------------------------------
 
 def _make_job(db, job_type="asset_sync", status="queued") -> JobRun:
+    from tests.conftest import TEST_USER_ID
     job = JobRun(
         id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
         job_type=job_type,
         status=status,
         processed_count=0,

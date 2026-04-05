@@ -1,9 +1,11 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 
 from ..database import get_db
+from ..dependencies import require_active_user
 from ..schemas.provider import (
     ImmichSettingsUpdate, ImmichSettingsOut,
     ProviderConfigCreate, ProviderConfigUpdate, ProviderConfigOut,
@@ -11,39 +13,46 @@ from ..schemas.provider import (
 from ..models.provider_config import ProviderConfig
 from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
-from ..config import settings
-import uuid
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-# Keys used in app_settings table
 _KEY_IMMICH_URL = "immich_url"
 _KEY_IMMICH_API_KEY = "immich_api_key"
 _KEY_ALLOW_NEW_TAGS = "allow_new_tags"
 _KEY_ALLOW_NEW_ALBUMS = "allow_new_albums"
 
 
-def _get_immich_credentials(db: Session):
-    """Return (url, api_key) from DB overrides, falling back to env vars."""
-    url_row = db.query(AppSetting).filter(AppSetting.key == _KEY_IMMICH_URL).first()
-    key_row = db.query(AppSetting).filter(AppSetting.key == _KEY_IMMICH_API_KEY).first()
-    url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
-    api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
-    return url, api_key
+def _get_setting(db: Session, user_id: str, key: str) -> Optional[str]:
+    row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == key
+    ).first()
+    return row.value if row else None
 
 
-def _set_app_setting(db: Session, key: str, value: str) -> None:
-    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+def _set_setting(db: Session, user_id: str, key: str, value: str) -> None:
+    row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == key
+    ).first()
     if row:
         row.value = value
     else:
-        db.add(AppSetting(key=key, value=value))
+        db.add(AppSetting(id=str(uuid.uuid4()), user_id=user_id, key=key, value=value))
     db.commit()
 
 
+def _get_immich_credentials(db: Session, user_id: str):
+    from ..config import settings
+    url = _get_setting(db, user_id, _KEY_IMMICH_URL) or settings.IMMICH_URL
+    api_key = _get_setting(db, user_id, _KEY_IMMICH_API_KEY) or settings.IMMICH_API_KEY
+    return url, api_key
+
+
 @router.get("/immich", response_model=ImmichSettingsOut)
-def get_immich_settings(db: Session = Depends(get_db)):
-    url, api_key = _get_immich_credentials(db)
+def get_immich_settings(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    url, api_key = _get_immich_credentials(db, current_user.id)
     if not url:
         return ImmichSettingsOut(immich_url="", connected=False, error="Not configured")
     try:
@@ -56,11 +65,14 @@ def get_immich_settings(db: Session = Depends(get_db)):
 
 
 @router.post("/immich", response_model=ImmichSettingsOut)
-def save_immich_settings(body: ImmichSettingsUpdate, db: Session = Depends(get_db)):
-    """Persist Immich URL and API key to the database."""
-    _set_app_setting(db, _KEY_IMMICH_URL, body.immich_url)
+def save_immich_settings(
+    body: ImmichSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    _set_setting(db, current_user.id, _KEY_IMMICH_URL, body.immich_url)
     if body.immich_api_key:
-        _set_app_setting(db, _KEY_IMMICH_API_KEY, body.immich_api_key)
+        _set_setting(db, current_user.id, _KEY_IMMICH_API_KEY, body.immich_api_key)
     try:
         client = ImmichClient(body.immich_url, body.immich_api_key)
         client.check_connectivity()
@@ -71,7 +83,10 @@ def save_immich_settings(body: ImmichSettingsUpdate, db: Session = Depends(get_d
 
 
 @router.post("/immich/test")
-def test_immich_connection(body: ImmichSettingsUpdate):
+def test_immich_connection(
+    body: ImmichSettingsUpdate,
+    _user=Depends(require_active_user),
+):
     try:
         client = ImmichClient(body.immich_url, body.immich_api_key)
         info = client.check_connectivity()
@@ -82,19 +97,31 @@ def test_immich_connection(body: ImmichSettingsUpdate):
 
 
 @router.get("/providers", response_model=List[ProviderConfigOut])
-def list_providers(db: Session = Depends(get_db)):
-    rows = db.query(ProviderConfig).all()
+def list_providers(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    rows = db.query(ProviderConfig).filter(
+        ProviderConfig.user_id == current_user.id
+    ).all()
     return [_provider_to_out(r) for r in rows]
 
 
 @router.post("/providers", response_model=ProviderConfigOut)
-def upsert_provider(body: ProviderConfigCreate, db: Session = Depends(get_db)):
+def upsert_provider(
+    body: ProviderConfigCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     existing = db.query(ProviderConfig).filter(
-        ProviderConfig.provider_name == body.provider_name
+        ProviderConfig.user_id == current_user.id,
+        ProviderConfig.provider_name == body.provider_name,
     ).first()
 
     if body.is_default:
-        db.query(ProviderConfig).update({"is_default": False})
+        db.query(ProviderConfig).filter(
+            ProviderConfig.user_id == current_user.id
+        ).update({"is_default": False})
 
     if existing:
         existing.enabled = body.enabled
@@ -113,6 +140,7 @@ def upsert_provider(body: ProviderConfigCreate, db: Session = Depends(get_db)):
     else:
         row = ProviderConfig(
             id=str(uuid.uuid4()),
+            user_id=current_user.id,
             provider_name=body.provider_name,
             enabled=body.enabled,
             is_default=body.is_default,
@@ -128,9 +156,14 @@ def upsert_provider(body: ProviderConfigCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/providers/{provider_name}")
-def delete_provider(provider_name: str, db: Session = Depends(get_db)):
+def delete_provider(
+    provider_name: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     row = db.query(ProviderConfig).filter(
-        ProviderConfig.provider_name == provider_name
+        ProviderConfig.user_id == current_user.id,
+        ProviderConfig.provider_name == provider_name,
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -140,10 +173,15 @@ def delete_provider(provider_name: str, db: Session = Depends(get_db)):
 
 
 @router.get("/providers/{provider_name}/test")
-def test_provider(provider_name: str, db: Session = Depends(get_db)):
+def test_provider(
+    provider_name: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     from ..services.ai_provider import build_provider
     row = db.query(ProviderConfig).filter(
-        ProviderConfig.provider_name == provider_name
+        ProviderConfig.user_id == current_user.id,
+        ProviderConfig.provider_name == provider_name,
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -162,10 +200,14 @@ def test_provider(provider_name: str, db: Session = Depends(get_db)):
 
 
 @router.get("/providers/{provider_name}/models")
-def list_provider_models(provider_name: str, db: Session = Depends(get_db)):
-    """Fetch available models from the provider (OpenRouter/Ollama only)."""
+def list_provider_models(
+    provider_name: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     row = db.query(ProviderConfig).filter(
-        ProviderConfig.provider_name == provider_name
+        ProviderConfig.user_id == current_user.id,
+        ProviderConfig.provider_name == provider_name,
     ).first()
     if not row:
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -201,13 +243,15 @@ class BehaviourSettings(BaseModel):
 
 
 @router.get("/behaviour", response_model=BehaviourSettings)
-def get_behaviour_settings(db: Session = Depends(get_db)):
-    """Return AI behaviour settings (tag/album creation)."""
+def get_behaviour_settings(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     def _get(key: str, default: bool) -> bool:
-        row = db.query(AppSetting).filter(AppSetting.key == key).first()
-        if row is None:
+        val = _get_setting(db, current_user.id, key)
+        if val is None:
             return default
-        return row.value.lower() not in ("false", "0", "no")
+        return val.lower() not in ("false", "0", "no")
 
     return BehaviourSettings(
         allow_new_tags=_get(_KEY_ALLOW_NEW_TAGS, True),
@@ -216,10 +260,13 @@ def get_behaviour_settings(db: Session = Depends(get_db)):
 
 
 @router.post("/behaviour", response_model=BehaviourSettings)
-def save_behaviour_settings(body: BehaviourSettings, db: Session = Depends(get_db)):
-    """Persist AI behaviour settings."""
-    _set_app_setting(db, _KEY_ALLOW_NEW_TAGS, "true" if body.allow_new_tags else "false")
-    _set_app_setting(db, _KEY_ALLOW_NEW_ALBUMS, "true" if body.allow_new_albums else "false")
+def save_behaviour_settings(
+    body: BehaviourSettings,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    _set_setting(db, current_user.id, _KEY_ALLOW_NEW_TAGS, "true" if body.allow_new_tags else "false")
+    _set_setting(db, current_user.id, _KEY_ALLOW_NEW_ALBUMS, "true" if body.allow_new_albums else "false")
     return body
 
 

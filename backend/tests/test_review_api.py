@@ -8,11 +8,13 @@ from app.models.bucket import Bucket
 
 
 def make_review_data(db, n=3):
+    from tests.conftest import TEST_USER_ID
     bucket = db.query(Bucket).filter(Bucket.name == "Personal").first()
     asset_ids = []
     for i in range(n):
         asset = Asset(
             id=str(uuid.uuid4()),
+            user_id=TEST_USER_ID,
             immich_id=f"immich-review-{i}",
             original_filename=f"photo_{i}.jpg",
             is_favorite=False,

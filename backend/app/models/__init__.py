@@ -1,3 +1,5 @@
+from .user import User
+from .session import UserSession, PasswordResetToken
 from .asset import Asset
 from .bucket import Bucket
 from .prompt_template import PromptTemplate
@@ -11,6 +13,9 @@ from .provider_config import ProviderConfig
 from .app_setting import AppSetting
 
 __all__ = [
+    "User",
+    "UserSession",
+    "PasswordResetToken",
     "Asset",
     "Bucket",
     "PromptTemplate",

@@ -3,16 +3,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from .config import settings
 
+_db_url = settings.DATABASE_URL
+
 # Ensure the data directory exists before SQLite tries to create the file.
-if settings.DATABASE_URL.startswith("sqlite:///"):
-    _db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+if _db_url.startswith("sqlite:///"):
+    _db_path = _db_url.replace("sqlite:///", "")
     _db_dir = os.path.dirname(_db_path)
     if _db_dir:
         os.makedirs(_db_dir, exist_ok=True)
 
+# SQLite requires check_same_thread=False; PostgreSQL does not accept it.
+_connect_args = {}
+if _db_url.startswith("sqlite"):
+    _connect_args = {"check_same_thread": False}
+
 engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    _db_url,
+    connect_args=_connect_args,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -39,6 +46,7 @@ def init_db():
     # Import every model so Base.metadata is fully populated before we
     # attempt either the Alembic run or the create_all fallback.
     from .models import (  # noqa: F401
+        User, UserSession, PasswordResetToken,
         asset, bucket, prompt_template, prompt_run,
         suggested_classification, suggested_metadata,
         review_decision, job_run, audit_log, provider_config, app_setting,
