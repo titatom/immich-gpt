@@ -8,6 +8,8 @@ import {
   deleteProvider,
   testProvider,
   getProviderModels,
+  getBehaviourSettings,
+  saveBehaviourSettings,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
 import { CheckCircle, AlertTriangle, Plus, Trash2 } from "lucide-react";
@@ -340,6 +342,137 @@ function ProvidersSection() {
   );
 }
 
+function BehaviourSection() {
+  const qc = useQueryClient();
+  const { data: behaviour } = useQuery({
+    queryKey: ["behaviour-settings"],
+    queryFn: getBehaviourSettings,
+  });
+
+  const [allowNewTags, setAllowNewTags] = React.useState<boolean | undefined>(undefined);
+  const [allowNewAlbums, setAllowNewAlbums] = React.useState<boolean | undefined>(undefined);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(() => {
+    if (behaviour) {
+      setAllowNewTags(behaviour.allow_new_tags);
+      setAllowNewAlbums(behaviour.allow_new_albums);
+    }
+  }, [behaviour]);
+
+  const saveMut = useMutation({
+    mutationFn: () => saveBehaviourSettings({
+      allow_new_tags: allowNewTags ?? true,
+      allow_new_albums: allowNewAlbums ?? true,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["behaviour-settings"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const effectiveTags = allowNewTags ?? behaviour?.allow_new_tags ?? true;
+  const effectiveAlbums = allowNewAlbums ?? behaviour?.allow_new_albums ?? true;
+
+  return (
+    <Section title="AI Behaviour">
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {/* Tags behaviour */}
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Tag Creation</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="tag_mode"
+                checked={effectiveTags}
+                onChange={() => setAllowNewTags(true)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Allow AI to create new tags</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  The AI can suggest any tag names, including ones that don't yet exist in Immich.
+                </div>
+              </div>
+            </label>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="tag_mode"
+                checked={!effectiveTags}
+                onChange={() => setAllowNewTags(false)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Only use existing tags</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  The AI will only select from tags already present on the asset. No new tag names will be created.
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid #334155" }} />
+
+        {/* Album behaviour */}
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Album / Sub-album Creation</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="album_mode"
+                checked={effectiveAlbums}
+                onChange={() => setAllowNewAlbums(true)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Allow AI to suggest new albums</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  The AI can suggest sub-album names freely, including creating new albums when writing back to Immich.
+                </div>
+              </div>
+            </label>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="album_mode"
+                checked={!effectiveAlbums}
+                onChange={() => setAllowNewAlbums(false)}
+                style={{ marginTop: 2 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Only use existing albums</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  The AI will only suggest sub-albums that already exist in Immich. New album names will not be used.
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <button
+            onClick={() => saveMut.mutate()}
+            disabled={saveMut.isPending || allowNewTags === undefined}
+            style={{
+              padding: "8px 20px", borderRadius: 8, border: "none",
+              background: saved ? "#16a34a" : "#1e40af",
+              color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              transition: "background 0.2s",
+            }}
+          >
+            {saveMut.isPending ? "Saving…" : saved ? "Saved!" : "Save Behaviour Settings"}
+          </button>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 export default function Settings() {
   return (
     <div style={{ padding: "32px 40px", maxWidth: 700 }}>
@@ -351,6 +484,7 @@ export default function Settings() {
       </div>
 
       <ImmichSection />
+      <BehaviourSection />
       <ProvidersSection />
 
       {/* Environment info */}

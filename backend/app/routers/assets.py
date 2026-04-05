@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
@@ -41,19 +42,64 @@ def list_assets(
     page: int = 1,
     page_size: int = 50,
     asset_type: Optional[str] = None,
+    bucket_name: Optional[str] = None,
+    q: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(Asset)
+    query = db.query(Asset)
     if asset_type:
-        q = q.filter(Asset.asset_type == asset_type)
+        query = query.filter(Asset.asset_type == asset_type)
+    if bucket_name:
+        # Filter assets that have an approved or pending classification for this bucket
+        classified_ids = (
+            db.query(SuggestedClassification.asset_id)
+            .filter(SuggestedClassification.suggested_bucket_name == bucket_name)
+            .subquery()
+        )
+        query = query.filter(Asset.id.in_(classified_ids))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Asset.original_filename.ilike(like),
+                Asset.description.ilike(like),
+                Asset.city.ilike(like),
+                Asset.country.ilike(like),
+            )
+        )
     offset = (page - 1) * page_size
-    assets = q.order_by(Asset.file_created_at.desc()).offset(offset).limit(page_size).all()
+    assets = query.order_by(Asset.file_created_at.desc()).offset(offset).limit(page_size).all()
     return [_to_out(a) for a in assets]
 
 
 @router.get("/count")
-def count_assets(db: Session = Depends(get_db)):
-    return {"count": db.query(Asset).count()}
+def count_assets(
+    asset_type: Optional[str] = None,
+    bucket_name: Optional[str] = None,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Asset)
+    if asset_type:
+        query = query.filter(Asset.asset_type == asset_type)
+    if bucket_name:
+        classified_ids = (
+            db.query(SuggestedClassification.asset_id)
+            .filter(SuggestedClassification.suggested_bucket_name == bucket_name)
+            .subquery()
+        )
+        query = query.filter(Asset.id.in_(classified_ids))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Asset.original_filename.ilike(like),
+                Asset.description.ilike(like),
+                Asset.city.ilike(like),
+                Asset.country.ilike(like),
+            )
+        )
+    return {"count": query.count()}
 
 
 class ClassificationDetail(BaseModel):
@@ -153,3 +199,25 @@ def get_asset_detail(asset_id: str, db: Session = Depends(get_db)):
         classification=classification,
         metadata_suggestion=metadata_suggestion,
     )
+
+
+class ReclassifyRequest(BaseModel):
+    asset_ids: List[str]
+    force: bool = True
+
+
+@router.post("/reclassify", response_model=dict)
+def reclassify_assets(body: ReclassifyRequest, db: Session = Depends(get_db)):
+    """Trigger reclassification for a list of assets (single or batch)."""
+    from ..services.job_progress import JobProgressService
+    from ..routers.jobs import _enqueue
+    from ..workers.tasks import run_classification
+    import uuid
+
+    svc = JobProgressService(db)
+    job = svc.create_job(
+        "classification",
+        params={"asset_ids": body.asset_ids, "limit": None, "force": body.force},
+    )
+    _enqueue(run_classification, job.id, body.asset_ids, None, body.force)
+    return {"job_id": job.id, "status": "queued", "asset_count": len(body.asset_ids)}

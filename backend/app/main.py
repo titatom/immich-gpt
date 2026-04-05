@@ -1,8 +1,9 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .database import init_db
 from .routers import (
@@ -55,5 +56,20 @@ def health():
 
 # Serve frontend static files in production
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
-if os.path.isdir(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
+_static_dir_exists = os.path.isdir(static_dir)
+
+if _static_dir_exists:
+    # Mount the built assets directory (JS/CSS bundles) as a static sub-path.
+    # The /assets path in Vite's output is always a subdirectory of the build root.
+    assets_build_dir = os.path.join(static_dir, "assets")
+    if os.path.isdir(assets_build_dir):
+        app.mount("/assets", StaticFiles(directory=assets_build_dir), name="assets-bundle")
+
+    # SPA catch-all: serve index.html for any non-API path so that client-side
+    # routing (React Router) works correctly on hard refresh or direct navigation.
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str, request: Request):
+        index_file = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"error": "Frontend not built. Run: cd frontend && npx vite build"}

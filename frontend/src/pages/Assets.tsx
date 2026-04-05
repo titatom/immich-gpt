@@ -1,32 +1,37 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { getAssets, getAssetCount, getAssetDetail, getThumbnailUrl } from "../services/api";
-import type { Asset, AssetDetail } from "../types";
+import {
+  getAssets, getAssetCount, getAssetDetail, getThumbnailUrl,
+  getBuckets, reclassifyAssets,
+} from "../services/api";
+import type { Asset, AssetDetail, Bucket } from "../types";
 import {
   Search, Image as ImageIcon, ArrowUp, ArrowDown, ArrowUpDown,
   X, Star, Archive, ExternalLink, Camera, MapPin, Tag, Calendar,
-  CheckCircle, Clock, XCircle, AlertCircle,
+  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const PAGE_SIZE = 50;
 
-type SortKey = "date" | "filename" | "location" | "tags" | "album" | "type";
+type SortKey = "date" | "filename" | "location" | "tags" | "album" | "type" | "bucket";
 type SortDir = "asc" | "desc";
 
-function sortAssets(assets: Asset[], key: SortKey, dir: SortDir): Asset[] {
+function sortAssets(assets: Asset[], key: SortKey, dir: SortDir, classificationMap?: Record<string, string>): Asset[] {
   const factor = dir === "asc" ? 1 : -1;
   return [...assets].sort((a, b) => {
     let va: string;
     let vb: string;
     switch (key) {
-      case "date":   va = a.file_created_at ?? a.created_at ?? ""; vb = b.file_created_at ?? b.created_at ?? ""; break;
+      case "date":     va = a.file_created_at ?? a.created_at ?? ""; vb = b.file_created_at ?? b.created_at ?? ""; break;
       case "filename": va = a.original_filename ?? ""; vb = b.original_filename ?? ""; break;
       case "location": va = [a.city, a.country].filter(Boolean).join(", "); vb = [b.city, b.country].filter(Boolean).join(", "); break;
-      case "tags":   va = (a.tags ?? []).join(", "); vb = (b.tags ?? []).join(", "); break;
-      case "album":  va = (a.album_ids ?? []).join(","); vb = (b.album_ids ?? []).join(","); break;
-      case "type":   va = a.asset_type ?? ""; vb = b.asset_type ?? ""; break;
-      default:       va = ""; vb = "";
+      case "tags":     va = (a.tags ?? []).join(", "); vb = (b.tags ?? []).join(", "); break;
+      case "album":    va = (a.album_ids ?? []).join(","); vb = (b.album_ids ?? []).join(","); break;
+      case "type":     va = a.asset_type ?? ""; vb = b.asset_type ?? ""; break;
+      case "bucket":   va = classificationMap?.[a.id] ?? ""; vb = classificationMap?.[b.id] ?? ""; break;
+      default:         va = ""; vb = "";
     }
     if (!va && vb) return 1;
     if (va && !vb) return -1;
@@ -37,7 +42,7 @@ function sortAssets(assets: Asset[], key: SortKey, dir: SortDir): Asset[] {
 
 const SORT_LABELS: Record<SortKey, string> = {
   date: "Date", filename: "Filename", location: "Location",
-  tags: "Tags", album: "Album", type: "Type",
+  tags: "Tags", album: "Album", type: "Type", bucket: "Bucket",
 };
 
 function SortHeader({ label, sortKey, current, dir, onChange }: {
@@ -85,7 +90,15 @@ function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
-function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () => void }) {
+function AssetDetailPanel({
+  assetId,
+  onClose,
+  onReclassify,
+}: {
+  assetId: string;
+  onClose: () => void;
+  onReclassify: (ids: string[]) => void;
+}) {
   const { data, isLoading } = useQuery<AssetDetail>({
     queryKey: ["asset-detail", assetId],
     queryFn: () => getAssetDetail(assetId),
@@ -93,7 +106,6 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
 
   const [imgError, setImgError] = React.useState(false);
 
-  // Close on Escape
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -108,26 +120,13 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200,
-        }}
-      />
-
-      {/* Panel */}
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200 }} />
       <div style={{
         position: "fixed", top: 0, right: 0, bottom: 0,
         width: "min(480px, 100vw)",
-        background: "#0f172a",
-        borderLeft: "1px solid #334155",
-        zIndex: 201,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
+        background: "#0f172a", borderLeft: "1px solid #334155",
+        zIndex: 201, display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
-        {/* Header */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "16px 20px", borderBottom: "1px solid #1e293b", flexShrink: 0,
@@ -135,12 +134,26 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
           <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: 12 }}>
             {data?.original_filename || data?.immich_id || "Asset Detail"}
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 4, flexShrink: 0 }}>
-            <X size={18} />
-          </button>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {data && (
+              <button
+                onClick={() => onReclassify([assetId])}
+                title="Re-classify this asset"
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "5px 10px", borderRadius: 6, border: "1px solid #334155",
+                  background: "transparent", color: "#7c3aed", cursor: "pointer", fontSize: 12,
+                }}
+              >
+                <RefreshCw size={12} /> Re-classify
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", padding: 4 }}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable body */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {isLoading ? (
             <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Loading…</div>
@@ -148,7 +161,6 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
             <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Asset not found.</div>
           ) : (
             <>
-              {/* Preview image */}
               <div style={{ background: "#000", position: "relative", aspectRatio: "16/9", overflow: "hidden", flexShrink: 0 }}>
                 {imgError ? (
                   <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -162,7 +174,6 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                     style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
                   />
                 )}
-                {/* Badges overlaid on image */}
                 <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 6 }}>
                   {data.is_favorite && (
                     <span style={{ background: "rgba(0,0,0,0.6)", borderRadius: 6, padding: "3px 7px", display: "flex", alignItems: "center", gap: 4 }}>
@@ -191,14 +202,12 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                 )}
               </div>
 
-              {/* Bucket / Classification */}
               <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
                   Classification
                 </div>
                 {cls ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {/* Bucket */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {classificationStatusIcon(cls.status)}
                       <div>
@@ -209,10 +218,8 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                           {effectiveBucket ?? <span style={{ color: "#475569" }}>—</span>}
                         </div>
                       </div>
-                      {/* Status badge */}
                       <span style={{
-                        marginLeft: "auto",
-                        fontSize: 11, fontWeight: 600,
+                        marginLeft: "auto", fontSize: 11, fontWeight: 600,
                         padding: "2px 8px", borderRadius: 6,
                         background: cls.status === "approved" ? "rgba(34,197,94,0.12)" :
                                     cls.status === "rejected" ? "rgba(239,68,68,0.12)" :
@@ -224,8 +231,6 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                         {cls.status?.replace("_", " ") ?? "unknown"}
                       </span>
                     </div>
-
-                    {/* Confidence */}
                     {cls.confidence !== undefined && cls.confidence !== null && (
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ flex: 1, height: 5, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
@@ -236,24 +241,16 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                         </span>
                       </div>
                     )}
-
-                    {/* Sub-album suggestion */}
                     {cls.subalbum_suggestion && (
                       <div style={{ fontSize: 12, color: "#94a3b8" }}>
                         Sub-album: <span style={{ color: "#60a5fa" }}>{cls.subalbum_suggestion}</span>
                       </div>
                     )}
-
-                    {/* Explanation */}
                     {cls.explanation && (
-                      <div style={{
-                        fontSize: 12, color: "#94a3b8", background: "#1e293b",
-                        borderRadius: 6, padding: "8px 12px", lineHeight: 1.6,
-                      }}>
+                      <div style={{ fontSize: 12, color: "#94a3b8", background: "#1e293b", borderRadius: 6, padding: "8px 12px", lineHeight: 1.6 }}>
                         {cls.explanation}
                       </div>
                     )}
-
                     {cls.provider_name && (
                       <div style={{ fontSize: 11, color: "#475569" }}>via {cls.provider_name}</div>
                     )}
@@ -265,7 +262,6 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                 )}
               </div>
 
-              {/* Metadata suggestion */}
               {meta && (meta.description_suggestion || (meta.tags ?? []).length > 0) && (
                 <div style={{ padding: "16px 20px", borderBottom: "1px solid #1e293b" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
@@ -297,34 +293,14 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                 </div>
               )}
 
-              {/* Core metadata */}
               <div style={{ padding: "16px 20px" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
                   Metadata
                 </div>
-
-                <MetaRow
-                  icon={<Calendar size={13} />}
-                  label="Date taken"
-                  value={data.file_created_at ? new Date(data.file_created_at).toLocaleString() : null}
-                />
-                <MetaRow
-                  icon={<MapPin size={13} />}
-                  label="Location"
-                  value={location || null}
-                />
-                <MetaRow
-                  icon={<Camera size={13} />}
-                  label="Camera"
-                  value={[data.camera_make, data.camera_model].filter(Boolean).join(" ") || null}
-                />
-                {data.description && (
-                  <MetaRow
-                    icon={<Tag size={13} />}
-                    label="Description"
-                    value={data.description}
-                  />
-                )}
+                <MetaRow icon={<Calendar size={13} />} label="Date taken" value={data.file_created_at ? new Date(data.file_created_at).toLocaleString() : null} />
+                <MetaRow icon={<MapPin size={13} />} label="Location" value={location || null} />
+                <MetaRow icon={<Camera size={13} />} label="Camera" value={[data.camera_make, data.camera_model].filter(Boolean).join(" ") || null} />
+                {data.description && <MetaRow icon={<Tag size={13} />} label="Description" value={data.description} />}
                 {(data.tags ?? []).length > 0 && (
                   <MetaRow
                     icon={<Tag size={13} />}
@@ -341,18 +317,10 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
                   />
                 )}
                 {(data.album_ids ?? []).length > 0 && (
-                  <MetaRow
-                    icon={<Tag size={13} />}
-                    label="Albums"
-                    value={`${data.album_ids!.length} album${data.album_ids!.length !== 1 ? "s" : ""}`}
-                  />
+                  <MetaRow icon={<Tag size={13} />} label="Albums" value={`${data.album_ids!.length} album${data.album_ids!.length !== 1 ? "s" : ""}`} />
                 )}
                 <MetaRow icon={<Tag size={13} />} label="MIME type" value={data.mime_type ?? null} />
-                <MetaRow
-                  icon={<Clock size={13} />}
-                  label="Synced at"
-                  value={data.synced_at ? new Date(data.synced_at).toLocaleString() : null}
-                />
+                <MetaRow icon={<Clock size={13} />} label="Synced at" value={data.synced_at ? new Date(data.synced_at).toLocaleString() : null} />
                 <MetaRow icon={<Tag size={13} />} label="Immich ID" value={
                   <span style={{ fontFamily: "monospace", fontSize: 11, color: "#64748b" }}>{data.immich_id}</span>
                 } />
@@ -365,19 +333,40 @@ function AssetDetailPanel({ assetId, onClose }: { assetId: string; onClose: () =
   );
 }
 
-function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
+function AssetCard({
+  asset, onClick, selected, onSelect,
+}: {
+  asset: Asset; onClick: () => void; selected: boolean; onSelect: (e: React.MouseEvent) => void;
+}) {
   const [imgError, setImgError] = React.useState(false);
   const location = [asset.city, asset.country].filter(Boolean).join(", ");
   return (
     <div
       onClick={onClick}
       style={{
-        background: "#1e293b", border: "1px solid #334155", borderRadius: 10,
-        overflow: "hidden", cursor: "pointer", transition: "border-color 0.15s",
+        background: selected ? "rgba(56,189,248,0.07)" : "#1e293b",
+        border: `1px solid ${selected ? "#38bdf8" : "#334155"}`,
+        borderRadius: 10, overflow: "hidden", cursor: "pointer",
+        transition: "border-color 0.15s", position: "relative",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#38bdf8")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.borderColor = "#38bdf8"; }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.borderColor = "#334155"; }}
     >
+      {/* Selection checkbox */}
+      <div
+        onClick={onSelect}
+        style={{
+          position: "absolute", top: 6, left: 6, zIndex: 10,
+          width: 20, height: 20, borderRadius: 5,
+          background: selected ? "#38bdf8" : "rgba(0,0,0,0.5)",
+          border: `2px solid ${selected ? "#38bdf8" : "rgba(255,255,255,0.3)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer",
+        }}
+      >
+        {selected && <CheckCircle size={14} color="#0f172a" />}
+      </div>
+
       <div style={{ width: "100%", aspectRatio: "1", background: "#0f172a", position: "relative", overflow: "hidden" }}>
         {imgError ? (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -425,10 +414,15 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
 export default function Assets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAssetId, setSelectedAssetId] = React.useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [reclassifyMessage, setReclassifyMessage] = React.useState<string | null>(null);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const page = parseInt(searchParams.get("page") || "1", 10);
   const assetType = searchParams.get("type") || "";
   const search = searchParams.get("q") || "";
+  const bucketFilter = searchParams.get("bucket") || "";
   const sortKey = (searchParams.get("sort") as SortKey) || "date";
   const sortDir = (searchParams.get("dir") as SortDir) || "desc";
   const [searchInput, setSearchInput] = React.useState(search);
@@ -440,6 +434,7 @@ export default function Assets() {
       if (key !== "page") next.set("page", "1");
       return next;
     });
+    setSelectedIds(new Set());
   }
 
   function handleSort(key: SortKey) {
@@ -456,14 +451,44 @@ export default function Assets() {
     }
   }
 
+  // Server-side filters: asset_type, bucket_name
   const { data: assets = [], isLoading } = useQuery({
-    queryKey: ["assets", page, assetType],
-    queryFn: () => getAssets({ page, page_size: PAGE_SIZE, asset_type: assetType || undefined }),
+    queryKey: ["assets", page, assetType, bucketFilter],
+    queryFn: () => getAssets({
+      page,
+      page_size: PAGE_SIZE,
+      asset_type: assetType || undefined,
+      bucket_name: bucketFilter || undefined,
+    }),
   });
 
-  const { data: countData } = useQuery({ queryKey: ["asset-count"], queryFn: getAssetCount });
+  const { data: countData } = useQuery({
+    queryKey: ["asset-count", assetType, bucketFilter],
+    queryFn: () => getAssetCount({
+      asset_type: assetType || undefined,
+      bucket_name: bucketFilter || undefined,
+    }),
+  });
   const totalPages = countData ? Math.ceil(countData.count / PAGE_SIZE) : 1;
 
+  const { data: buckets = [] } = useQuery<Bucket[]>({
+    queryKey: ["buckets"],
+    queryFn: getBuckets,
+  });
+
+  const reclassifyMut = useMutation({
+    mutationFn: (ids: string[]) => reclassifyAssets(ids, true),
+    onSuccess: (data, ids) => {
+      setReclassifyMessage(
+        `Re-classification job started for ${ids.length} asset${ids.length !== 1 ? "s" : ""}. Job ID: ${data.job_id}`
+      );
+      setSelectedIds(new Set());
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      setTimeout(() => setReclassifyMessage(null), 5000);
+    },
+  });
+
+  // Client-side search filter only (server handles bucket/type)
   const filtered = search
     ? assets.filter((a) =>
         (a.original_filename || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -475,6 +500,26 @@ export default function Assets() {
 
   const sorted = sortAssets(filtered, sortKey, sortDir);
 
+  function toggleSelect(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === sorted.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map((a) => a.id)));
+    }
+  }
+
+  const allSelected = sorted.length > 0 && selectedIds.size === sorted.length;
+  const someSelected = selectedIds.size > 0;
+
   return (
     <div style={{ padding: "32px 40px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
@@ -484,7 +529,46 @@ export default function Assets() {
             {countData ? `${countData.count.toLocaleString()} synced assets` : "Loading…"}
           </p>
         </div>
+        {someSelected && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#94a3b8" }}>{selectedIds.size} selected</span>
+            <button
+              onClick={() => reclassifyMut.mutate(Array.from(selectedIds))}
+              disabled={reclassifyMut.isPending}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "8px 16px", borderRadius: 8, border: "none",
+                background: "#7c3aed", color: "white", fontSize: 13, fontWeight: 600,
+                cursor: reclassifyMut.isPending ? "not-allowed" : "pointer",
+                opacity: reclassifyMut.isPending ? 0.6 : 1,
+              }}
+            >
+              <RefreshCw size={13} />
+              {reclassifyMut.isPending ? "Starting…" : `Re-classify ${selectedIds.size}`}
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#64748b", fontSize: 13, cursor: "pointer" }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
+
+      {reclassifyMessage && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)",
+          fontSize: 13, color: "#c4b5fd",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>{reclassifyMessage}</span>
+          <button onClick={() => navigate("/jobs")} style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
+            View Jobs
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
@@ -512,14 +596,37 @@ export default function Assets() {
           <option value="IMAGE">Images</option>
           <option value="VIDEO">Videos</option>
         </select>
+        <select
+          value={bucketFilter}
+          onChange={(e) => setParam("bucket", e.target.value)}
+          style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}
+        >
+          <option value="">All buckets</option>
+          {buckets.map((b) => (
+            <option key={b.id} value={b.name}>{b.name}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Sort bar */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, color: "#475569", marginRight: 4 }}>Sort:</span>
-        {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-          <SortHeader key={k} label={SORT_LABELS[k]} sortKey={k} current={sortKey} dir={sortDir} onChange={handleSort} />
-        ))}
+      {/* Sort bar + select all */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#475569", marginRight: 4 }}>Sort:</span>
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+            <SortHeader key={k} label={SORT_LABELS[k]} sortKey={k} current={sortKey} dir={sortDir} onChange={handleSort} />
+          ))}
+        </div>
+        {sorted.length > 0 && (
+          <button
+            onClick={toggleSelectAll}
+            style={{
+              fontSize: 12, color: "#64748b", background: "transparent", border: "1px solid #334155",
+              borderRadius: 6, padding: "4px 10px", cursor: "pointer",
+            }}
+          >
+            {allSelected ? "Deselect all" : `Select all ${sorted.length}`}
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -530,11 +637,16 @@ export default function Assets() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
             {sorted.map((a) => (
-              <AssetCard key={a.id} asset={a} onClick={() => setSelectedAssetId(a.id)} />
+              <AssetCard
+                key={a.id}
+                asset={a}
+                selected={selectedIds.has(a.id)}
+                onSelect={(e) => toggleSelect(a.id, e)}
+                onClick={() => setSelectedAssetId(a.id)}
+              />
             ))}
           </div>
 
-          {/* Pagination */}
           <div style={{ display: "flex", gap: 8, justifyContent: "center", alignItems: "center" }}>
             <button
               onClick={() => setParam("page", String(Math.max(1, page - 1)))}
@@ -555,11 +667,14 @@ export default function Assets() {
         </>
       )}
 
-      {/* Asset detail panel */}
       {selectedAssetId && (
         <AssetDetailPanel
           assetId={selectedAssetId}
           onClose={() => setSelectedAssetId(null)}
+          onReclassify={(ids) => {
+            setSelectedAssetId(null);
+            reclassifyMut.mutate(ids);
+          }}
         />
       )}
     </div>

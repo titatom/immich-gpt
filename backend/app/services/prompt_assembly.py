@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from ..models.prompt_template import PromptTemplate
 from ..models.bucket import Bucket
+from ..models.app_setting import AppSetting
 
 
 DEFAULT_GLOBAL_CLASSIFICATION = (
@@ -46,6 +47,12 @@ class PromptAssemblyService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _get_behaviour_setting(self, key: str, default: bool) -> bool:
+        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row is None:
+            return default
+        return row.value.lower() not in ("false", "0", "no")
+
     def _get_prompt(self, prompt_type: str, bucket_id: Optional[str] = None) -> Optional[str]:
         q = self.db.query(PromptTemplate).filter(
             PromptTemplate.prompt_type == prompt_type,
@@ -65,6 +72,9 @@ class PromptAssemblyService:
         Build the message list for one-call AI classification.
         Returns provider-ready messages (without image - image injected by provider).
         """
+        allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
+        allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
+
         global_prompt = (
             self._get_prompt("global_classification")
             or DEFAULT_GLOBAL_CLASSIFICATION
@@ -73,14 +83,39 @@ class PromptAssemblyService:
             self._get_prompt("description_generation")
             or DEFAULT_DESCRIPTION_PROMPT
         )
-        tags_prompt = (
-            self._get_prompt("tags_generation")
-            or DEFAULT_TAGS_PROMPT
-        )
+
+        if allow_new_tags:
+            tags_prompt = (
+                self._get_prompt("tags_generation")
+                or DEFAULT_TAGS_PROMPT
+            )
+        else:
+            existing_tags = asset_metadata.get("tags") or []
+            if existing_tags:
+                existing_str = ", ".join(existing_tags)
+                tags_prompt = (
+                    f"IMPORTANT: You must only use tags from the existing tag list. "
+                    f"Do NOT invent new tags. Existing tags available: {existing_str}. "
+                    f"Select 0–8 relevant tags from that list only."
+                )
+            else:
+                tags_prompt = (
+                    "IMPORTANT: You must only use existing tags. No existing tags are available for this asset, "
+                    "so return an empty tags array."
+                )
+
+        if allow_new_albums:
+            subalbum_note = ""
+        else:
+            subalbum_note = (
+                "\n\nIMPORTANT: For subalbum_suggestion, you may only use names of albums that already exist "
+                "in Immich. Do NOT invent new album or sub-album names. If no suitable existing album exists, "
+                "set subalbum_suggestion to null."
+            )
 
         bucket_defs = self._build_bucket_definitions(buckets)
         metadata_summary = self._build_metadata_summary(asset_metadata)
-        output_schema = self._build_output_schema_instructions(buckets)
+        output_schema = self._build_output_schema_instructions(buckets) + subalbum_note
 
         system_content = (
             f"You are an expert photo and document classifier and metadata enricher.\n\n"

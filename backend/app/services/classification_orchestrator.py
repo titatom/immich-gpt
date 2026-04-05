@@ -67,6 +67,17 @@ class ClassificationOrchestrator:
                 return
 
             for idx, asset in enumerate(assets):
+                # Cooperative pause/cancel check before each asset
+                current_job = self.job_service.get_job(job_id)
+                if current_job and current_job.status == "paused":
+                    self.job_service.update_progress(
+                        job_id,
+                        log_line=f"Job paused at asset {idx + 1}/{total}. Resume to continue.",
+                    )
+                    return
+                if current_job and current_job.status == "cancelled":
+                    return
+
                 self.job_service.update_progress(
                     job_id,
                     status="preparing_image",

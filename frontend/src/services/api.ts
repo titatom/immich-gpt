@@ -29,6 +29,16 @@ export const getImmichSettings = (): Promise<ImmichSettings> =>
 export const saveImmichSettings = (url: string, apiKey: string): Promise<ImmichSettings> =>
   api.post("/settings/immich", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
 
+export interface BehaviourSettings {
+  allow_new_tags: boolean;
+  allow_new_albums: boolean;
+}
+export const getBehaviourSettings = (): Promise<BehaviourSettings> =>
+  api.get("/settings/behaviour").then((r) => r.data);
+
+export const saveBehaviourSettings = (data: BehaviourSettings): Promise<BehaviourSettings> =>
+  api.post("/settings/behaviour", data).then((r) => r.data);
+
 export const testImmichConnection = (url: string, apiKey: string) =>
   api.post("/settings/immich/test", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
 
@@ -80,14 +90,25 @@ export const deletePrompt = (id: string) =>
   api.delete(`/prompts/${id}`).then((r) => r.data);
 
 // --- Assets ---
-export const getAssets = (params?: { page?: number; page_size?: number; asset_type?: string }) =>
-  api.get("/assets", { params }).then((r) => r.data as Asset[]);
+export const getAssets = (params?: {
+  page?: number;
+  page_size?: number;
+  asset_type?: string;
+  bucket_name?: string;
+  q?: string;
+}) => api.get("/assets", { params }).then((r) => r.data as Asset[]);
 
-export const getAssetCount = () =>
-  api.get("/assets/count").then((r) => r.data as { count: number });
+export const getAssetCount = (params?: {
+  asset_type?: string;
+  bucket_name?: string;
+  q?: string;
+}) => api.get("/assets/count", { params }).then((r) => r.data as { count: number });
 
 export const getAssetDetail = (id: string): Promise<AssetDetail> =>
   api.get(`/assets/${id}/detail`).then((r) => r.data);
+
+export const reclassifyAssets = (asset_ids: string[], force = true) =>
+  api.post("/assets/reclassify", { asset_ids, force }).then((r) => r.data as { job_id: string; status: string; asset_count: number });
 
 // --- Jobs ---
 export const getJobs = (params?: { job_type?: string; status?: string; limit?: number }): Promise<JobRun[]> =>
