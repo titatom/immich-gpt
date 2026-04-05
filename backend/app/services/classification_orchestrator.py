@@ -34,6 +34,33 @@ class ClassificationOrchestrator:
         self.prompt_service = PromptAssemblyService(db)
         self.job_service = JobProgressService(db)
 
+    def _get_behaviour_setting(self, key: str, default: bool) -> bool:
+        from ..models.app_setting import AppSetting
+        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row is None:
+            return default
+        return row.value.lower() not in ("false", "0", "no")
+
+    def _fetch_immich_tags(self) -> Optional[List[str]]:
+        """Fetch all tag names from Immich. Returns None on failure."""
+        try:
+            with self.immich._client() as client:
+                r = client.get("/api/tags")
+                if r.status_code == 200:
+                    return [t.get("name") for t in r.json() if t.get("name")]
+        except Exception:
+            pass
+        return None
+
+    def _fetch_immich_albums(self) -> Optional[List[str]]:
+        """Fetch all album names from Immich. Returns None on failure."""
+        try:
+            albums = self.immich.list_albums()
+            return [a.get("albumName") for a in albums if a.get("albumName")]
+        except Exception:
+            pass
+        return None
+
     def run_classification_job(
         self,
         job_id: str,
@@ -66,6 +93,29 @@ class ClassificationOrchestrator:
                 self.job_service.fail_job(job_id, "No enabled buckets configured")
                 return
 
+            # Resolve behaviour settings once per job.
+            allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
+            allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
+
+            available_tags: Optional[List[str]] = None
+            available_albums: Optional[List[str]] = None
+
+            if not allow_new_tags:
+                available_tags = self._fetch_immich_tags()
+                tag_count = len(available_tags) if available_tags else 0
+                self.job_service.update_progress(
+                    job_id,
+                    log_line=f"Existing-tags mode: loaded {tag_count} Immich tags for prompt",
+                )
+
+            if not allow_new_albums:
+                available_albums = self._fetch_immich_albums()
+                album_count = len(available_albums) if available_albums else 0
+                self.job_service.update_progress(
+                    job_id,
+                    log_line=f"Existing-albums mode: loaded {album_count} Immich albums for prompt",
+                )
+
             for idx, asset in enumerate(assets):
                 # Cooperative pause/cancel check before each asset
                 current_job = self.job_service.get_job(job_id)
@@ -86,7 +136,11 @@ class ClassificationOrchestrator:
                     log_line=f"Processing asset {idx + 1}/{total}: {asset.immich_id}",
                 )
                 try:
-                    self._process_asset(job_id, asset, buckets)
+                    self._process_asset(
+                        job_id, asset, buckets,
+                        available_tags=available_tags,
+                        available_albums=available_albums,
+                    )
                     self.job_service.update_progress(
                         job_id,
                         processed=idx + 1,
@@ -111,7 +165,14 @@ class ClassificationOrchestrator:
             self.job_service.fail_job(job_id, f"Job failed: {str(e)}")
             raise
 
-    def _process_asset(self, job_id: str, asset: Asset, buckets: List[Bucket]) -> None:
+    def _process_asset(
+        self,
+        job_id: str,
+        asset: Asset,
+        buckets: List[Bucket],
+        available_tags: Optional[List[str]] = None,
+        available_albums: Optional[List[str]] = None,
+    ) -> None:
         """Process a single asset through the full pipeline."""
         metadata = self._asset_to_metadata_dict(asset)
 
@@ -131,8 +192,16 @@ class ClassificationOrchestrator:
 
         # Step 2: assemble prompt
         self.job_service.update_progress(job_id, status="classifying_ai")
-        messages = self.prompt_service.assemble_classification_messages(metadata, buckets)
-        prompt_record = self.prompt_service.get_assembled_prompt_record(metadata, buckets)
+        messages = self.prompt_service.assemble_classification_messages(
+            metadata, buckets,
+            available_tags=available_tags,
+            available_albums=available_albums,
+        )
+        prompt_record = self.prompt_service.get_assembled_prompt_record(
+            metadata, buckets,
+            available_tags=available_tags,
+            available_albums=available_albums,
+        )
 
         # Step 3: AI call
         prompt_run = PromptRun(

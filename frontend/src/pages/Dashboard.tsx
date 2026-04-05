@@ -14,6 +14,7 @@ import {
 } from "../services/api";
 import type { BucketStat, SyncScope, ImmichAlbum } from "../types";
 import JobProgressBar from "../components/JobProgressBar";
+import JobDetail from "../components/JobDetail";
 import {
   Database, Eye, Play, RefreshCw, AlertTriangle, CheckCircle,
   Star, FolderOpen, ChevronDown, ChevronUp, Trash2,
@@ -199,6 +200,7 @@ function SyncPanel({
 export default function Dashboard() {
   const qc = useQueryClient();
   const [confirmClear, setConfirmClear] = useState(false);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   const { data: immich } = useQuery({
     queryKey: ["immich-settings"],
@@ -218,7 +220,7 @@ export default function Dashboard() {
   });
 
   const { data: jobs = [] } = useQuery({
-    queryKey: ["jobs-recent"],
+    queryKey: ["jobs", { limit: 10 }],
     queryFn: () => getJobs({ limit: 10 }),
     refetchInterval: 3_000,
   });
@@ -232,21 +234,21 @@ export default function Dashboard() {
   const syncMutation = useMutation({
     mutationFn: (params: { scope: SyncScope; album_ids?: string[] }) => startSyncJob(params),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["jobs-recent"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["asset-count"] });
     },
   });
 
   const classifyMutation = useMutation({
     mutationFn: () => startClassifyJob(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs-recent"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
 
   const clearMutation = useMutation({
     mutationFn: clearTerminalJobs,
     onSuccess: () => {
       setConfirmClear(false);
-      qc.invalidateQueries({ queryKey: ["jobs-recent"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 
@@ -329,7 +331,26 @@ export default function Dashboard() {
       {activeJob && (
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginBottom: 12 }}>Active Job</h2>
-          <JobProgressBar job={activeJob} />
+          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, overflow: "hidden" }}>
+            <div
+              style={{ padding: "12px 16px", cursor: "pointer" }}
+              onClick={() => setExpandedJobId(expandedJobId === activeJob.id ? null : activeJob.id)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <JobProgressBar job={activeJob} compact />
+                </div>
+                {expandedJobId === activeJob.id
+                  ? <ChevronUp size={14} color="#64748b" />
+                  : <ChevronDown size={14} color="#64748b" />}
+              </div>
+            </div>
+            {expandedJobId === activeJob.id && (
+              <div style={{ padding: "0 16px 16px", borderTop: "1px solid #1e293b" }}>
+                <JobDetail jobId={activeJob.id} />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -377,7 +398,26 @@ export default function Dashboard() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {jobs.slice(0, 5).map((job) => (
-              <JobProgressBar key={job.id} job={job} compact />
+              <div key={job.id} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 10, overflow: "hidden" }}>
+                <div
+                  style={{ padding: "12px 16px", cursor: "pointer" }}
+                  onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <JobProgressBar job={job} compact />
+                    </div>
+                    {expandedJobId === job.id
+                      ? <ChevronUp size={14} color="#64748b" />
+                      : <ChevronDown size={14} color="#64748b" />}
+                  </div>
+                </div>
+                {expandedJobId === job.id && (
+                  <div style={{ padding: "0 16px 16px", borderTop: "1px solid #1e293b" }}>
+                    <JobDetail jobId={job.id} />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

@@ -12,6 +12,7 @@ from ..models.suggested_metadata import SuggestedMetadata
 from ..models.review_decision import ReviewDecision
 from ..models.audit_log import AuditLog
 from ..models.bucket import Bucket
+from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
 
 
@@ -130,6 +131,12 @@ class ReviewDecisionService:
         self.db.add(decision)
         self.db.commit()
 
+    def _get_behaviour_setting(self, key: str, default: bool) -> bool:
+        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
+        if row is None:
+            return default
+        return row.value.lower() not in ("false", "0", "no")
+
     def _do_writeback(
         self,
         asset: Asset,
@@ -148,6 +155,10 @@ class ReviewDecisionService:
                 "Asset is from an external library. Description/tag writes may be restricted."
             )
 
+        # Read behaviour settings to decide whether to create new entities.
+        allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
+        allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
+
         # Write description
         if description and description.strip():
             try:
@@ -163,14 +174,27 @@ class ReviewDecisionService:
                     metadata_suggestion.writeback_status = "failed"
                     metadata_suggestion.writeback_error = msg
 
-        # Write tags — batch-resolve all names in one Immich round-trip
+        # Write tags
         if tags:
             try:
-                tag_objects = self.immich.get_or_create_tags(tags)
-                tag_ids = [t["id"] for t in tag_objects]
-                self.immich.tag_asset(asset.immich_id, tag_ids)
-                result.tags_written = True
-                self._audit(asset.id, "writeback_tags", "success", {"tags": tags})
+                if allow_new_tags:
+                    # Normal mode: create tags that don't exist yet.
+                    tag_objects = self.immich.get_or_create_tags(tags)
+                else:
+                    # Restricted mode: only apply tags that already exist; skip unknowns.
+                    tag_objects = self.immich.get_existing_tags_only(tags)
+                    skipped = len(tags) - len(tag_objects)
+                    if skipped:
+                        result.errors.append(
+                            f"{skipped} suggested tag(s) skipped — not found in Immich "
+                            "(existing-tags-only mode is enabled)."
+                        )
+                if tag_objects:
+                    tag_ids = [t["id"] for t in tag_objects]
+                    self.immich.tag_asset(asset.immich_id, tag_ids)
+                    result.tags_written = True
+                    self._audit(asset.id, "writeback_tags", "success",
+                                {"tags": [t.get("name") for t in tag_objects]})
             except ImmichError as e:
                 msg = f"Failed to write tags: {e}"
                 result.errors.append(msg)
@@ -182,13 +206,25 @@ class ReviewDecisionService:
         target_album_name: Optional[str] = None
 
         if subalbum:
-            # subalbum_suggestion: try to find/create an album with that name
-            try:
-                album = self.immich.get_or_create_album(subalbum)
-                target_album_id = album.get("id")
-                target_album_name = subalbum
-            except ImmichError as e:
-                result.errors.append(f"Failed to resolve subalbum '{subalbum}': {e}")
+            if allow_new_albums:
+                # Normal mode: find or create the album.
+                try:
+                    album = self.immich.get_or_create_album(subalbum)
+                    target_album_id = album.get("id")
+                    target_album_name = subalbum
+                except ImmichError as e:
+                    result.errors.append(f"Failed to resolve subalbum '{subalbum}': {e}")
+            else:
+                # Restricted mode: only use the album if it already exists.
+                album = self.immich.get_existing_album(subalbum)
+                if album:
+                    target_album_id = album.get("id")
+                    target_album_name = subalbum
+                else:
+                    result.errors.append(
+                        f"Subalbum '{subalbum}' not found in Immich and was not created "
+                        "(existing-albums-only mode is enabled)."
+                    )
 
         if not target_album_id and bucket_id:
             bucket = self.db.query(Bucket).filter(Bucket.id == bucket_id).first()
@@ -197,16 +233,24 @@ class ReviewDecisionService:
                     target_album_id = bucket.immich_album_id
                     target_album_name = bucket.name
                 else:
-                    # Auto-create an album named after the bucket
-                    try:
-                        album = self.immich.get_or_create_album(bucket.name)
-                        target_album_id = album.get("id")
-                        target_album_name = bucket.name
-                        # Persist the created album id back to the bucket for next time
-                        bucket.immich_album_id = target_album_id
-                        self.db.commit()
-                    except ImmichError as e:
-                        result.errors.append(f"Failed to create album for bucket '{bucket.name}': {e}")
+                    if allow_new_albums:
+                        # Auto-create an album named after the bucket.
+                        try:
+                            album = self.immich.get_or_create_album(bucket.name)
+                            target_album_id = album.get("id")
+                            target_album_name = bucket.name
+                            # Persist the created album id back to the bucket for next time.
+                            bucket.immich_album_id = target_album_id
+                            self.db.commit()
+                        except ImmichError as e:
+                            result.errors.append(f"Failed to create album for bucket '{bucket.name}': {e}")
+                    else:
+                        album = self.immich.get_existing_album(bucket.name)
+                        if album:
+                            target_album_id = album.get("id")
+                            target_album_name = bucket.name
+                            bucket.immich_album_id = target_album_id
+                            self.db.commit()
 
         if target_album_id:
             try:
@@ -221,7 +265,7 @@ class ReviewDecisionService:
 
         if metadata_suggestion:
             metadata_suggestion.writeback_status = (
-                "written" if not result.errors else "failed"
+                "written" if not result.errors else "partial"
             )
         self.db.commit()
 

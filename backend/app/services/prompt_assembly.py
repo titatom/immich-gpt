@@ -67,10 +67,15 @@ class PromptAssemblyService:
         self,
         asset_metadata: Dict[str, Any],
         buckets: List[Bucket],
+        available_tags: Optional[List[str]] = None,
+        available_albums: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Build the message list for one-call AI classification.
         Returns provider-ready messages (without image - image injected by provider).
+
+        available_tags: when set and allow_new_tags=False, used as the authoritative tag list.
+        available_albums: when set and allow_new_albums=False, listed in the album constraint.
         """
         allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
         allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
@@ -90,32 +95,41 @@ class PromptAssemblyService:
                 or DEFAULT_TAGS_PROMPT
             )
         else:
-            existing_tags = asset_metadata.get("tags") or []
+            # Prefer the full Immich tag list if provided; fall back to asset's own tags.
+            existing_tags = available_tags if available_tags is not None else (asset_metadata.get("tags") or [])
             if existing_tags:
                 existing_str = ", ".join(existing_tags)
                 tags_prompt = (
-                    f"IMPORTANT: You must only use tags from the existing tag list. "
-                    f"Do NOT invent new tags. Existing tags available: {existing_str}. "
+                    f"IMPORTANT: You must only use tags from the following existing tag list. "
+                    f"Do NOT invent new tags. Available tags: {existing_str}. "
                     f"Select 0–8 relevant tags from that list only."
                 )
             else:
                 tags_prompt = (
                     "IMPORTANT: You must only use existing tags. No existing tags are available for this asset, "
-                    "so return an empty tags array."
+                    "so return an empty tags array []."
                 )
 
         if allow_new_albums:
             subalbum_note = ""
         else:
-            subalbum_note = (
-                "\n\nIMPORTANT: For subalbum_suggestion, you may only use names of albums that already exist "
-                "in Immich. Do NOT invent new album or sub-album names. If no suitable existing album exists, "
-                "set subalbum_suggestion to null."
-            )
+            if available_albums:
+                albums_str = ", ".join(available_albums[:50])
+                subalbum_note = (
+                    f"\n\nIMPORTANT: For subalbum_suggestion, you may only use names from this existing album list: "
+                    f"{albums_str}. Do NOT invent new album names. If no suitable album exists, "
+                    "set subalbum_suggestion to null."
+                )
+            else:
+                subalbum_note = (
+                    "\n\nIMPORTANT: For subalbum_suggestion, you may only use names of albums that already exist "
+                    "in Immich. Do NOT invent new album or sub-album names. If no suitable existing album exists, "
+                    "set subalbum_suggestion to null."
+                )
 
         bucket_defs = self._build_bucket_definitions(buckets)
         metadata_summary = self._build_metadata_summary(asset_metadata)
-        output_schema = self._build_output_schema_instructions(buckets) + subalbum_note
+        output_schema = self._build_output_schema_instructions(buckets, allow_new_tags) + subalbum_note
 
         system_content = (
             f"You are an expert photo and document classifier and metadata enricher.\n\n"
@@ -181,16 +195,21 @@ class PromptAssemblyService:
             parts.append(f"Current tags: {', '.join(metadata['tags'])}")
         return "\n".join(parts) if parts else "No metadata available."
 
-    def _build_output_schema_instructions(self, buckets: List[Bucket]) -> str:
+    def _build_output_schema_instructions(self, buckets: List[Bucket], allow_new_tags: bool = True) -> str:
         bucket_names = [b.name for b in buckets if b.enabled]
         names_str = ", ".join(f'"{n}"' for n in bucket_names)
+        tags_desc = (
+            "array of 3-8 strings"
+            if allow_new_tags
+            else "array of 0-8 strings chosen strictly from the provided tag list (may be empty [])"
+        )
         return (
             f"Return ONLY a JSON object with these exact fields:\n"
             f"- bucket_name: one of [{names_str}]\n"
             f"- confidence: float 0.0-1.0\n"
             f"- explanation: string, 1-3 sentences\n"
             f"- description_suggestion: string, concise and useful\n"
-            f"- tags: array of 3-8 strings\n"
+            f"- tags: {tags_desc}\n"
             f"- subalbum_suggestion: string or null\n"
             f"- review_recommended: boolean\n\n"
             f"No other fields. No markdown. Valid JSON only."
@@ -200,9 +219,15 @@ class PromptAssemblyService:
         self,
         asset_metadata: Dict[str, Any],
         buckets: List[Bucket],
+        available_tags: Optional[List[str]] = None,
+        available_albums: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Return the assembled prompt as a dict for storage/audit."""
-        messages = self.assemble_classification_messages(asset_metadata, buckets)
+        messages = self.assemble_classification_messages(
+            asset_metadata, buckets,
+            available_tags=available_tags,
+            available_albums=available_albums,
+        )
         return {
             "messages": messages,
             "bucket_names": [b.name for b in buckets if b.enabled],

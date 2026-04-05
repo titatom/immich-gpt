@@ -248,7 +248,9 @@ function ProvidersSection() {
             </div>
             {testResults[p.provider_name] && (
               <div style={{ fontSize: 12, color: testResults[p.provider_name].connected ? "#86efac" : "#fca5a5" }}>
-                {testResults[p.provider_name].connected ? "✓ Connected" : `✗ ${testResults[p.provider_name].error}`}
+                {testResults[p.provider_name].connected
+                  ? "✓ Connected"
+                  : `✗ ${testResults[p.provider_name].error || "Connection failed"}`}
               </div>
             )}
           </div>
@@ -273,7 +275,7 @@ function ProvidersSection() {
 
       {providers.length === 0 && !showAdd && (
         <div style={{ fontSize: 14, color: "#64748b", textAlign: "center", padding: 16 }}>
-          No providers configured. Add OpenAI or Ollama to get started.
+          No providers configured. Add OpenAI, OpenRouter, or Ollama to get started.
         </div>
       )}
 
@@ -294,15 +296,23 @@ function ProvidersSection() {
             </div>
           )}
 
-          {(form.provider_name === "ollama" || form.provider_name === "openrouter") && (
+          {form.provider_name === "ollama" && (
             <div style={{ marginBottom: 12 }}>
               <label style={{ fontSize: 12, color: "#64748b", display: "block", marginBottom: 4 }}>Base URL</label>
-              <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder={form.provider_name === "ollama" ? "http://localhost:11434" : "http://..."} />
-              {form.provider_name === "ollama" && (
-                <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
-                  Ollama is self-hosted and does not require an API key.
-                </div>
-              )}
+              <input value={form.base_url} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value }))} style={inputStyle} placeholder="http://localhost:11434" />
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>
+                Ollama is self-hosted and does not require an API key.
+              </div>
+            </div>
+          )}
+          {form.provider_name === "openrouter" && (
+            <div style={{ marginBottom: 12, padding: "10px 14px", background: "#0f172a", borderRadius: 8, border: "1px solid #334155" }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                OpenRouter uses <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>https://openrouter.ai/api/v1</code> automatically — no Base URL needed.
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>
+                After saving, the model picker will load all available OpenRouter models. You can type a model ID (e.g. <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>openai/gpt-4o</code>, <code style={{ background: "#1e293b", padding: "1px 4px", borderRadius: 3 }}>anthropic/claude-3.5-sonnet</code>) or save first to browse.
+              </div>
             </div>
           )}
 
