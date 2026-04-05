@@ -113,3 +113,23 @@ def test_missing_thumbnail_does_not_break_review_queue(client, db):
     resp = client.get("/api/review/queue")
     assert resp.status_code == 200
     assert len(resp.json()) >= 2
+
+
+def test_review_queue_ids_returns_all(client, db):
+    asset_ids = make_review_data(db, n=4)
+    resp = client.get("/api/review/queue/ids")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "ids" in data
+    for aid in asset_ids:
+        assert aid in data["ids"]
+
+
+def test_review_queue_ids_filter_by_bucket(client, db):
+    bucket = db.query(Bucket).filter(Bucket.name == "Personal").first()
+    make_review_data(db, n=3)
+    resp = client.get(f"/api/review/queue/ids?bucket_id={bucket.id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "ids" in data
+    assert len(data["ids"]) >= 3

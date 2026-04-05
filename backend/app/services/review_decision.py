@@ -228,7 +228,19 @@ class ReviewDecisionService:
 
         if not target_album_id and bucket_id:
             bucket = self.db.query(Bucket).filter(Bucket.id == bucket_id).first()
-            if bucket and bucket.mapping_mode == "immich_album":
+            if bucket and bucket.mapping_mode == "immich_trash":
+                try:
+                    self.immich.trash_assets([asset.immich_id])
+                    result.album_assigned = True
+                    self._audit(asset.id, "writeback_trash", "success",
+                                {"immich_id": asset.immich_id})
+                except ImmichError as e:
+                    msg = f"Failed to trash asset in Immich: {e}"
+                    result.errors.append(msg)
+                    self._audit(asset.id, "writeback_trash", "failed", error=msg)
+                # Skip album assignment — trashing is the action for this bucket.
+                target_album_id = None
+            elif bucket and bucket.mapping_mode == "immich_album":
                 if bucket.immich_album_id:
                     target_album_id = bucket.immich_album_id
                     target_album_name = bucket.name

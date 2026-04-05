@@ -91,6 +91,26 @@ def get_review_count(
     return {"count": count, "status": status}
 
 
+@router.get("/queue/ids")
+def get_review_queue_ids(
+    status: str = "pending_review",
+    bucket_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Return all asset IDs in the review queue matching the given filters.
+
+    Used by the frontend to implement cross-page 'select all' without
+    fetching full review items.
+    """
+    q = db.query(SuggestedClassification.asset_id).filter(
+        SuggestedClassification.status == status
+    )
+    if bucket_id:
+        q = q.filter(SuggestedClassification.suggested_bucket_id == bucket_id)
+    rows = q.order_by(SuggestedClassification.created_at.desc()).all()
+    return {"ids": [r[0] for r in rows]}
+
+
 @router.get("/item/{asset_id}", response_model=ReviewItemOut)
 def get_review_item(asset_id: str, db: Session = Depends(get_db)):
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
