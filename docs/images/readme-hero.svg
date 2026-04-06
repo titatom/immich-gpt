@@ -1,0 +1,52 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1280" height="720" rx="32" fill="#020617"/>
+<rect x="24" y="24" width="1232" height="672" rx="28" fill="url(#paint0_linear)"/>
+<rect x="72" y="80" width="528" height="560" rx="28" fill="#0F172A" stroke="#334155" stroke-width="2"/>
+<text x="112" y="156" fill="#38BDF8" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700">Immich GPT</text>
+<text x="112" y="214" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">Reviewable AI metadata</text>
+<text x="112" y="274" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">for your Immich library</text>
+<text x="112" y="340" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="26">Sync. Classify. Review. Write back only when approved.</text>
+
+<rect x="112" y="392" width="204" height="52" rx="14" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+<text x="136" y="425" fill="#E0F2FE" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">Single container</text>
+<rect x="334" y="392" width="216" height="52" rx="14" fill="#22C55E" fill-opacity="0.16" stroke="#4ADE80"/>
+<text x="358" y="425" fill="#DCFCE7" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700">Human review first</text>
+
+<circle cx="134" cy="500" r="7" fill="#38BDF8"/>
+<text x="156" y="508" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="24">OpenAI, Ollama, and OpenRouter support</text>
+<circle cx="134" cy="548" r="7" fill="#38BDF8"/>
+<text x="156" y="556" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="24">Per-user buckets, prompts, settings, and jobs</text>
+<circle cx="134" cy="596" r="7" fill="#38BDF8"/>
+<text x="156" y="604" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="24">Safe write-back to albums, sub-albums, or Immich trash</text>
+
+<rect x="656" y="104" width="552" height="504" rx="28" fill="#0F172A" stroke="#334155" stroke-width="2"/>
+<rect x="704" y="144" width="456" height="76" rx="18" fill="#111827" stroke="#1E293B"/>
+<text x="742" y="190" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Connect to Immich</text>
+<text x="1032" y="190" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="22">server-side thumbnails</text>
+
+<rect x="704" y="252" width="456" height="76" rx="18" fill="#111827" stroke="#1E293B"/>
+<text x="742" y="298" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Run AI classification</text>
+<text x="1011" y="298" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="22">bucket + tags + description</text>
+
+<rect x="704" y="360" width="456" height="76" rx="18" fill="#111827" stroke="#1E293B"/>
+<text x="742" y="406" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Review suggestions</text>
+<text x="1048" y="406" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="22">edit, bulk approve, re-analyse</text>
+
+<rect x="704" y="468" width="456" height="76" rx="18" fill="#111827" stroke="#1E293B"/>
+<text x="742" y="514" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Write back safely</text>
+<text x="1034" y="514" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="22">albums, parent groups, or trash</text>
+
+<path d="M933 220V252" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+<path d="M933 328V360" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+<path d="M933 436V468" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+<path d="M925 244L933 252L941 244" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M925 352L933 360L941 352" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M925 460L933 468L941 460" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+<defs>
+<linearGradient id="paint0_linear" x1="640" y1="24" x2="640" y2="696" gradientUnits="userSpaceOnUse">
+<stop stop-color="#071126"/>
+<stop offset="1" stop-color="#050B18"/>
+</linearGradient>
+</defs>
+</svg>

@@ -19,9 +19,12 @@ Search for **Immich GPT** in the CA plugin.  The template pre-fills all required
 | **Data Directory** | `/mnt/user/appdata/immich-gpt` |
 | **Immich URL** | `http://192.168.1.x:2283` |
 | **Immich API Key** | *(create in Immich → Account → API Keys)* |
+| **Admin Email** | `admin@example.com` |
+| **Admin Password** | `change-me-now` |
 | **OpenAI API Key** | *(or leave blank and configure Ollama in the UI)* |
 
 You can leave Immich URL / API Key blank and configure them after first launch via **Settings → Immich Connection**.
+Set the admin email/password before the first launch so the initial admin account can be created.
 
 ### Manual Docker run
 
@@ -33,6 +36,8 @@ docker run -d \
   -v /path/to/appdata/immich-gpt:/data \
   -e IMMICH_URL=http://192.168.1.x:2283 \
   -e IMMICH_API_KEY=your-key \
+  -e ADMIN_EMAIL=admin@example.com \
+  -e ADMIN_PASSWORD=change-me-now \
   -e OPENAI_API_KEY=sk-... \
   ghcr.io/titatom/immich-gpt:latest
 ```
@@ -43,6 +48,8 @@ docker run -d \
 cp .env.example .env   # edit with your values
 docker compose up -d
 ```
+
+On a fresh database, make sure `.env` includes `ADMIN_EMAIL` and `ADMIN_PASSWORD` so the bootstrap admin can sign in.
 
 ---
 
@@ -101,6 +108,9 @@ docker build -f Dockerfile.unraid -t immich-gpt:local .
 | `IMMICH_API_KEY` | *(empty)* | Immich API key — can also be set in the UI |
 | `OPENAI_API_KEY` | *(empty)* | OpenAI key (optional — configure via UI) |
 | `OPENAI_MODEL` | `gpt-4o` | Default model when using env-based OpenAI config |
+| `ADMIN_EMAIL` | *(empty)* | Bootstrap admin email used only when no users exist yet |
+| `ADMIN_PASSWORD` | *(empty)* | Bootstrap admin password used only when no users exist yet |
+| `ADMIN_USERNAME` | `admin` | Bootstrap admin username |
 | `WORKER_CONCURRENCY` | `2` | Background job threads (ignored when `REDIS_URL` is set) |
 | `REDIS_URL` | *(empty)* | Optional — set to `redis://host:6379/0` to use an existing Redis |
 | `AUTH_ENABLED` | `false` | Set `true` to require Bearer token auth |

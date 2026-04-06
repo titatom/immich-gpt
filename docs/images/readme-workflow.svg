@@ -1,0 +1,56 @@
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1280" height="760" rx="32" fill="#020617"/>
+<rect x="40" y="48" width="1200" height="664" rx="28" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+<text x="84" y="120" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">Immich GPT workflow</text>
+<text x="84" y="162" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="24">From raw library sync to approved write-back</text>
+
+<rect x="84" y="232" width="248" height="360" rx="24" fill="#111827" stroke="#334155" stroke-width="2"/>
+<rect x="108" y="256" width="62" height="62" rx="18" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+<text x="129" y="296" fill="#E0F2FE" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">1</text>
+<text x="108" y="358" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Connect</text>
+<text x="108" y="400" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Save Immich credentials</text>
+<text x="108" y="434" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Choose OpenAI, Ollama,</text>
+<text x="108" y="468" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">or OpenRouter</text>
+<text x="108" y="528" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="20">Per-user settings</text>
+
+<rect x="388" y="232" width="248" height="360" rx="24" fill="#111827" stroke="#334155" stroke-width="2"/>
+<rect x="412" y="256" width="62" height="62" rx="18" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+<text x="433" y="296" fill="#E0F2FE" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">2</text>
+<text x="412" y="358" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Sync</text>
+<text x="412" y="400" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Import all assets,</text>
+<text x="412" y="434" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">favourites, or</text>
+<text x="412" y="468" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">specific albums</text>
+<text x="412" y="528" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="20">Dashboard controls scope</text>
+
+<rect x="692" y="232" width="248" height="360" rx="24" fill="#111827" stroke="#334155" stroke-width="2"/>
+<rect x="716" y="256" width="62" height="62" rx="18" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+<text x="737" y="296" fill="#E0F2FE" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">3</text>
+<text x="716" y="358" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Classify</text>
+<text x="716" y="400" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Generate bucket,</text>
+<text x="716" y="434" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">tags, descriptions,</text>
+<text x="716" y="468" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">and sub-albums</text>
+<text x="716" y="528" fill="#64748B" font-family="Arial, Helvetica, sans-serif" font-size="20">Prompt-driven AI pipeline</text>
+
+<rect x="996" y="232" width="200" height="360" rx="24" fill="#111827" stroke="#334155" stroke-width="2"/>
+<rect x="1020" y="256" width="62" height="62" rx="18" fill="#22C55E" fill-opacity="0.16" stroke="#4ADE80"/>
+<text x="1041" y="296" fill="#DCFCE7" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">4</text>
+<text x="1020" y="358" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Review</text>
+<text x="1020" y="400" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Approve</text>
+<text x="1020" y="434" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Reject</text>
+<text x="1020" y="468" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Re-analyse</text>
+<text x="1020" y="502" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Bulk actions</text>
+<text x="1020" y="536" fill="#CBD5E1" font-family="Arial, Helvetica, sans-serif" font-size="22">Write-back</text>
+
+<path d="M332 412H388" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"/>
+<path d="M636 412H692" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"/>
+<path d="M940 412H996" stroke="#4ADE80" stroke-width="5" stroke-linecap="round"/>
+<path d="M374 404L388 412L374 420" stroke="#38BDF8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M678 404L692 412L678 420" stroke="#38BDF8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M982 404L996 412L982 420" stroke="#4ADE80" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+<rect x="84" y="632" width="1112" height="40" rx="20" fill="#071120" stroke="#1E293B"/>
+<text x="116" y="658" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="20">Write-back modes: virtual only</text>
+<text x="413" y="658" fill="#38BDF8" font-family="Arial, Helvetica, sans-serif" font-size="20">album mapping</text>
+<text x="555" y="658" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="20">parent-group sub-albums</text>
+<text x="839" y="658" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="20">Immich trash</text>
+</svg>

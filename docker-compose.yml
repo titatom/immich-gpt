@@ -10,7 +10,7 @@
 #   in that case).
 #
 # Quick start:
-#   cp .env.example .env   # fill in IMMICH_URL, IMMICH_API_KEY, OPENAI_API_KEY
+#   cp .env.example .env   # fill in Immich + admin bootstrap values
 #   docker compose up -d
 # =============================================================================
 
@@ -30,6 +30,10 @@ services:
       IMMICH_API_KEY: ${IMMICH_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      # Used once on first boot to create the initial admin account.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       AUTH_ENABLED: ${AUTH_ENABLED:-false}
       # Leave empty to use the built-in thread-pool worker (default).
