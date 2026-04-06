@@ -34,9 +34,8 @@ def create_user(
     db.commit()
     db.refresh(user)
 
-    # Seed personal defaults for non-admin users
-    if role == "user":
-        _seed_user_defaults(db, user.id)
+    # Seed personal defaults for every new user regardless of role
+    _seed_user_defaults(db, user.id)
 
     return user
 
