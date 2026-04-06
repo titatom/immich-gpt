@@ -73,14 +73,44 @@ def get_review_queue(
         SuggestedClassification.created_at.desc()
     ).offset(offset).limit(page_size).all()
 
+    if not classifications:
+        return []
+
+    # Batch-fetch assets and latest metadata to avoid N+1 queries
+    asset_ids = [cls.asset_id for cls in classifications]
+    assets_by_id = {
+        a.id: a
+        for a in db.query(Asset).filter(Asset.id.in_(asset_ids)).all()
+    }
+
+    # Latest metadata per asset (one query, not N)
+    from sqlalchemy import func as sa_func
+    latest_meta_subq = (
+        db.query(
+            SuggestedMetadata.asset_id,
+            sa_func.max(SuggestedMetadata.created_at).label("latest"),
+        )
+        .filter(SuggestedMetadata.asset_id.in_(asset_ids))
+        .group_by(SuggestedMetadata.asset_id)
+        .subquery()
+    )
+    metas = (
+        db.query(SuggestedMetadata)
+        .join(
+            latest_meta_subq,
+            (SuggestedMetadata.asset_id == latest_meta_subq.c.asset_id)
+            & (SuggestedMetadata.created_at == latest_meta_subq.c.latest),
+        )
+        .all()
+    )
+    meta_by_asset = {m.asset_id: m for m in metas}
+
     items = []
     for cls in classifications:
-        asset = db.query(Asset).filter(Asset.id == cls.asset_id).first()
+        asset = assets_by_id.get(cls.asset_id)
         if not asset:
             continue
-        meta = db.query(SuggestedMetadata).filter(
-            SuggestedMetadata.asset_id == cls.asset_id
-        ).order_by(SuggestedMetadata.created_at.desc()).first()
+        meta = meta_by_asset.get(cls.asset_id)
         items.append(_build_review_item(asset, cls, meta))
 
     return items

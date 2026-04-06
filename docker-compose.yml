@@ -28,8 +28,13 @@ x-common-env: &common-env
   IMMICH_API_KEY: ${IMMICH_API_KEY:-}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-  SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-  AUTH_ENABLED: ${AUTH_ENABLED:-false}
+  # Admin bootstrap: creates the first admin account on startup if none exist.
+  # The admin must change the password on first login.
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  # Set true when running behind HTTPS (internet-exposed deployments).
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
 
 services:
 
