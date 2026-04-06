@@ -40,19 +40,23 @@ async def lifespan(app: FastAPI):
 
 
 def _bootstrap_admin() -> None:
-    """Create the default admin account from env vars if no users exist."""
-    if not app_settings.ADMIN_EMAIL or not app_settings.ADMIN_PASSWORD:
+    """Create the default admin account from env vars if no users exist.
+
+    Empty ADMIN_EMAIL / ADMIN_PASSWORD values fall back to the built-in
+    'admin'/'admin' defaults so that a vanilla first boot (or a Docker
+    template that ships blank placeholders) is always usable out of the box.
+    Set ADMIN_SKIP_BOOTSTRAP=true to suppress auto-creation entirely.
+    """
+    if app_settings.ADMIN_SKIP_BOOTSTRAP:
         return
+    email = app_settings.ADMIN_EMAIL.strip() or "admin"
+    password = app_settings.ADMIN_PASSWORD.strip() or "admin"
+    username = app_settings.ADMIN_USERNAME.strip() or "admin"
     from .database import SessionLocal
     from .services.user_service import ensure_admin_exists
     db = SessionLocal()
     try:
-        ensure_admin_exists(
-            db,
-            email=app_settings.ADMIN_EMAIL,
-            password=app_settings.ADMIN_PASSWORD,
-            username=app_settings.ADMIN_USERNAME,
-        )
+        ensure_admin_exists(db, email=email, password=password, username=username)
     finally:
         db.close()
 

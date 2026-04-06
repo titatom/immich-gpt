@@ -209,3 +209,54 @@ def test_bootstrap_admin_login_via_api(empty_db):
     data = resp.json()
     assert data["username"] == "admin"
     assert data["force_password_change"] is True
+
+
+# ---------------------------------------------------------------------------
+# Empty-env-var fallback (Unraid / Docker blank placeholder regression)
+# ---------------------------------------------------------------------------
+
+def test_bootstrap_admin_empty_email_falls_back(empty_db):
+    """_bootstrap_admin falls back to admin/admin/admin when env vars are empty strings.
+
+    This is the regression test for the Unraid CA template shipping
+    ADMIN_EMAIL="" and ADMIN_PASSWORD="" as blank Docker env vars, which
+    previously caused the bootstrap to skip entirely and left the UI locked
+    on first boot.
+    """
+    from app.main import _bootstrap_admin
+    from app.services.auth_service import authenticate_user
+    from app.models.user import User
+
+    # Patch the settings object used inside _bootstrap_admin, and redirect
+    # SessionLocal (imported lazily inside the function) to our empty_db.
+    mock_settings = type("S", (), {
+        "ADMIN_SKIP_BOOTSTRAP": False,
+        "ADMIN_EMAIL": "",      # blank — simulates empty Docker env var
+        "ADMIN_PASSWORD": "",   # blank
+        "ADMIN_USERNAME": "",   # blank
+    })()
+
+    with patch("app.main.app_settings", mock_settings), \
+         patch("app.database.SessionLocal", return_value=empty_db):
+        _bootstrap_admin()
+
+    # The fallback should have created admin/admin
+    user = authenticate_user(empty_db, "admin", "admin")
+    assert user is not None, "admin/admin must work after bootstrap with empty env vars"
+    assert user.role == "admin"
+
+
+def test_bootstrap_admin_skip_flag(empty_db):
+    """ADMIN_SKIP_BOOTSTRAP=true suppresses auto-creation entirely."""
+    from app.main import _bootstrap_admin
+    from app.models.user import User
+
+    mock_settings = type("S", (), {
+        "ADMIN_SKIP_BOOTSTRAP": True,
+    })()
+
+    with patch("app.main.app_settings", mock_settings):
+        _bootstrap_admin()
+
+    assert empty_db.query(User).count() == 0, \
+        "no user should be created when ADMIN_SKIP_BOOTSTRAP is true"

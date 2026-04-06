@@ -50,9 +50,12 @@ class Settings(BaseSettings):
     # Admin bootstrap: credentials used when no users exist on startup.
     # Defaults to admin / admin so a fresh install is immediately usable.
     # The user is forced to change the password on first login.
+    # Empty strings are treated as "not configured" — built-in defaults apply.
+    # Set ADMIN_SKIP_BOOTSTRAP=true to suppress auto-creation entirely.
     ADMIN_EMAIL: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_USERNAME: str = "admin"
+    ADMIN_SKIP_BOOTSTRAP: bool = False
 
     @property
     def cors_origins_list(self) -> List[str]:
