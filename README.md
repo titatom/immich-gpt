@@ -1,184 +1,203 @@
 # immich-gpt
 
-> AI-first metadata enrichment and organization for Immich — "Paperless-GPT for Immich"
+> AI-assisted metadata enrichment and review for Immich.
 
-A self-hosted web app that connects to your Immich instance, processes your photos one-by-one with AI, and suggests metadata enrichments for human review before writing anything back.
+`immich-gpt` connects to your Immich library, sends thumbnails and metadata to an AI provider, and stages the resulting bucket, description, and tag suggestions for human review before anything is written back.
 
-## What it does
+## Highlights
 
-- **Connects** to your Immich instance and syncs asset metadata
-- **Fetches thumbnails** server-side (never exposes your Immich credentials to AI providers)
-- **Classifies** each asset into a user-defined Bucket using OpenAI vision
-- **Generates** description and tag suggestions per asset
-- **Stages** all suggestions in a review queue — nothing is written automatically
-- **After approval**, writes descriptions and tags back to Immich
+- Sync assets from Immich without exposing your Immich credentials to the AI provider
+- Classify assets into editable buckets and generate descriptions and tags
+- Review every suggestion before write-back
+- Track long-running sync/classification jobs in the web UI
+- Run as a simple single-container app by default, or with Redis + a dedicated worker for higher throughput
 
-## Architecture
+## How it works
 
+1. Sign in to the web app.
+2. Add or confirm your Immich connection and AI provider settings.
+3. Sync assets from Immich.
+4. Run AI classification jobs.
+5. Review, edit, approve, or reject suggestions.
+6. Write approved metadata back to Immich.
+
+Nothing is written automatically. Review stays in the loop.
+
+## Deployment modes
+
+### Single-container mode (default)
+
+- One container
+- No Redis required
+- Background jobs run in-process via `ThreadPoolExecutor`
+- Best fit for home servers, Unraid, Synology, and local evaluation
+
+Start it with plain `docker compose up -d`.
+
+### Full-stack mode
+
+- Separate API container
+- Separate worker container
+- Redis-backed job queue
+- Better fit for larger libraries or heavier sustained workloads
+
+Start it with `docker compose --profile full up -d`.
+
+More deployment examples are in `DOCKER.md`.
+
+## Quick start
+
+### 1. Create your env file
+
+```bash
+cp .env.example .env
 ```
-┌─────────────┐    ┌──────────────────────┐    ┌────────────┐
-│   Browser   │───▶│   FastAPI (Python)   │───▶│   Immich   │
-│  React SPA  │    │                      │    │   Server   │
-└─────────────┘    │  ImmichClient        │    └────────────┘
-                   │  ImagePrepService    │
-                   │  OpenAIProvider      │───▶ OpenAI API
-                   │  PromptAssembly      │     (base64 data URL,
-                   │  ClassificationOrch  │      never raw URL)
-                   │  ReviewDecisionSvc   │
-                   │  JobProgressService  │
-                   └──────────────────────┘
-                          │        │
-                   ┌──────┘        └──────┐
-                   ▼                      ▼
-              SQLite DB             Redis + RQ
-           (persistent vol)       (background jobs)
+
+### 2. Edit the required values
+
+At minimum, set:
+
+- `IMMICH_URL`
+- `IMMICH_API_KEY`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+
+Optional but usually useful on day one:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+
+The admin bootstrap values are important on a fresh database. If no users exist yet, the backend creates that first admin account automatically on startup.
+
+### 3. Build or pull the app image
+
+Build locally:
+
+```bash
+docker build -f Dockerfile.unraid -t immich-gpt:latest .
 ```
 
-## Quick Start
+Or use the published image:
 
-1. Copy the example env file:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+docker pull ghcr.io/titatom/immich-gpt:latest
+docker tag ghcr.io/titatom/immich-gpt:latest immich-gpt:latest
+```
 
-2. Edit `.env` with your Immich URL, API key, and OpenAI key.
+### 4. Start the app
 
-3. Run with Docker Compose:
-   ```bash
-   docker compose up -d
-   ```
+Single-container mode:
 
-4. Open http://localhost:8000 in your browser.
+```bash
+docker compose up -d
+```
 
-5. Go to **Dashboard** → **Sync Assets** to pull your Immich library.
+Full-stack mode:
 
-6. Click **Run AI Classification** to start processing.
+```bash
+docker compose --profile full up -d
+```
 
-7. Go to **Review** to approve or edit each suggestion.
+### 5. Sign in and run your first job
 
-## Default Buckets
+1. Open `http://localhost:8000`
+2. Sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+3. Go to `Settings` if you want to finish configuring Immich or the AI provider in the UI
+4. Go to `Dashboard` and run `Sync Assets`
+5. Start `Run AI Classification`
+6. Review results in `Review`
 
-| Bucket | Purpose |
-|--------|---------|
-| Documents | Receipts, invoices, forms, scans, photos of paper |
-| Business | Work sites, tools, project documentation |
-| Personal | Family, travel, events, everyday life |
-| Trash | Blurry, accidental, no-value shots |
+## Environment variables
 
-Documents always beats Business when the asset is clearly a receipt, invoice, contract, or photo of paper.
-
-Trash is **non-destructive** — nothing is ever deleted automatically.
-
-## Features
-
-### AI-First Pipeline
-- One AI call per asset (image + metadata combined)
-- Structured JSON output with strict schema validation
-- Malformed responses surfaced as errors, never silently dropped
-
-### Image Handling
-- Thumbnails fetched server-side from Immich
-- Converted to base64 data URLs before sending to OpenAI
-- Private Immich URLs **never** passed to external providers
-
-### Prompt System
-- Global classification, description, and tags prompts
-- Per-bucket classification prompts
-- All prompts stored in DB, editable in UI, versioned
-
-### Review Workflow
-- Thumbnail shown for every item
-- Approve/edit description, tags, bucket
-- Override bucket with dropdown
-- Bulk approve/reject
-- Clicking thumbnail opens large preview
-
-### Jobs & Progress
-- Real-time progress bar (processed/total, %, step)
-- Live log panel per job
-- Job states: queued → syncing → preparing_image → classifying_ai → completed
-- Cancel support
-
-### Write-back
-- Explicit: only after user approval
-- Logged to AuditLog table
-- Failures surfaced clearly (not silently swallowed)
-- External library write limitations detected and warned
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.12 + FastAPI |
-| Database | SQLite (persistent volume) |
-| Background jobs | Redis + RQ |
-| Frontend | React 18 + TypeScript + Vite |
-| AI | OpenAI (gpt-4o default), Ollama/OpenRouter stubs |
-| Container | Docker + Docker Compose |
-
-## Environment Variables
+`README` lists the most important variables; `.env.example` contains the full starter file with comments.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `IMMICH_URL` | — | Your Immich server URL |
-| `IMMICH_API_KEY` | — | Immich API key |
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `OPENAI_MODEL` | `gpt-4o` | OpenAI model to use |
-| `APP_PORT` | `8000` | Host port to expose |
-| `REDIS_URL` | `redis://redis:6379/0` | Redis connection string |
-| `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLite database path |
+| `IMMICH_URL` | empty | Immich server URL |
+| `IMMICH_API_KEY` | empty | Immich API key |
+| `OPENAI_API_KEY` | empty | OpenAI API key when using env-based provider config |
+| `OPENAI_MODEL` | `gpt-4o` | Default OpenAI model |
+| `ADMIN_EMAIL` | empty | First admin account email on a fresh database |
+| `ADMIN_PASSWORD` | empty | First admin account password on a fresh database |
+| `ADMIN_USERNAME` | `admin` | First admin username on a fresh database |
+| `APP_PORT` | `8000` | Host port published by Docker Compose |
+| `WORKER_CONCURRENCY` | `2` | In-process worker threads in single-container mode |
+| `REDIS_URL` | empty | Enable Redis/RQ mode for custom or multi-process deployments |
+| `DATABASE_URL` | `sqlite:///./data/immich_gpt.db` | Backend DB URL for local/custom runs |
+| `AUTH_ENABLED` | `false` | Optional extra Bearer-token gate on API requests |
+| `SECRET_KEY` | `change-me-in-production` | Secret for tokens and optional Bearer-token gate |
 
-## API Reference
+## Local development
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET/POST | `/api/settings/immich` | Immich connection settings |
-| GET/POST | `/api/settings/providers` | AI provider config |
-| GET/POST/PATCH/DELETE | `/api/buckets` | Bucket CRUD |
-| GET/POST/PATCH/DELETE | `/api/prompts` | Prompt template CRUD |
-| GET | `/api/assets` | List synced assets |
-| GET | `/api/assets/count` | Asset count |
-| POST | `/api/jobs/sync` | Start asset sync job |
-| POST | `/api/jobs/classify` | Start classification job |
-| GET | `/api/jobs/{id}` | Job status + logs |
-| GET | `/api/review/queue` | Review queue |
-| GET | `/api/review/queue/count` | Pending count |
-| POST | `/api/review/item/{id}/approve` | Approve with edits |
-| POST | `/api/review/item/{id}/reject` | Reject suggestion |
-| POST | `/api/review/bulk` | Bulk approve/reject |
-| GET | `/api/thumbnails/{asset_id}` | Proxied thumbnail |
-| GET | `/api/albums` | Immich albums (for bucket mapping) |
+### Backend
 
-## Running Tests
+Run from `backend/` so the app loads the local `.env` file correctly:
 
 ```bash
 cd backend
-pip install -r requirements.txt
+export PATH="$HOME/.local/bin:$PATH"
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+For local single-process development, leave `REDIS_URL` empty. If you want Redis-backed jobs locally, start Redis and the RQ worker separately.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npx vite --host 0.0.0.0 --port 3000
+```
+
+The Vite dev server proxies `/api` to the backend on port `8000`.
+
+## Running tests
+
+Backend:
+
+```bash
+cd backend
 python3 -m pytest tests/ -v
 ```
 
-61 tests covering:
-- Prompt assembly (global + bucket + field prompts)
-- ImmichClient (auth headers, thumbnail fetch, external library detection)
-- ImagePreparationService (data URL, no raw URL regression, oversized handling)
-- OpenAIProvider (schema validation, malformed JSON, image injection)
-- ClassificationOrchestrator (end-to-end, error handling, image failures)
-- JobProgressService (all state transitions)
-- ReviewDecisionService (write-back flows, failure reporting, external library warning)
-- Review API (queue rendering, thumbnails, pagination)
-- Bucket API (CRUD)
+Frontend:
 
-## Unraid Deployment
+```bash
+cd frontend
+npm test
+npm run lint
+npx tsc --noEmit
+```
 
-1. Add a new Docker container in Unraid using the docker-compose or manually configure each service.
-2. Map `/data` and `/logs` volumes to persistent paths on your array.
-3. Set environment variables in Unraid's Docker template.
-4. Ensure the container can reach your Immich instance on the local network.
+## API surface
+
+Key endpoints:
+
+- `GET /api/health`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `GET/POST /api/settings/immich`
+- `GET/POST /api/settings/providers`
+- `POST /api/jobs/sync`
+- `POST /api/jobs/classify`
+- `GET /api/review/queue`
+- `POST /api/review/item/{id}/approve`
+- `POST /api/review/item/{id}/reject`
+
+## Default buckets
+
+| Bucket | Purpose |
+|--------|---------|
+| Documents | Receipts, invoices, forms, scans, and paper photos |
+| Business | Work sites, tools, and project documentation |
+| Personal | Family, travel, events, and daily life |
+| Trash | Blurry, accidental, or low-value shots |
+
+`Trash` is non-destructive. Nothing is deleted automatically.
 
 ## Roadmap
 
-- [ ] Ollama provider (local models)
+- [ ] Ollama provider
 - [ ] OpenRouter provider
 - [ ] SSE for real-time job updates
 - [ ] Asset detail view
