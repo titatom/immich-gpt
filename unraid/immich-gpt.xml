@@ -25,6 +25,9 @@
     review and write AI-generated descriptions, tags, and album assignments back
     to Immich — all from a clean web UI.
 
+    Multi-user: each person manages their own Immich connection, AI providers,
+    buckets, and assets. An admin account is created automatically on first start.
+
     Single-container — no Redis, no separate worker process required.
     All jobs run in-process using a lightweight thread pool.
   </Overview>
@@ -60,12 +63,49 @@
     Target="/data"
     Default="/mnt/user/appdata/immich-gpt"
     Mode="rw"
-    Description="Persistent storage for the SQLite database. All settings, job history, and AI suggestions are stored here. Back this up."
+    Description="Persistent storage for the SQLite database. All user accounts, settings, job history, and AI suggestions are stored here. Back this up."
     Type="Path"
     Display="always"
     Required="true"
     Mask="false"
   >/mnt/user/appdata/immich-gpt</Config>
+
+  <!-- ── Admin account bootstrap ───────────────────────────────────────── -->
+  <Config
+    Name="Admin Email"
+    Target="ADMIN_EMAIL"
+    Default=""
+    Mode=""
+    Description="Email address for the admin account created automatically on first startup. You will use this to log in for the first time."
+    Type="Variable"
+    Display="always"
+    Required="true"
+    Mask="false"
+  ></Config>
+
+  <Config
+    Name="Admin Password"
+    Target="ADMIN_PASSWORD"
+    Default=""
+    Mode=""
+    Description="Initial password for the admin account. You will be forced to change it on first login. Use a temporary value here."
+    Type="Variable"
+    Display="always"
+    Required="true"
+    Mask="true"
+  ></Config>
+
+  <Config
+    Name="Admin Username"
+    Target="ADMIN_USERNAME"
+    Default="admin"
+    Mode=""
+    Description="Username for the auto-created admin account."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >admin</Config>
 
   <!-- ── Immich connection ─────────────────────────────────────────────── -->
   <Config
@@ -73,7 +113,7 @@
     Target="IMMICH_URL"
     Default="http://192.168.1.x:2283"
     Mode=""
-    Description="Full URL of your Immich server. Must be reachable from inside Docker (use your LAN IP, not localhost). Example: http://192.168.1.100:2283"
+    Description="Full URL of your Immich server (optional — can be set per-user in the UI after login). Must be reachable from inside Docker. Example: http://192.168.1.100:2283"
     Type="Variable"
     Display="always"
     Required="false"
@@ -85,7 +125,7 @@
     Target="IMMICH_API_KEY"
     Default=""
     Mode=""
-    Description="Immich API key. Create one in Immich → Account Settings → API Keys. You can also set this in the web UI after first launch."
+    Description="Immich API key (optional — can be set per-user in the UI after login). Create one in Immich → Account Settings → API Keys."
     Type="Variable"
     Display="always"
     Required="false"
@@ -98,7 +138,7 @@
     Target="OPENAI_API_KEY"
     Default=""
     Mode=""
-    Description="OpenAI API key for GPT-4o vision classification. Leave blank if using Ollama or OpenRouter instead. Configure providers inside the web UI → Settings."
+    Description="OpenAI API key for GPT-4o vision classification (optional — configure providers per-user in the UI). Leave blank if using Ollama or OpenRouter."
     Type="Variable"
     Display="always"
     Required="false"
@@ -110,12 +150,25 @@
     Target="OPENAI_MODEL"
     Default="gpt-4o"
     Mode=""
-    Description="Default OpenAI model. Only used when OPENAI_API_KEY is set and no provider has been configured in the UI. gpt-4o-mini is cheaper; gpt-4o is more accurate."
+    Description="Default OpenAI model. Only used when OPENAI_API_KEY is set and no provider is configured in the UI. gpt-4o-mini is cheaper; gpt-4o is more accurate."
     Type="Variable"
     Display="advanced"
     Required="false"
     Mask="false"
   >gpt-4o</Config>
+
+  <!-- ── Session security ───────────────────────────────────────────────── -->
+  <Config
+    Name="Secure Cookie (HTTPS)"
+    Target="SESSION_COOKIE_SECURE"
+    Default="false"
+    Mode=""
+    Description="Set to true if you access Immich GPT over HTTPS (e.g. via a reverse proxy with SSL). Required for internet-exposed deployments. Leave false for LAN-only HTTP."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >false</Config>
 
   <!-- ── Worker ────────────────────────────────────────────────────────── -->
   <Config
@@ -136,36 +189,11 @@
     Target="REDIS_URL"
     Default=""
     Mode=""
-    Description="Leave blank to use the built-in thread-pool worker (recommended for Unraid). Set to redis://host:6379/0 only if you run a separate Redis container and want distributed workers."
+    Description="Leave blank to use the built-in thread-pool worker (recommended for Unraid). Set to redis://host:6379/0 if you run a separate Redis instance and want distributed workers."
     Type="Variable"
     Display="advanced"
     Required="false"
     Mask="false"
-  ></Config>
-
-  <!-- ── Auth ──────────────────────────────────────────────────────────── -->
-  <Config
-    Name="Enable Auth"
-    Target="AUTH_ENABLED"
-    Default="false"
-    Mode=""
-    Description="Set to true to require a Bearer token on all API calls. You must also set SECRET_KEY. Useful when exposing Immich GPT to the internet via a reverse proxy."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="false"
-  >false</Config>
-
-  <Config
-    Name="Secret Key"
-    Target="SECRET_KEY"
-    Default=""
-    Mode=""
-    Description="Bearer token / secret used for auth when AUTH_ENABLED=true. Generate a strong random string. No effect when AUTH_ENABLED=false."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="true"
   ></Config>
 
 </Container>

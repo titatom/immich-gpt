@@ -10,7 +10,7 @@
 #   in that case).
 #
 # Quick start:
-#   cp .env.example .env   # fill in IMMICH_URL, IMMICH_API_KEY, OPENAI_API_KEY
+#   cp .env.example .env   # fill in ADMIN_EMAIL + ADMIN_PASSWORD at minimum
 #   docker compose up -d
 # =============================================================================
 
@@ -35,8 +35,13 @@ services:
       IMMICH_API_KEY: ${IMMICH_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      AUTH_ENABLED: ${AUTH_ENABLED:-false}
+      # Admin bootstrap: creates the first admin account on startup if none exist.
+      # The admin must change the password on first login.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      # Set true when running behind HTTPS (internet-exposed deployments).
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       # Leave empty to use the built-in thread-pool worker (default).
       # Set to redis://host:6379/0 to dispatch jobs through an existing Redis.
       REDIS_URL: ${REDIS_URL:-}
