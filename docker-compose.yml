@@ -14,6 +14,21 @@
 #   docker compose up -d
 # =============================================================================
 
+# ── Shared environment fragment (YAML anchor) ──────────────────────────────
+x-common-env: &common-env
+  DATABASE_URL: sqlite:////data/immich_gpt.db
+  IMMICH_URL: ${IMMICH_URL:-}
+  IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+  # Admin bootstrap: creates the first admin account on startup if none exist.
+  # The admin must change the password on first login.
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  # Set true when running behind HTTPS (internet-exposed deployments).
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+
 services:
 
   app:

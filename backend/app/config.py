@@ -36,11 +36,10 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SECURE: bool = False  # Set True in production (HTTPS)
     SESSION_COOKIE_SAMESITE: str = "lax"
 
-    # Secret used for signing tokens / CSRF (must be changed in production)
-    SECRET_KEY: str = "change-me-in-production"
-
-    # Legacy single-user auth (deprecated — no longer used for user auth)
-    AUTH_ENABLED: bool = False
+    # Admin bootstrap: if no users exist on startup, create this admin account
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+    ADMIN_USERNAME: str = "admin"
 
     # Admin bootstrap: if no users exist on startup, create this admin account
     ADMIN_EMAIL: str = ""
