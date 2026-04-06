@@ -10,30 +10,19 @@
 #   in that case).
 #
 # Quick start:
-#   cp .env.example .env   # fill in IMMICH_URL, IMMICH_API_KEY, OPENAI_API_KEY
+#   cp .env.example .env   # fill in at minimum: DATA_DIR, ADMIN_EMAIL,
+#                          # ADMIN_PASSWORD, IMMICH_URL, IMMICH_API_KEY
 #   docker compose up -d
+#
+# Unraid users: DATA_DIR defaults to /mnt/user/appdata/immich-gpt.
+# All persistent data (SQLite DB, settings, job history) lives there.
 # =============================================================================
-
-# ── Shared environment fragment (YAML anchor) ──────────────────────────────
-x-common-env: &common-env
-  DATABASE_URL: sqlite:////data/immich_gpt.db
-  IMMICH_URL: ${IMMICH_URL:-}
-  IMMICH_API_KEY: ${IMMICH_API_KEY:-}
-  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-  # Admin bootstrap: creates the first admin account on startup if none exist.
-  # The admin must change the password on first login.
-  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-  # Set true when running behind HTTPS (internet-exposed deployments).
-  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
 
 services:
 
   app:
     image: ${IMMICH_GPT_IMAGE:-ghcr.io/titatom/immich-gpt:latest}
-    # `docker compose build` now requires Docker Buildx >= 0.17.
+    # `docker compose build` requires Docker Buildx >= 0.17.
     # On older Unraid / distro Docker installs, build locally with:
     #   ./build.sh
     # Or point Compose at a custom local tag:
@@ -43,17 +32,34 @@ services:
     ports:
       - "${APP_PORT:-8000}:8000"
     volumes:
-      - immich_gpt_data:/data
+      # Bind-mount the data directory so files are directly accessible on the
+      # host (important for Unraid users browsing /mnt/user/appdata).
+      # Override DATA_DIR in .env to point at any host path you prefer.
+      - ${DATA_DIR:-/mnt/user/appdata/immich-gpt}:/data
     environment:
       DATABASE_URL: sqlite:////data/immich_gpt.db
+      # ── Immich connection ──────────────────────────────────────────────
+      # Optional here — can also be configured per-user in the web UI.
       IMMICH_URL: ${IMMICH_URL:-}
       IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+      # ── AI provider ────────────────────────────────────────────────────
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      # ── Authentication ─────────────────────────────────────────────────
+      # Admin bootstrap: creates the first admin account on startup (if none
+      # exist). The admin must change the password on first login.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       AUTH_ENABLED: ${AUTH_ENABLED:-false}
-      # Leave empty to use the built-in thread-pool worker (default).
-      # Set to redis://host:6379/0 to dispatch jobs through an existing Redis.
+      # Cryptographic key for signing session cookies. Change this in
+      # production — any long random string works.
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      # Set true when running behind HTTPS (internet-exposed deployments).
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      # ── Worker ─────────────────────────────────────────────────────────
+      # Leave REDIS_URL empty to use the built-in thread-pool (recommended
+      # for Unraid). Set it to dispatch jobs through an existing Redis.
       REDIS_URL: ${REDIS_URL:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
     healthcheck:
@@ -62,7 +68,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-
-volumes:
-  immich_gpt_data:
-    driver: local
