@@ -326,26 +326,22 @@ export default function Review() {
 
   const pageSize = 20;
 
-  /** Change page without resetting selection or edits. */
-  function goToPage(newPage: number) {
+  /**
+   * Navigate to a different page or change bucket filter.
+   * Always resets selection (matches Assets page behaviour).
+   * Edit states are intentionally kept — they survive page navigation.
+   */
+  function setParam(key: string, value: string) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set("page", String(newPage));
-      return next;
-    });
-  }
-
-  /** Change bucket filter — reset selection and edits since the context changes. */
-  function setBucketFilter(bucketId: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (bucketId) next.set("bucket_id", bucketId); else next.delete("bucket_id");
-      next.set("page", "1");
+      if (value) next.set(key, value); else next.delete(key);
+      if (key !== "page") next.set("page", "1");
       return next;
     });
     setSelected(new Set());
     setSelectAllPages(false);
-    setEditStates(new Map());
+    // Reset edit states only when the bucket filter (queue context) changes.
+    if (key === "bucket_id") setEditStates(new Map());
   }
 
   const handleEditChange = useCallback((assetId: string, patch: Partial<EditState>) => {
@@ -499,7 +495,7 @@ export default function Review() {
         </div>
         <select
           value={selectedBucketFilter}
-          onChange={(e) => setBucketFilter(e.target.value)}
+          onChange={(e) => setParam("bucket_id", e.target.value)}
           style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "7px 12px", fontSize: 13 }}
         >
           <option value="">All buckets</option>
@@ -649,12 +645,12 @@ export default function Review() {
       {/* Pagination */}
       {(items.length === pageSize || page > 1) && (
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
-          <button onClick={() => goToPage(Math.max(1, page - 1))} disabled={page === 1}
+          <button onClick={() => setParam("page", String(Math.max(1, page - 1)))} disabled={page === 1}
             style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer", opacity: page === 1 ? 0.4 : 1 }}>
             ← Prev
           </button>
           <span style={{ padding: "8px 16px", color: "#64748b", fontSize: 13 }}>Page {page}</span>
-          <button onClick={() => goToPage(page + 1)} disabled={items.length < pageSize}
+          <button onClick={() => setParam("page", String(page + 1))} disabled={items.length < pageSize}
             style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer", opacity: items.length < pageSize ? 0.4 : 1 }}>
             Next →
           </button>
