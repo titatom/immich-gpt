@@ -44,6 +44,8 @@ cp .env.example .env   # edit with your values
 docker compose up -d
 ```
 
+`docker compose build` now requires Docker Buildx 0.17 or later. On older Unraid or distro-packaged Docker installs, use the published GHCR image with `docker compose up -d`, or build locally with `./build.sh` as shown below.
+
 ---
 
 ## Using an existing Redis instance (optional)
@@ -78,8 +80,10 @@ docker run -d \
 The production image uses a **two-stage build**: Node.js builds the React frontend, then the Python runtime stage copies the compiled assets.
 
 ```bash
-docker build -f Dockerfile.unraid -t immich-gpt:local .
+./build.sh
 ```
+
+The script avoids `docker compose build`, so it still works on older Docker installations that do not ship a new enough Buildx plugin.
 
 ---
 
@@ -107,6 +111,7 @@ docker build -f Dockerfile.unraid -t immich-gpt:local .
 | `SECRET_KEY` | `change-me` | Token value when `AUTH_ENABLED=true` |
 | `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLAlchemy DB URL |
 | `APP_PORT` | `8000` | Host port (Compose only) |
+| `IMMICH_GPT_IMAGE` | `ghcr.io/titatom/immich-gpt:latest` | Image tag used by `docker-compose.yml` |
 
 ---
 
@@ -125,15 +130,16 @@ Alembic migrations run automatically on startup — no manual migration step nee
 If the GHCR image isn't available yet (e.g. you are deploying before the first CI run completes), build the image directly from source:
 
 ```bash
-# Build and start in one step — skips the GHCR pull
-docker compose up -d --build
+# Build a local image with the same tag used by docker-compose.yml
+./build.sh
+docker compose up -d
 ```
 
-Or build manually:
+Or build a custom local tag and tell Compose to use it:
 
 ```bash
-docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest .
-docker compose up -d
+./build.sh immich-gpt:local
+IMMICH_GPT_IMAGE=immich-gpt:local docker compose up -d
 ```
 
 ---

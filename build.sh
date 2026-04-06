@@ -6,11 +6,13 @@
 # Python image is built with plain docker build.
 #
 # Usage:
-#   ./build.sh              # tags as immich-gpt:latest
-#   ./build.sh myapp:1.0    # custom tag
+#   ./build.sh                                   # tags as ghcr.io/titatom/immich-gpt:latest
+#   ./build.sh immich-gpt:local                  # custom tag
+#   IMMICH_GPT_IMAGE=immich-gpt:local docker compose up -d
 set -e
 
-TAG="${1:-immich-gpt:latest}"
+DEFAULT_TAG="ghcr.io/titatom/immich-gpt:latest"
+TAG="${1:-$DEFAULT_TAG}"
 FRONTEND_BUILDER="immich-gpt-node-build:tmp"
 
 echo "==> [1/3] Building React frontend (Node container)..."
@@ -37,4 +39,8 @@ echo ""
 echo "Build complete. Image: $TAG"
 echo ""
 echo "Start with:"
-echo "  docker compose up -d"
+if [ "$TAG" = "$DEFAULT_TAG" ]; then
+  echo "  docker compose up -d"
+else
+  echo "  IMMICH_GPT_IMAGE=$TAG docker compose up -d"
+fi

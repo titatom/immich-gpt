@@ -48,6 +48,8 @@ A self-hosted web app that connects to your Immich instance, processes your phot
    docker compose up -d
    ```
 
+   If your Docker install is too old for `docker compose build` (for example older Unraid packages), use the published image with `docker compose up -d`, or build locally with `./build.sh` and then start Compose.
+
 4. Open http://localhost:8000 in your browser.
 
 5. Go to **Dashboard** → **Sync Assets** to pull your Immich library.
@@ -171,7 +173,7 @@ python3 -m pytest tests/ -v
 
 ## Unraid Deployment
 
-1. Add a new Docker container in Unraid using the docker-compose or manually configure each service.
+1. Use the published `ghcr.io/titatom/immich-gpt:latest` image in Unraid, or build locally with `./build.sh` if you need a source build on an older Docker stack.
 2. Map `/data` and `/logs` volumes to persistent paths on your array.
 3. Set environment variables in Unraid's Docker template.
 4. Ensure the container can reach your Immich instance on the local network.
