@@ -122,14 +122,7 @@ Alembic migrations run automatically on startup — no manual migration step nee
 
 ## Building the image locally (no GHCR required)
 
-If the GHCR image isn't available yet (e.g. you are deploying before the first CI run completes), build the image directly from source:
-
-```bash
-# Build and start in one step — skips the GHCR pull
-docker compose up -d --build
-```
-
-Or build manually:
+If the GHCR image isn't available yet (e.g. you are deploying before the first CI run completes), build the image from source and tag it so Compose finds it:
 
 ```bash
 docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest .
