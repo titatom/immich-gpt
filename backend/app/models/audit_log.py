@@ -7,7 +7,6 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(String, primary_key=True)
-    user_id = Column(String, nullable=True, index=True)  # nullable: preserved after user deletion
     asset_id = Column(String, nullable=True, index=True)
     job_run_id = Column(String, nullable=True, index=True)
     action = Column(String, nullable=False)

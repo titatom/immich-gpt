@@ -5,16 +5,7 @@ vi.mock("axios", async () => {
   const mockPost = vi.fn();
   const mockDelete = vi.fn();
   const mockPatch = vi.fn();
-  const instance = {
-    get: mockGet,
-    post: mockPost,
-    delete: mockDelete,
-    patch: mockPatch,
-    interceptors: {
-      response: { use: vi.fn() },
-      request: { use: vi.fn() },
-    },
-  };
+  const instance = { get: mockGet, post: mockPost, delete: mockDelete, patch: mockPatch };
   return {
     default: {
       create: vi.fn(() => instance),

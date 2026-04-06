@@ -16,15 +16,9 @@ class JobProgressService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_job(
-        self,
-        job_type: str,
-        params: Optional[dict] = None,
-        user_id: Optional[str] = None,
-    ) -> JobRun:
+    def create_job(self, job_type: str, params: Optional[dict] = None) -> JobRun:
         job = JobRun(
             id=str(uuid.uuid4()),
-            user_id=user_id,
             job_type=job_type,
             status="queued",
             progress_percent=0.0,
@@ -153,11 +147,8 @@ class JobProgressService:
         job_type: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 20,
-        user_id: Optional[str] = None,
     ) -> List[JobRun]:
         q = self.db.query(JobRun)
-        if user_id:
-            q = q.filter(JobRun.user_id == user_id)
         if job_type:
             q = q.filter(JobRun.job_type == job_type)
         if status:

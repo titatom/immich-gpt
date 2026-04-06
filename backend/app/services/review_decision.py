@@ -35,15 +35,9 @@ class WritebackResult:
 
 
 class ReviewDecisionService:
-    def __init__(
-        self,
-        db: Session,
-        immich_client: Optional[ImmichClient] = None,
-        user_id: Optional[str] = None,
-    ):
+    def __init__(self, db: Session, immich_client: Optional[ImmichClient] = None):
         self.db = db
         self.immich = immich_client or ImmichClient()
-        self.user_id = user_id
 
     def approve_asset(
         self,
@@ -138,10 +132,7 @@ class ReviewDecisionService:
         self.db.commit()
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
-        q = self.db.query(AppSetting).filter(AppSetting.key == key)
-        if self.user_id:
-            q = q.filter(AppSetting.user_id == self.user_id)
-        row = q.first()
+        row = self.db.query(AppSetting).filter(AppSetting.key == key).first()
         if row is None:
             return default
         return row.value.lower() not in ("false", "0", "no")
@@ -300,7 +291,6 @@ class ReviewDecisionService:
     ) -> None:
         log = AuditLog(
             id=str(uuid.uuid4()),
-            user_id=self.user_id,
             asset_id=asset_id,
             action=action,
             status=status,

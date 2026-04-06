@@ -10,10 +10,8 @@ from app.models.audit_log import AuditLog
 
 def _make_log(db, action="writeback_description", status="success",
               asset_id=None, job_run_id=None) -> AuditLog:
-    from tests.conftest import TEST_USER_ID
     log = AuditLog(
         id=str(uuid.uuid4()),
-        user_id=TEST_USER_ID,
         asset_id=asset_id or str(uuid.uuid4()),
         job_run_id=job_run_id,
         action=action,

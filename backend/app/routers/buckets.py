@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from ..database import get_db
-from ..dependencies import require_active_user
 from ..models.bucket import Bucket
 from ..models.suggested_classification import SuggestedClassification
 from ..schemas.bucket import BucketCreate, BucketUpdate, BucketOut
@@ -32,34 +31,17 @@ def _to_out(b: Bucket) -> BucketOut:
 
 
 @router.get("", response_model=List[BucketOut])
-def list_buckets(
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    return [
-        _to_out(b)
-        for b in db.query(Bucket)
-        .filter(Bucket.user_id == current_user.id)
-        .order_by(Bucket.priority)
-        .all()
-    ]
+def list_buckets(db: Session = Depends(get_db)):
+    return [_to_out(b) for b in db.query(Bucket).order_by(Bucket.priority).all()]
 
 
 @router.post("", response_model=BucketOut)
-def create_bucket(
-    body: BucketCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    existing = db.query(Bucket).filter(
-        Bucket.user_id == current_user.id,
-        Bucket.name == body.name,
-    ).first()
+def create_bucket(body: BucketCreate, db: Session = Depends(get_db)):
+    existing = db.query(Bucket).filter(Bucket.name == body.name).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Bucket '{body.name}' already exists")
     b = Bucket(
         id=str(uuid.uuid4()),
-        user_id=current_user.id,
         name=body.name,
         description=body.description,
         enabled=body.enabled,
@@ -78,21 +60,13 @@ def create_bucket(
 
 
 @router.get("/stats")
-def bucket_stats(
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
+def bucket_stats(db: Session = Depends(get_db)):
     """
     Returns per-bucket classification counts broken down by status.
-    Scoped to the current user's assets.
+    Useful for prompt-tuning and confidence-threshold calibration.
 
     IMPORTANT: must be registered before /{bucket_id} to avoid route shadowing.
     """
-    from ..models.asset import Asset as AssetModel
-    from sqlalchemy import select as sa_select
-
-    user_asset_ids_stmt = sa_select(AssetModel.id).where(AssetModel.user_id == current_user.id)
-
     rows = (
         db.query(
             SuggestedClassification.suggested_bucket_name,
@@ -100,7 +74,6 @@ def bucket_stats(
             SuggestedClassification.status,
             func.count(SuggestedClassification.id).label("count"),
         )
-        .filter(SuggestedClassification.asset_id.in_(user_asset_ids_stmt))
         .group_by(
             SuggestedClassification.suggested_bucket_name,
             SuggestedClassification.suggested_bucket_id,
@@ -126,31 +99,16 @@ def bucket_stats(
 
 
 @router.get("/{bucket_id}", response_model=BucketOut)
-def get_bucket(
-    bucket_id: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    b = db.query(Bucket).filter(
-        Bucket.id == bucket_id,
-        Bucket.user_id == current_user.id,
-    ).first()
+def get_bucket(bucket_id: str, db: Session = Depends(get_db)):
+    b = db.query(Bucket).filter(Bucket.id == bucket_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Bucket not found")
     return _to_out(b)
 
 
 @router.patch("/{bucket_id}", response_model=BucketOut)
-def update_bucket(
-    bucket_id: str,
-    body: BucketUpdate,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    b = db.query(Bucket).filter(
-        Bucket.id == bucket_id,
-        Bucket.user_id == current_user.id,
-    ).first()
+def update_bucket(bucket_id: str, body: BucketUpdate, db: Session = Depends(get_db)):
+    b = db.query(Bucket).filter(Bucket.id == bucket_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Bucket not found")
     if body.name is not None:
@@ -179,15 +137,8 @@ def update_bucket(
 
 
 @router.delete("/{bucket_id}")
-def delete_bucket(
-    bucket_id: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    b = db.query(Bucket).filter(
-        Bucket.id == bucket_id,
-        Bucket.user_id == current_user.id,
-    ).first()
+def delete_bucket(bucket_id: str, db: Session = Depends(get_db)):
+    b = db.query(Bucket).filter(Bucket.id == bucket_id).first()
     if not b:
         raise HTTPException(status_code=404, detail="Bucket not found")
     db.delete(b)
@@ -196,16 +147,10 @@ def delete_bucket(
 
 
 @router.post("/reorder")
-def reorder_buckets(
-    order: List[dict],
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
+def reorder_buckets(order: List[dict], db: Session = Depends(get_db)):
+    """Reorder buckets by priority. Body: [{"id": "...", "priority": 1}, ...]"""
     for item in order:
-        b = db.query(Bucket).filter(
-            Bucket.id == item["id"],
-            Bucket.user_id == current_user.id,
-        ).first()
+        b = db.query(Bucket).filter(Bucket.id == item["id"]).first()
         if b:
             b.priority = item["priority"]
     db.commit()

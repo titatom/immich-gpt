@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -10,15 +10,6 @@ vi.mock("../services/api", async (importOriginal) => {
   const noop = vi.fn().mockResolvedValue(undefined);
   return {
     ...real,
-    getCurrentUser: vi.fn().mockResolvedValue({
-      id: "test-user",
-      email: "test@example.com",
-      username: "testuser",
-      role: "user",
-      force_password_change: false,
-    }),
-    login: vi.fn().mockResolvedValue({ id: "test-user", email: "test@example.com", username: "testuser", role: "user", force_password_change: false }),
-    logout: vi.fn().mockResolvedValue(undefined),
     getHealth: vi.fn().mockResolvedValue({ status: "ok" }),
     getImmichSettings: vi.fn().mockResolvedValue({ immich_url: "", connected: false }),
     testImmichConnection: noop,
@@ -75,91 +66,91 @@ function Wrapper({ children, path = "/" }: { children: React.ReactNode; path?: s
 import App from "../App";
 
 describe("App routing", () => {
-  it("renders the app brand name", async () => {
+  it("renders the app brand name", () => {
     render(
       <Wrapper>
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Immich GPT").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByText("Immich GPT")).toBeInTheDocument();
   });
 
-  it("renders all nav links in the sidebar", async () => {
+  it("renders all nav links in the sidebar", () => {
     render(
       <Wrapper>
         <App />
       </Wrapper>
     );
     // Use getAllByText since nav + page heading may both match
-    await waitFor(() => expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Review").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders AI metadata enrichment label", async () => {
+  it("renders version label in the sidebar", () => {
     render(
       <Wrapper>
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getByText("AI Metadata Enrichment")).toBeInTheDocument());
+    expect(screen.getByText("v0.1.0")).toBeInTheDocument();
   });
 
-  it("renders the dashboard page by default", async () => {
+  it("renders the dashboard page by default", () => {
     render(
       <Wrapper path="/">
         <App />
       </Wrapper>
     );
     // Multiple instances of "Dashboard" is expected (nav + page heading)
-    await waitFor(() => expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders the jobs page on /jobs route", async () => {
+  it("renders the jobs page on /jobs route", () => {
     render(
       <Wrapper path="/jobs">
         <App />
       </Wrapper>
     );
     // At least the nav link must be present
-    await waitFor(() => expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders settings page on /settings route", async () => {
+  it("renders settings page on /settings route", () => {
     render(
       <Wrapper path="/settings">
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders buckets page on /buckets route", async () => {
+  it("renders buckets page on /buckets route", () => {
     render(
       <Wrapper path="/buckets">
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders assets page on /assets route", async () => {
+  it("renders assets page on /assets route", () => {
     render(
       <Wrapper path="/assets">
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders logs page on /logs route", async () => {
+  it("renders logs page on /logs route", () => {
     render(
       <Wrapper path="/logs">
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Audit Logs").length).toBeGreaterThanOrEqual(1));
+    expect(screen.getAllByText("Audit Logs").length).toBeGreaterThanOrEqual(1);
   });
 });

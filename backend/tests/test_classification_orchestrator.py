@@ -13,10 +13,8 @@ from app.services.job_progress import JobProgressService
 
 
 def make_asset(db) -> Asset:
-    from tests.conftest import TEST_USER_ID
     a = Asset(
         id=str(uuid.uuid4()),
-        user_id=TEST_USER_ID,
         immich_id="immich-abc-123",
         original_filename="photo.jpg",
         asset_type="IMAGE",
@@ -32,9 +30,8 @@ def make_asset(db) -> Asset:
 
 
 def make_job(db) -> JobRun:
-    from tests.conftest import TEST_USER_ID
     svc = JobProgressService(db)
-    return svc.create_job("classification", user_id=TEST_USER_ID)
+    return svc.create_job("classification")
 
 
 def make_mock_provider():
@@ -63,12 +60,11 @@ def make_mock_image_service():
 
 
 def test_processes_single_asset(db):
-    from tests.conftest import TEST_USER_ID
     asset = make_asset(db)
     job = make_job(db)
     provider = make_mock_provider()
 
-    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator = ClassificationOrchestrator(db, provider)
     orchestrator.image_service = make_mock_image_service()
 
     orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
@@ -84,12 +80,11 @@ def test_processes_single_asset(db):
 
 
 def test_saves_suggested_metadata(db):
-    from tests.conftest import TEST_USER_ID
     asset = make_asset(db)
     job = make_job(db)
     provider = make_mock_provider()
 
-    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator = ClassificationOrchestrator(db, provider)
     orchestrator.image_service = make_mock_image_service()
     orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
 
@@ -101,12 +96,11 @@ def test_saves_suggested_metadata(db):
 
 
 def test_job_completes_successfully(db):
-    from tests.conftest import TEST_USER_ID
     asset = make_asset(db)
     job = make_job(db)
     provider = make_mock_provider()
 
-    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator = ClassificationOrchestrator(db, provider)
     orchestrator.image_service = make_mock_image_service()
     orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
 
@@ -117,7 +111,6 @@ def test_job_completes_successfully(db):
 
 
 def test_handles_ai_error_gracefully(db):
-    from tests.conftest import TEST_USER_ID
     asset = make_asset(db)
     job = make_job(db)
 
@@ -125,7 +118,7 @@ def test_handles_ai_error_gracefully(db):
     provider.provider_name = "openai"
     provider.classify_asset.side_effect = ValueError("AI is broken")
 
-    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator = ClassificationOrchestrator(db, provider)
     orchestrator.image_service = make_mock_image_service()
     orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
 
@@ -135,7 +128,6 @@ def test_handles_ai_error_gracefully(db):
 
 
 def test_image_failure_continues_with_text_only(db):
-    from tests.conftest import TEST_USER_ID
     asset = make_asset(db)
     job = make_job(db)
     provider = make_mock_provider()
@@ -143,7 +135,7 @@ def test_image_failure_continues_with_text_only(db):
     image_service = MagicMock()
     image_service.prepare_for_provider.side_effect = Exception("Thumbnail not available")
 
-    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator = ClassificationOrchestrator(db, provider)
     orchestrator.image_service = image_service
     orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
 

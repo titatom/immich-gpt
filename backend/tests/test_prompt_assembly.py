@@ -6,9 +6,8 @@ import uuid
 
 
 def test_assembles_system_and_user_messages(db):
-    from tests.conftest import TEST_USER_ID
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    buckets = db.query(Bucket).all()
 
     metadata = {
         "original_filename": "receipt.jpg",
@@ -29,9 +28,8 @@ def test_assembles_system_and_user_messages(db):
 
 
 def test_system_prompt_includes_bucket_names(db):
-    from tests.conftest import TEST_USER_ID
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    buckets = db.query(Bucket).all()
 
     messages = svc.assemble_classification_messages({}, buckets)
     system = messages[0]["content"]
@@ -40,9 +38,8 @@ def test_system_prompt_includes_bucket_names(db):
 
 
 def test_system_prompt_includes_global_classification(db):
-    from tests.conftest import TEST_USER_ID
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    buckets = db.query(Bucket).all()
 
     messages = svc.assemble_classification_messages({}, buckets)
     system = messages[0]["content"]
@@ -50,9 +47,8 @@ def test_system_prompt_includes_global_classification(db):
 
 
 def test_metadata_included_in_user_message(db):
-    from tests.conftest import TEST_USER_ID
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    buckets = db.query(Bucket).all()
 
     metadata = {
         "original_filename": "invoice_2024.pdf",
@@ -68,9 +64,8 @@ def test_metadata_included_in_user_message(db):
 
 
 def test_output_schema_contains_bucket_names(db):
-    from tests.conftest import TEST_USER_ID
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    buckets = db.query(Bucket).all()
 
     messages = svc.assemble_classification_messages({}, buckets)
     system = messages[0]["content"]
@@ -81,13 +76,12 @@ def test_output_schema_contains_bucket_names(db):
 
 def test_disabled_buckets_excluded(db):
     from app.models.bucket import Bucket as B
-    from tests.conftest import TEST_USER_ID
-    b = B(id=str(uuid.uuid4()), user_id=TEST_USER_ID, name="Disabled", enabled=False, priority=999, mapping_mode="virtual")
+    b = B(id=str(uuid.uuid4()), name="Disabled", enabled=False, priority=999, mapping_mode="virtual")
     db.add(b)
     db.commit()
 
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
-    enabled_buckets = db.query(B).filter(B.enabled == True, B.user_id == TEST_USER_ID).all()
+    svc = PromptAssemblyService(db)
+    enabled_buckets = db.query(B).filter(B.enabled == True).all()
     messages = svc.assemble_classification_messages({}, enabled_buckets)
     system = messages[0]["content"]
     assert "Disabled" not in system
@@ -95,13 +89,11 @@ def test_disabled_buckets_excluded(db):
 
 def test_custom_bucket_prompt_overrides_default(db):
     from app.models.prompt_template import PromptTemplate as PT
-    from tests.conftest import TEST_USER_ID
-    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    buckets = db.query(Bucket).all()
     biz = next(b for b in buckets if b.name == "Business")
 
     custom_pt = PT(
         id=str(uuid.uuid4()),
-        user_id=TEST_USER_ID,
         prompt_type="bucket_classification",
         name="Custom Business",
         content="Custom: This is MY business prompt.",
@@ -112,7 +104,7 @@ def test_custom_bucket_prompt_overrides_default(db):
     db.add(custom_pt)
     db.commit()
 
-    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
+    svc = PromptAssemblyService(db)
     messages = svc.assemble_classification_messages({}, buckets)
     system = messages[0]["content"]
     assert "Custom: This is MY business prompt." in system

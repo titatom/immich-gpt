@@ -7,7 +7,6 @@ class PromptTemplate(Base):
     __tablename__ = "prompt_templates"
 
     id = Column(String, primary_key=True)
-    user_id = Column(String, nullable=False, index=True)
     # type: "global_classification", "bucket_classification",
     #        "description_generation", "tags_generation", "review_guidance"
     prompt_type = Column(String, nullable=False, index=True)

@@ -22,15 +22,9 @@ def _parse_dt(val: Any) -> Optional[datetime]:
 
 
 class AssetSyncService:
-    def __init__(
-        self,
-        db: Session,
-        immich_client: Optional[ImmichClient] = None,
-        user_id: Optional[str] = None,
-    ):
+    def __init__(self, db: Session, immich_client: Optional[ImmichClient] = None):
         self.db = db
         self.immich = immich_client or ImmichClient()
-        self.user_id = user_id
 
     def sync_all(
         self,
@@ -156,10 +150,7 @@ class AssetSyncService:
         if not immich_id:
             return 0, 0
 
-        q = self.db.query(Asset).filter(Asset.immich_id == immich_id)
-        if self.user_id:
-            q = q.filter(Asset.user_id == self.user_id)
-        existing = q.first()
+        existing = self.db.query(Asset).filter(Asset.immich_id == immich_id).first()
         exif = raw.get("exifInfo") or {}
         people = raw.get("people") or []
         tags = [t.get("name") for t in (raw.get("tags") or []) if t.get("name")]
@@ -194,7 +185,7 @@ class AssetSyncService:
             self.db.commit()
             return 0, 1
         else:
-            asset = Asset(id=str(uuid.uuid4()), user_id=self.user_id, **data)
+            asset = Asset(id=str(uuid.uuid4()), **data)
             self.db.add(asset)
             self.db.commit()
             return 1, 0
