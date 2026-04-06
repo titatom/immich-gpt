@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from ..database import get_db
+from ..dependencies import require_active_user
 from ..models.asset import Asset
 from ..models.suggested_classification import SuggestedClassification
 from ..models.suggested_metadata import SuggestedMetadata
@@ -55,9 +56,14 @@ def get_review_queue(
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
+
     q = db.query(SuggestedClassification).filter(
-        SuggestedClassification.status == status
+        SuggestedClassification.status == status,
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     )
     if bucket_id:
         q = q.filter(SuggestedClassification.suggested_bucket_id == bucket_id)
@@ -84,9 +90,13 @@ def get_review_queue(
 def get_review_count(
     status: str = "pending_review",
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     count = db.query(SuggestedClassification).filter(
-        SuggestedClassification.status == status
+        SuggestedClassification.status == status,
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     ).count()
     return {"count": count, "status": status}
 
@@ -96,14 +106,13 @@ def get_review_queue_ids(
     status: str = "pending_review",
     bucket_id: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    """Return all asset IDs in the review queue matching the given filters.
-
-    Used by the frontend to implement cross-page 'select all' without
-    fetching full review items.
-    """
+    from sqlalchemy import select as sa_select
+    user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     q = db.query(SuggestedClassification.asset_id).filter(
-        SuggestedClassification.status == status
+        SuggestedClassification.status == status,
+        SuggestedClassification.asset_id.in_(user_asset_ids_stmt),
     )
     if bucket_id:
         q = q.filter(SuggestedClassification.suggested_bucket_id == bucket_id)
@@ -112,8 +121,15 @@ def get_review_queue_ids(
 
 
 @router.get("/item/{asset_id}", response_model=ReviewItemOut)
-def get_review_item(asset_id: str, db: Session = Depends(get_db)):
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+def get_review_item(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id,
+    ).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     classification = db.query(SuggestedClassification).filter(
@@ -130,7 +146,15 @@ def approve_asset(
     asset_id: str,
     body: ReviewApproveRequest,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id,
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     svc = ReviewDecisionService(db)
     try:
         result = svc.approve_asset(
@@ -151,7 +175,18 @@ def approve_asset(
 
 
 @router.post("/item/{asset_id}/reject")
-def reject_asset(asset_id: str, db: Session = Depends(get_db)):
+def reject_asset(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id,
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     svc = ReviewDecisionService(db)
     try:
         svc.reject_asset(asset_id)
@@ -161,10 +196,22 @@ def reject_asset(asset_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk")
-def bulk_review(body: BulkReviewRequest, db: Session = Depends(get_db)):
+def bulk_review(
+    body: BulkReviewRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
     svc = ReviewDecisionService(db)
     results = []
     for asset_id in body.asset_ids:
+        # Verify asset ownership
+        asset = db.query(Asset).filter(
+            Asset.id == asset_id,
+            Asset.user_id == current_user.id,
+        ).first()
+        if not asset:
+            results.append({"asset_id": asset_id, "status": "error", "error": "Asset not found"})
+            continue
         try:
             if body.action == "approve_all":
                 cls = db.query(SuggestedClassification).filter(

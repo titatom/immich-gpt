@@ -16,8 +16,10 @@ from app.models.asset import Asset
 # ---------------------------------------------------------------------------
 
 def _make_asset(db, immich_id=None, asset_type="IMAGE") -> Asset:
+    from tests.conftest import TEST_USER_ID
     a = Asset(
         id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
         immich_id=immich_id or str(uuid.uuid4()),
         original_filename="photo.jpg",
         file_created_at=datetime(2024, 1, 1),

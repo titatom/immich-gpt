@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getReviewCount } from "../services/api";
+import { useAuth } from "../contexts/useAuth";
 import {
   LayoutDashboard,
   Eye,
@@ -12,6 +13,8 @@ import {
   Zap,
   Images,
   ClipboardList,
+  Users,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
@@ -26,6 +29,7 @@ const navItems = [
 ];
 
 export default function Layout() {
+  const { user, logout, isAdmin } = useAuth();
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["review-count"],
     queryFn: () => getReviewCount("pending_review"),
@@ -96,10 +100,63 @@ export default function Layout() {
               )}
             </NavLink>
           ))}
+
+          {isAdmin && (
+            <NavLink
+              to="/admin/users"
+              style={({ isActive }) => ({
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "9px 12px",
+                borderRadius: 8,
+                textDecoration: "none",
+                fontSize: 14,
+                fontWeight: isActive ? 600 : 400,
+                color: isActive ? "#a78bfa" : "#94a3b8",
+                background: isActive ? "rgba(139,92,246,0.1)" : "transparent",
+                transition: "all 0.15s",
+                marginTop: 8,
+                borderTop: "1px solid #334155",
+                paddingTop: "9px",
+              })}
+            >
+              <Users size={16} />
+              <span>Users</span>
+            </NavLink>
+          )}
         </div>
 
-        <div style={{ padding: "12px 20px", borderTop: "1px solid #334155", fontSize: 11, color: "#475569" }}>
-          v0.1.0
+        {/* User footer */}
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #334155" }}>
+          {user && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500, marginBottom: 2 }}>
+                {user.username}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>{user.email}</div>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              width: "100%",
+              padding: "7px 8px",
+              background: "transparent",
+              border: "1px solid #334155",
+              borderRadius: 6,
+              color: "#94a3b8",
+              fontSize: 12,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            <LogOut size={13} />
+            Sign out
+          </button>
         </div>
       </nav>
 

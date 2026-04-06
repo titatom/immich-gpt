@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, JSON, Boolean, Text
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from ..database import Base
 
@@ -6,8 +6,9 @@ from ..database import Base
 class Asset(Base):
     __tablename__ = "assets"
 
-    id = Column(String, primary_key=True)  # Immich asset ID
-    immich_id = Column(String, unique=True, nullable=False, index=True)
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
+    immich_id = Column(String, nullable=False, index=True)
     original_filename = Column(String, nullable=True)
     file_created_at = Column(DateTime, nullable=True)
     file_modified_at = Column(DateTime, nullable=True)
@@ -30,3 +31,7 @@ class Asset(Base):
     synced_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "immich_id", name="uq_assets_user_immich"),
+    )

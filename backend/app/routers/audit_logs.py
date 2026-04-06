@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 from ..database import get_db
+from ..dependencies import require_active_user
 from ..models.audit_log import AuditLog
 
 router = APIRouter(prefix="/api/audit-logs", tags=["audit-logs"])
@@ -37,8 +38,9 @@ def list_audit_logs(
     page: int = 1,
     page_size: int = 50,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    query = db.query(AuditLog)
+    query = db.query(AuditLog).filter(AuditLog.user_id == current_user.id)
     if asset_id:
         query = query.filter(AuditLog.asset_id == asset_id)
     if job_run_id:
@@ -70,8 +72,9 @@ def count_audit_logs(
     status: Optional[str] = None,
     level: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
 ):
-    query = db.query(AuditLog)
+    query = db.query(AuditLog).filter(AuditLog.user_id == current_user.id)
     if asset_id:
         query = query.filter(AuditLog.asset_id == asset_id)
     if job_run_id:
@@ -84,8 +87,15 @@ def count_audit_logs(
 
 
 @router.get("/{log_id}", response_model=AuditLogOut)
-def get_audit_log(log_id: str, db: Session = Depends(get_db)):
-    log = db.query(AuditLog).filter(AuditLog.id == log_id).first()
+def get_audit_log(
+    log_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    log = db.query(AuditLog).filter(
+        AuditLog.id == log_id,
+        AuditLog.user_id == current_user.id,
+    ).first()
     if not log:
         raise HTTPException(status_code=404, detail="Audit log not found")
     return log

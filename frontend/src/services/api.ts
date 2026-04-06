@@ -17,7 +17,67 @@ import type {
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
+
+// Redirect to login on 401
+api.interceptors.response.use(
+  res => res,
+  err => {
+    if (err?.response?.status === 401 && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+// --- Auth ---
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  role: "admin" | "user";
+  force_password_change: boolean;
+}
+
+export const login = (email: string, password: string): Promise<AuthUser> =>
+  api.post("/auth/login", { email, password }).then(r => r.data);
+
+export const logout = () =>
+  api.post("/auth/logout").then(r => r.data);
+
+export const getCurrentUser = (): Promise<AuthUser> =>
+  api.get("/auth/me").then(r => r.data);
+
+export const changePassword = (current_password: string, new_password: string) =>
+  api.post("/auth/change-password", { current_password, new_password }).then(r => r.data);
+
+export const forgotPassword = (email: string) =>
+  api.post("/auth/forgot-password", { email }).then(r => r.data);
+
+export const resetPassword = (token: string, new_password: string) =>
+  api.post("/auth/reset-password", { token, new_password }).then(r => r.data);
+
+// --- Admin ---
+export const adminListUsers = () =>
+  api.get("/admin/users").then(r => r.data);
+
+export const adminCreateUser = (data: {
+  email: string;
+  username: string;
+  password: string;
+  role: string;
+  force_password_change: boolean;
+}) => api.post("/admin/users", data).then(r => r.data);
+
+export const adminUpdateUser = (userId: string, data: { is_active?: boolean; force_password_change?: boolean }) =>
+  api.patch(`/admin/users/${userId}`, data).then(r => r.data);
+
+export const adminResetPassword = (userId: string, new_password?: string) =>
+  api.post(`/admin/users/${userId}/reset-password`, { new_password: new_password ?? null }).then(r => r.data);
+
+export const adminDeleteUser = (userId: string) =>
+  api.delete(`/admin/users/${userId}`).then(r => r.data);
 
 // --- Health ---
 export const getHealth = () => api.get("/health").then((r) => r.data);

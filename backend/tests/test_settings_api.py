@@ -17,8 +17,10 @@ from app.models.provider_config import ProviderConfig
 # ---------------------------------------------------------------------------
 
 def _make_provider(db, name="openai", enabled=True, is_default=False) -> ProviderConfig:
+    from tests.conftest import TEST_USER_ID
     p = ProviderConfig(
         id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
         provider_name=name,
         enabled=enabled,
         is_default=is_default,
@@ -36,9 +38,8 @@ def _make_provider(db, name="openai", enabled=True, is_default=False) -> Provide
 # ---------------------------------------------------------------------------
 
 def test_get_immich_settings_not_configured(client):
-    with patch("app.routers.settings.settings") as mock_settings:
-        mock_settings.IMMICH_URL = ""
-        mock_settings.IMMICH_API_KEY = ""
+    # No DB row and empty env vars → not configured
+    with patch("app.routers.settings._get_immich_credentials", return_value=("", "")):
         r = client.get("/api/settings/immich")
     assert r.status_code == 200
     data = r.json()
@@ -46,17 +47,18 @@ def test_get_immich_settings_not_configured(client):
     assert data["error"] == "Not configured"
 
 
-def test_get_immich_settings_connected(client):
+def test_get_immich_settings_connected(client, db):
+    from app.models.app_setting import AppSetting
+    from tests.conftest import TEST_USER_ID
+    db.add(AppSetting(id="1", user_id=TEST_USER_ID, key="immich_url", value="http://immich.local"))
+    db.add(AppSetting(id="2", user_id=TEST_USER_ID, key="immich_api_key", value="key"))
+    db.commit()
+
     mock_client = MagicMock()
     mock_client.check_connectivity.return_value = {"connected": True, "info": {}}
     mock_client.get_asset_count.return_value = 42
 
-    with (
-        patch("app.routers.settings.settings") as mock_settings,
-        patch("app.routers.settings.ImmichClient", return_value=mock_client),
-    ):
-        mock_settings.IMMICH_URL = "http://immich.local"
-        mock_settings.IMMICH_API_KEY = "key"
+    with patch("app.routers.settings.ImmichClient", return_value=mock_client):
         r = client.get("/api/settings/immich")
 
     assert r.status_code == 200
@@ -65,18 +67,18 @@ def test_get_immich_settings_connected(client):
     assert data["asset_count"] == 42
 
 
-def test_get_immich_settings_error(client):
+def test_get_immich_settings_error(client, db):
     from app.services.immich_client import ImmichError
+    from app.models.app_setting import AppSetting
+    from tests.conftest import TEST_USER_ID
+    db.add(AppSetting(id="3", user_id=TEST_USER_ID, key="immich_url", value="http://immich.local"))
+    db.add(AppSetting(id="4", user_id=TEST_USER_ID, key="immich_api_key", value="key"))
+    db.commit()
 
     mock_client = MagicMock()
     mock_client.check_connectivity.side_effect = ImmichError("timeout")
 
-    with (
-        patch("app.routers.settings.settings") as mock_settings,
-        patch("app.routers.settings.ImmichClient", return_value=mock_client),
-    ):
-        mock_settings.IMMICH_URL = "http://immich.local"
-        mock_settings.IMMICH_API_KEY = "key"
+    with patch("app.routers.settings.ImmichClient", return_value=mock_client):
         r = client.get("/api/settings/immich")
 
     assert r.status_code == 200
