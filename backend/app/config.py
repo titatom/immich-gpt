@@ -47,9 +47,11 @@ class Settings(BaseSettings):
     # When left empty the default tightens to same-origin only (no explicit CORS headers).
     CORS_ORIGINS: str = ""
 
-    # Admin bootstrap: if no users exist on startup, create this admin account
-    ADMIN_EMAIL: str = ""
-    ADMIN_PASSWORD: str = ""
+    # Admin bootstrap: credentials used when no users exist on startup.
+    # Defaults to admin / admin so a fresh install is immediately usable.
+    # The user is forced to change the password on first login.
+    ADMIN_EMAIL: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
     ADMIN_USERNAME: str = "admin"
 
     @property
