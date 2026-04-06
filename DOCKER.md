@@ -120,7 +120,35 @@ Alembic migrations run automatically on startup — no manual migration step nee
 
 ---
 
+## Building the image locally (no GHCR required)
+
+If the GHCR image isn't available yet (e.g. you are deploying before the first CI run completes), build the image directly from source:
+
+```bash
+# Build and start in one step — skips the GHCR pull
+docker compose up -d --build
+```
+
+Or build manually:
+
+```bash
+docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest .
+docker compose up -d
+```
+
+---
+
 ## Publishing to GHCR (maintainers)
+
+The GitHub Actions workflow (`.github/workflows/docker.yml`) publishes automatically:
+
+| Trigger | Tags pushed |
+|---------|-------------|
+| Push / merge to `main` | `:latest`, `:main` |
+| Version tag `v1.2.3` | `:latest`, `:1.2.3`, `:1.2`, `:1` |
+| Manual dispatch | same as whichever ref was selected |
+
+To publish manually:
 
 ```bash
 docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest \
@@ -128,5 +156,3 @@ docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest \
 docker push ghcr.io/titatom/immich-gpt:latest
 docker push ghcr.io/titatom/immich-gpt:1.0.0
 ```
-
-A GitHub Actions workflow (`.github/workflows/docker.yml`) automates this on every tagged release.
