@@ -12,8 +12,24 @@ from ..schemas.review import (
     ReviewItemOut, ReviewApproveRequest, BulkReviewRequest, WritebackResult as WritebackResultSchema
 )
 from ..services.review_decision import ReviewDecisionService
+from ..services.immich_client import ImmichClient
 
 router = APIRouter(prefix="/api/review", tags=["review"])
+
+
+def _get_user_immich_client(db: Session, user_id: str) -> ImmichClient:
+    """Resolve Immich credentials for a specific user from AppSettings, falling back to env vars."""
+    from ..models.app_setting import AppSetting
+    from ..config import settings
+    url_row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == "immich_url"
+    ).first()
+    key_row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
+    ).first()
+    url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
+    api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
+    return ImmichClient(url, api_key)
 
 
 def _build_review_item(
@@ -183,7 +199,8 @@ def approve_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    svc = ReviewDecisionService(db)
+    immich_client = _get_user_immich_client(db, current_user.id)
+    svc = ReviewDecisionService(db, immich_client=immich_client, user_id=current_user.id)
     try:
         result = svc.approve_asset(
             asset_id=asset_id,
@@ -215,7 +232,7 @@ def reject_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    svc = ReviewDecisionService(db)
+    svc = ReviewDecisionService(db, user_id=current_user.id)
     try:
         svc.reject_asset(asset_id)
         return {"rejected": True}
@@ -231,7 +248,8 @@ def bulk_review(
 ):
     from sqlalchemy import func
 
-    svc = ReviewDecisionService(db)
+    immich_client = _get_user_immich_client(db, current_user.id)
+    svc = ReviewDecisionService(db, immich_client=immich_client, user_id=current_user.id)
     asset_ids = body.asset_ids
 
     # Batch-load all owned assets in one query

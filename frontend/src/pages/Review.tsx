@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -30,10 +30,20 @@ interface ApproveData {
   trigger_writeback?: boolean;
 }
 
+/** Per-asset editable fields stored in the parent to persist across page navigation. */
+interface EditState {
+  description: string;
+  tags: string[];
+  bucketId: string;
+  subalbum: string;
+}
+
 interface ReviewCardProps {
   item: ReviewItem;
   buckets: Bucket[];
   albums: Array<{ id: string; albumName: string }>;
+  editState: EditState;
+  onEditChange: (assetId: string, patch: Partial<EditState>) => void;
   onApprove: (assetId: string, data: ApproveData) => void;
   onReject: (assetId: string) => void;
   onReanalyse: (assetId: string) => void;
@@ -42,47 +52,34 @@ interface ReviewCardProps {
   reanalysing?: boolean;
 }
 
-function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, approving, rejecting, reanalysing }: ReviewCardProps) {
+function ReviewCard({
+  item,
+  buckets,
+  albums,
+  editState,
+  onEditChange,
+  onApprove,
+  onReject,
+  onReanalyse,
+  approving,
+  rejecting,
+  reanalysing,
+}: ReviewCardProps) {
   const [showMeta, setShowMeta] = useState(false);
-  const [editDescription, setEditDescription] = useState(item.description_suggestion ?? item.current_description ?? "");
-  const [editTags, setEditTags] = useState<string[]>(item.tags_suggestion ?? item.current_tags ?? []);
-  const [selectedBucketId, setSelectedBucketId] = useState(item.suggested_bucket_id ?? "");
-  const [editSubalbum, setEditSubalbum] = useState(item.subalbum_suggestion ?? "");
   const [lightbox, setLightbox] = useState(false);
-
-  // Reset editable state when the underlying asset changes (e.g. after queue refreshes).
-  // The parent supplies a stable `key={item.asset_id}` so this component is entirely
-  // re-mounted when the asset changes — making this effect run only for subsequent
-  // in-place updates (rare). Listing every item field would trigger spurious resets.
-  const {
-    asset_id,
-    description_suggestion,
-    current_description,
-    tags_suggestion,
-    current_tags,
-    suggested_bucket_id,
-    subalbum_suggestion,
-  } = item;
-  React.useEffect(() => {
-    setEditDescription(description_suggestion ?? current_description ?? "");
-    setEditTags(tags_suggestion ?? current_tags ?? []);
-    setSelectedBucketId(suggested_bucket_id ?? "");
-    setEditSubalbum(subalbum_suggestion ?? "");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [asset_id]);
 
   const busy = approving || rejecting || reanalysing;
 
   const handleApprove = () => {
     if (busy) return;
-    const bucket = buckets.find((b) => b.id === selectedBucketId);
+    const bucket = buckets.find((b) => b.id === editState.bucketId);
     onApprove(item.asset_id, {
-      approved_bucket_id: selectedBucketId || item.suggested_bucket_id,
+      approved_bucket_id: editState.bucketId || item.suggested_bucket_id,
       approved_bucket_name: bucket?.name || item.suggested_bucket_name,
-      approved_description: editDescription,
-      approved_tags: editTags,
-      approved_subalbum: editSubalbum || undefined,
-      subalbum_approved: !!editSubalbum,
+      approved_description: editState.description,
+      approved_tags: editState.tags,
+      approved_subalbum: editState.subalbum || undefined,
+      subalbum_approved: !!editState.subalbum,
       trigger_writeback: true,
     });
   };
@@ -113,8 +110,8 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: "#64748b", flexShrink: 0 }}>Bucket:</span>
             <select
-              value={selectedBucketId}
-              onChange={(e) => setSelectedBucketId(e.target.value)}
+              value={editState.bucketId}
+              onChange={(e) => onEditChange(item.asset_id, { bucketId: e.target.value })}
               style={{
                 background: "#0f172a", border: "1px solid #334155",
                 borderRadius: 6, color: "#38bdf8", fontSize: 12,
@@ -146,8 +143,8 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
           <div>
             <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 3 }}>Description</label>
             <textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
+              value={editState.description}
+              onChange={(e) => onEditChange(item.asset_id, { description: e.target.value })}
               rows={2}
               style={{
                 width: "100%", boxSizing: "border-box",
@@ -161,7 +158,11 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
           {/* Tags — always editable */}
           <div>
             <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 3 }}>Tags</label>
-            <TagList tags={editTags} editable onChange={setEditTags} />
+            <TagList
+              tags={editState.tags}
+              editable
+              onChange={(tags) => onEditChange(item.asset_id, { tags })}
+            />
           </div>
 
           {/* Sub-album — always editable with existing album suggestions */}
@@ -171,7 +172,7 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
               {item.subalbum_suggestion && (
                 <span style={{ marginLeft: 6, color: "#64748b", fontWeight: 400 }}>
                   (suggested: <button
-                    onClick={() => setEditSubalbum(item.subalbum_suggestion!)}
+                    onClick={() => onEditChange(item.asset_id, { subalbum: item.subalbum_suggestion! })}
                     style={{ background: "none", border: "none", color: "#38bdf8", fontSize: 11, cursor: "pointer", padding: 0 }}
                   >{item.subalbum_suggestion}</button>)
                 </span>
@@ -179,8 +180,8 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
             </label>
             <div style={{ display: "flex", gap: 6 }}>
               <input
-                value={editSubalbum}
-                onChange={(e) => setEditSubalbum(e.target.value)}
+                value={editState.subalbum}
+                onChange={(e) => onEditChange(item.asset_id, { subalbum: e.target.value })}
                 placeholder="Album name or leave empty"
                 style={{
                   flex: 1, background: "#0f172a", border: "1px solid #334155",
@@ -191,7 +192,7 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
               {albums.length > 0 && (
                 <select
                   value=""
-                  onChange={(e) => { if (e.target.value) setEditSubalbum(e.target.value); }}
+                  onChange={(e) => { if (e.target.value) onEditChange(item.asset_id, { subalbum: e.target.value }); }}
                   style={{
                     background: "#0f172a", border: "1px solid #334155", borderRadius: 6,
                     color: "#64748b", fontSize: 12, padding: "6px 10px",
@@ -294,19 +295,42 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, a
   );
 }
 
+/** Build an EditState from a ReviewItem's suggestion values. */
+function buildDefaultEditState(item: ReviewItem): EditState {
+  return {
+    description: item.description_suggestion ?? item.current_description ?? "",
+    tags: item.tags_suggestion ?? item.current_tags ?? [],
+    bucketId: item.suggested_bucket_id ?? "",
+    subalbum: item.subalbum_suggestion ?? "",
+  };
+}
+
 export default function Review() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parseInt(searchParams.get("page") || "1", 10);
   const selectedBucketFilter = searchParams.get("bucket_id") || "";
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [loadingAllIds, setLoadingAllIds] = useState(false);
   const [reanalyseMessage, setReanalyseMessage] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  /**
+   * Persistent edit state keyed by asset_id.
+   * Survives page navigation. Cleared when bucket filter changes (new queue context).
+   */
+  const [editStates, setEditStates] = useState<Map<string, EditState>>(new Map());
+
   const pageSize = 20;
 
+  /**
+   * Navigate to a different page or change bucket filter.
+   * Always resets selection (matches Assets page behaviour).
+   * Edit states are intentionally kept — they survive page navigation.
+   */
   function setParam(key: string, value: string) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -316,7 +340,20 @@ export default function Review() {
     });
     setSelected(new Set());
     setSelectAllPages(false);
+    // Reset edit states only when the bucket filter (queue context) changes.
+    if (key === "bucket_id") setEditStates(new Map());
   }
+
+  const handleEditChange = useCallback((assetId: string, patch: Partial<EditState>) => {
+    setEditStates((prev) => {
+      const next = new Map(prev);
+      const current = next.get(assetId);
+      if (current) {
+        next.set(assetId, { ...current, ...patch });
+      }
+      return next;
+    });
+  }, []);
 
   const { data: buckets = [] } = useQuery({ queryKey: ["buckets"], queryFn: getBuckets });
   const { data: albums = [] } = useQuery({ queryKey: ["albums"], queryFn: getAlbums });
@@ -327,6 +364,22 @@ export default function Review() {
     refetchInterval: 15_000,
   });
 
+  // When items load, populate edit states for new assets (don't overwrite existing edits).
+  React.useEffect(() => {
+    if (!items.length) return;
+    setEditStates((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      for (const item of items) {
+        if (!next.has(item.asset_id)) {
+          next.set(item.asset_id, buildDefaultEditState(item));
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
+
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["review-count"],
     queryFn: () => getReviewCount(),
@@ -335,8 +388,10 @@ export default function Review() {
 
   const approveMutation = useMutation({
     mutationFn: ({ assetId, data }: { assetId: string; data: ApproveData }) => approveAsset(assetId, data),
-    onSuccess: () => {
+    onSuccess: (_result, { assetId }) => {
       setMutationError(null);
+      // Remove the approved asset's edit state.
+      setEditStates((prev) => { const next = new Map(prev); next.delete(assetId); return next; });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
     },
@@ -349,8 +404,9 @@ export default function Review() {
 
   const rejectMutation = useMutation({
     mutationFn: rejectAsset,
-    onSuccess: () => {
+    onSuccess: (_result, assetId) => {
       setMutationError(null);
+      setEditStates((prev) => { const next = new Map(prev); next.delete(assetId); return next; });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
     },
@@ -366,6 +422,12 @@ export default function Review() {
       bulkReview({ asset_ids: Array.from(selected), action, trigger_writeback: true }),
     onSuccess: () => {
       setMutationError(null);
+      // Clear edit states for bulk-actioned assets.
+      setEditStates((prev) => {
+        const next = new Map(prev);
+        for (const id of selected) next.delete(id);
+        return next;
+      });
       setSelected(new Set());
       setSelectAllPages(false);
       qc.invalidateQueries({ queryKey: ["review-queue"] });
@@ -567,6 +629,8 @@ export default function Review() {
               item={item}
               buckets={buckets}
               albums={albums}
+              editState={editStates.get(item.asset_id) ?? buildDefaultEditState(item)}
+              onEditChange={handleEditChange}
               onApprove={(assetId, data) => approveMutation.mutate({ assetId, data })}
               onReject={(assetId) => rejectMutation.mutate(assetId)}
               onReanalyse={(assetId) => reclassifyMut.mutate([assetId])}
@@ -579,15 +643,15 @@ export default function Review() {
       )}
 
       {/* Pagination */}
-      {items.length === pageSize && (
+      {(items.length === pageSize || page > 1) && (
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
           <button onClick={() => setParam("page", String(Math.max(1, page - 1)))} disabled={page === 1}
             style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer", opacity: page === 1 ? 0.4 : 1 }}>
             ← Prev
           </button>
           <span style={{ padding: "8px 16px", color: "#64748b", fontSize: 13 }}>Page {page}</span>
-          <button onClick={() => setParam("page", String(page + 1))}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer" }}>
+          <button onClick={() => setParam("page", String(page + 1))} disabled={items.length < pageSize}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer", opacity: items.length < pageSize ? 0.4 : 1 }}>
             Next →
           </button>
         </div>
