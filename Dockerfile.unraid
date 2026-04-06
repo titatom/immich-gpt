@@ -1,5 +1,5 @@
 # =============================================================================
-# Immich GPT — single-container image for Unraid Community Apps
+# Immich GPT — single-container image
 # =============================================================================
 #
 # What this image contains:
@@ -8,9 +8,8 @@
 #   - Built-in background job worker (ThreadPoolExecutor, no Redis required)
 #   - SQLite database (persisted via /data volume)
 #
-# Redis is NOT included.  Background jobs run in-process using Python threads.
-# For high-volume installations (1000+ assets/day) see docker-compose.yml
-# which uses a separate Redis + RQ worker container.
+# Background jobs run in-process via Python threads when REDIS_URL is empty.
+# Set REDIS_URL to point at an existing Redis instance to use RQ instead.
 #
 # Build:
 #   docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest .

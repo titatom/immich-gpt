@@ -1,12 +1,12 @@
 # Docker Deployment Guide
 
-Immich GPT ships as a **single Docker image** for home-server use (Unraid, Synology, Portainer, etc.) and optionally as a **multi-container stack** for higher-volume deployments.
+Immich GPT ships as a **single Docker image**.  Background jobs run in-process via a Python `ThreadPoolExecutor`, so no extra services are needed.  If you already run Redis, you can point `REDIS_URL` at it and jobs will be dispatched through RQ instead — still the same single image.
 
 ---
 
-## Single-container (recommended for Unraid / home servers)
+## Single-container (recommended)
 
-One image, one container, zero extra services.  Background jobs run in-process via a Python `ThreadPoolExecutor`.  The built React UI is served directly from FastAPI.
+One image, one container, zero extra services.
 
 ### Unraid Community Apps
 
@@ -38,14 +38,14 @@ docker run -d \
   ghcr.io/titatom/immich-gpt:latest
 ```
 
-### Docker Compose (single-container)
+### Docker Compose
 
 ```bash
 cp .env.example .env   # fill in ADMIN_EMAIL + ADMIN_PASSWORD at minimum
 docker compose up -d
 ```
 
-The default `docker compose up` starts only the `app` service (no Redis, no separate worker).
+`docker compose build` now requires Docker Buildx 0.17 or later. On older Unraid or distro-packaged Docker installs, use the published GHCR image with `docker compose up -d`, or build locally with `./build.sh` as shown below.
 
 ---
 
@@ -61,18 +61,28 @@ The default `docker compose up` starts only the `app` service (no Redis, no sepa
 
 ## Multi-container stack (full stack)
 
-Use this when classifying **1 000+ assets/day** or when you want a separate worker process (e.g., to avoid blocking the API during long classification runs).
+If you already run Redis (e.g. for another service on the same host), you can have Immich GPT dispatch background jobs through it instead of the built-in thread pool.  No extra containers are added — it is still the same single image.
 
-```bash
-cp .env.example .env
-# edit .env — set REDIS_URL=redis://redis:6379/0
-docker compose --profile full up -d
+Set `REDIS_URL` in your `.env` or in the Unraid template:
+
+```dotenv
+REDIS_URL=redis://192.168.1.x:6379/0
 ```
 
-This starts three containers:
-- `immich-gpt-api` — FastAPI + Uvicorn
-- `immich-gpt-worker` — RQ worker (reads from Redis queue)
-- `immich-gpt-redis` — Redis 7 (job queue + result backend)
+When `REDIS_URL` is set, `WORKER_CONCURRENCY` is ignored because job execution moves to RQ.  You can optionally run a dedicated RQ worker in a second container of the same image:
+
+```bash
+docker run -d \
+  --name immich-gpt-worker \
+  --restart unless-stopped \
+  -v /path/to/appdata/immich-gpt:/data \
+  -e DATABASE_URL=sqlite:////data/immich_gpt.db \
+  -e REDIS_URL=redis://192.168.1.x:6379/0 \
+  ghcr.io/titatom/immich-gpt:latest \
+  python -m app.workers.rq_worker
+```
+
+> For most home-server installs the built-in thread pool (no Redis) is the right choice.
 
 ---
 
@@ -81,12 +91,10 @@ This starts three containers:
 The production image uses a **two-stage build**: Node.js builds the React frontend, then the Python runtime stage copies the compiled assets.
 
 ```bash
-# Build the single-container image
-docker build -f Dockerfile.unraid -t immich-gpt:local .
-
-# Build the API-only image (for full-stack compose)
-docker build -f backend/Dockerfile -t immich-gpt-api:local backend/
+./build.sh
 ```
+
+The script avoids `docker compose build`, so it still works on older Docker installations that do not ship a new enough Buildx plugin.
 
 ---
 
@@ -116,6 +124,7 @@ docker build -f backend/Dockerfile -t immich-gpt-api:local backend/
 | `REDIS_URL` | *(empty)* | Set to `redis://host:6379/0` to enable RQ distributed workers |
 | `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLAlchemy DB URL (SQLite default; PostgreSQL supported) |
 | `APP_PORT` | `8000` | Host port (Compose only) |
+| `IMMICH_GPT_IMAGE` | `ghcr.io/titatom/immich-gpt:latest` | Image tag used by `docker-compose.yml` |
 
 ### Internet-exposed deployments
 
@@ -132,25 +141,47 @@ This marks the session cookie `Secure`, ensuring it is only sent over HTTPS.
 ## Upgrading
 
 ```bash
-# Single-container
 docker compose pull && docker compose up -d
-
-# Full stack
-docker compose --profile full pull && docker compose --profile full up -d
 ```
 
 Alembic migrations run automatically on startup — no manual migration step needed.
 
 ---
 
-## Publishing to GHCR (maintainers)
+## Building the image locally (no GHCR required)
+
+If the GHCR image isn't available yet (e.g. you are deploying before the first CI run completes), build the image directly from source:
 
 ```bash
-# Tag and push
+# Build a local image with the same tag used by docker-compose.yml
+./build.sh
+docker compose up -d
+```
+
+Or build a custom local tag and tell Compose to use it:
+
+```bash
+./build.sh immich-gpt:local
+IMMICH_GPT_IMAGE=immich-gpt:local docker compose up -d
+```
+
+---
+
+## Publishing to GHCR (maintainers)
+
+The GitHub Actions workflow (`.github/workflows/docker.yml`) publishes automatically:
+
+| Trigger | Tags pushed |
+|---------|-------------|
+| Push / merge to `main` | `:latest`, `:main` |
+| Version tag `v1.2.3` | `:latest`, `:1.2.3`, `:1.2`, `:1` |
+| Manual dispatch | same as whichever ref was selected |
+
+To publish manually:
+
+```bash
 docker build -f Dockerfile.unraid -t ghcr.io/titatom/immich-gpt:latest \
                                    -t ghcr.io/titatom/immich-gpt:1.0.0 .
 docker push ghcr.io/titatom/immich-gpt:latest
 docker push ghcr.io/titatom/immich-gpt:1.0.0
 ```
-
-A GitHub Actions workflow (`.github/workflows/docker.yml`) automates this on every tagged release.

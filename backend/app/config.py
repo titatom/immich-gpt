@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = ""
     ADMIN_USERNAME: str = "admin"
 
+    # Admin bootstrap: if no users exist on startup, create this admin account
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+    ADMIN_USERNAME: str = "admin"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

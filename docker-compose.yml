@@ -2,22 +2,15 @@
 # Immich GPT — Docker Compose
 # =============================================================================
 #
-# Two deployment modes are supported via Compose profiles:
+# Single-container deployment — one image, no bundled Redis.
 #
-#   Single-container (default, Unraid-friendly):
-#     docker compose up
-#     - One container, no Redis.
-#     - Jobs run in-process via ThreadPoolExecutor.
-#     - Built from Dockerfile.unraid (multi-stage: Node frontend + Python API).
+#   Background jobs run in-process via a ThreadPoolExecutor by default.
+#   If you already run Redis, point REDIS_URL at it and background jobs
+#   will be dispatched through RQ instead (WORKER_CONCURRENCY is ignored
+#   in that case).
 #
-#   Full stack (production / high-volume):
-#     docker compose --profile full up
-#     - Three containers: api, worker, redis.
-#     - RQ distributes jobs to a separate worker process.
-#     - Use when classifying 1000+ assets/day or running multiple API instances.
-#
-# Quick start (single-container):
-#   cp .env.example .env   # fill in IMMICH_URL + IMMICH_API_KEY + OPENAI_API_KEY
+# Quick start:
+#   cp .env.example .env   # fill in IMMICH_URL, IMMICH_API_KEY, OPENAI_API_KEY
 #   docker compose up -d
 # =============================================================================
 
@@ -38,12 +31,13 @@ x-common-env: &common-env
 
 services:
 
-  # ── Single-container mode (default) ──────────────────────────────────────
-  # The image is built separately with:  docker build -f Dockerfile.unraid -t immich-gpt .
-  # Or pulled from GHCR when a release is published:
-  #   image: ghcr.io/titatom/immich-gpt:latest
   app:
-    image: immich-gpt:latest
+    image: ${IMMICH_GPT_IMAGE:-ghcr.io/titatom/immich-gpt:latest}
+    # `docker compose build` now requires Docker Buildx >= 0.17.
+    # On older Unraid / distro Docker installs, build locally with:
+    #   ./build.sh
+    # Or point Compose at a custom local tag:
+    #   IMMICH_GPT_IMAGE=immich-gpt:local docker compose up -d
     container_name: immich-gpt
     restart: unless-stopped
     ports:
@@ -51,8 +45,16 @@ services:
     volumes:
       - immich_gpt_data:/data
     environment:
-      <<: *common-env
-      REDIS_URL: ""                        # empty = use in-process workers
+      DATABASE_URL: sqlite:////data/immich_gpt.db
+      IMMICH_URL: ${IMMICH_URL:-}
+      IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      AUTH_ENABLED: ${AUTH_ENABLED:-false}
+      # Leave empty to use the built-in thread-pool worker (default).
+      # Set to redis://host:6379/0 to dispatch jobs through an existing Redis.
+      REDIS_URL: ${REDIS_URL:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -61,80 +63,6 @@ services:
       retries: 3
       start_period: 15s
 
-  # ── Full-stack: API ───────────────────────────────────────────────────────
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: ghcr.io/titatom/immich-gpt-api:latest
-    container_name: immich-gpt-api
-    restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8000}:8000"
-    volumes:
-      - immich_gpt_data:/data
-      - immich_gpt_logs:/logs
-    environment:
-      <<: *common-env
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - immich_gpt_net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    profiles: ["full"]
-
-  # ── Full-stack: Worker ────────────────────────────────────────────────────
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
-    image: ghcr.io/titatom/immich-gpt-worker:latest
-    container_name: immich-gpt-worker
-    restart: unless-stopped
-    volumes:
-      - immich_gpt_data:/data
-      - immich_gpt_logs:/logs
-    environment:
-      <<: *common-env
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - immich_gpt_net
-    profiles: ["full"]
-
-  # ── Full-stack: Redis ─────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: immich-gpt-redis
-    restart: unless-stopped
-    volumes:
-      - immich_gpt_redis:/data
-    networks:
-      - immich_gpt_net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    profiles: ["full"]
-
 volumes:
   immich_gpt_data:
     driver: local
-  immich_gpt_logs:
-    driver: local
-  immich_gpt_redis:
-    driver: local
-
-networks:
-  immich_gpt_net:
-    driver: bridge
