@@ -74,26 +74,26 @@
   <Config
     Name="Admin Email"
     Target="ADMIN_EMAIL"
-    Default=""
+    Default="admin"
     Mode=""
-    Description="Email address for the admin account created automatically on first startup. You will use this to log in for the first time."
+    Description="Login identifier for the admin account created automatically on first startup. Default is admin."
     Type="Variable"
     Display="always"
     Required="true"
     Mask="false"
-  ></Config>
+  >admin</Config>
 
   <Config
     Name="Admin Password"
     Target="ADMIN_PASSWORD"
-    Default=""
+    Default="admin"
     Mode=""
-    Description="Initial password for the admin account. You will be forced to change it on first login. Use a temporary value here."
+    Description="Initial password for the admin account. Default is admin and you will be forced to change it on first login."
     Type="Variable"
     Display="always"
     Required="true"
     Mask="true"
-  ></Config>
+  >admin</Config>
 
   <Config
     Name="Admin Username"
