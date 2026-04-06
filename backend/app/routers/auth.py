@@ -2,7 +2,7 @@
 Authentication router: login, logout, me, password flows.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -51,7 +51,7 @@ def _clear_session_cookie(response: Response) -> None:
 # ---------------------------------------------------------------------------
 
 class LoginRequest(BaseModel):
-    email: str
+    username: str
     password: str
 
 
@@ -83,9 +83,9 @@ class ResetPasswordRequest(BaseModel):
 
 @router.post("/login", response_model=UserOut)
 def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
-    user = authenticate_user(db, body.email, body.password)
+    user = authenticate_user(db, body.username, body.password)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
 
     ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent")
