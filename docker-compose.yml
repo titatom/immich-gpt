@@ -17,12 +17,12 @@
 services:
 
   app:
-    image: ghcr.io/titatom/immich-gpt:latest
-    # If the GHCR image is unavailable (e.g. first deploy before a release),
-    # build locally instead:  docker compose up -d --build
-    build:
-      context: .
-      dockerfile: Dockerfile.unraid
+    image: ${IMMICH_GPT_IMAGE:-ghcr.io/titatom/immich-gpt:latest}
+    # `docker compose build` now requires Docker Buildx >= 0.17.
+    # On older Unraid / distro Docker installs, build locally with:
+    #   ./build.sh
+    # Or point Compose at a custom local tag:
+    #   IMMICH_GPT_IMAGE=immich-gpt:local docker compose up -d
     container_name: immich-gpt
     restart: unless-stopped
     ports:
