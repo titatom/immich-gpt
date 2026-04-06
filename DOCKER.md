@@ -41,9 +41,11 @@ docker run -d \
 ### Docker Compose
 
 ```bash
-cp .env.example .env   # fill in ADMIN_EMAIL + ADMIN_PASSWORD at minimum
+cp .env.example .env   # fill in DATA_DIR, ADMIN_EMAIL, ADMIN_PASSWORD at minimum
 docker compose up -d
 ```
+
+`DATA_DIR` in `.env` controls where persistent data lives on the host.  For Unraid it defaults to `/mnt/user/appdata/immich-gpt`; change it to any path you prefer.
 
 `docker compose build` now requires Docker Buildx 0.17 or later. On older Unraid or distro-packaged Docker installs, use the published GHCR image with `docker compose up -d`, or build locally with `./build.sh` as shown below.
 
@@ -100,11 +102,20 @@ The script avoids `docker compose build`, so it still works on older Docker inst
 
 ## Volumes
 
-| Mount point | Purpose |
-|-------------|---------|
-| `/data` | SQLite database (`immich_gpt.db`), persisted app data |
+| Host path (default) | Container path | Purpose |
+|---------------------|----------------|---------|
+| `DATA_DIR` → `/mnt/user/appdata/immich-gpt` | `/data` | SQLite database (`immich_gpt.db`), settings, job history, user accounts |
 
-**Back up `/data`.**  It contains your bucket config, prompt templates, all AI suggestions, review decisions, and user accounts.
+The Compose file uses a **bind-mount** (not a named Docker volume) so the data directory is directly browsable on the host — ideal for Unraid, where `/mnt/user/appdata` is the standard location for container data.
+
+To use a different path, set `DATA_DIR` in your `.env`:
+
+```dotenv
+DATA_DIR=/mnt/user/appdata/immich-gpt   # Unraid default
+# DATA_DIR=/opt/immich-gpt/data         # Linux example
+```
+
+**Back up `DATA_DIR`.**  It contains your bucket config, prompt templates, all AI suggestions, review decisions, and user accounts.
 
 ---
 
@@ -112,9 +123,12 @@ The script avoids `docker compose build`, so it still works on older Docker inst
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `DATA_DIR` | `/mnt/user/appdata/immich-gpt` | Host path bind-mounted to `/data` (Compose only) |
 | `ADMIN_EMAIL` | *(empty)* | Email for the auto-created admin account on first startup |
 | `ADMIN_PASSWORD` | *(empty)* | Initial password for the admin account (forced change on first login) |
 | `ADMIN_USERNAME` | `admin` | Username for the auto-created admin account |
+| `AUTH_ENABLED` | `false` | Set `true` to require login for all users |
+| `SECRET_KEY` | `change-me-in-production` | Cryptographic key for signing session cookies — change before going to production |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` when running behind HTTPS (internet-exposed) |
 | `IMMICH_URL` | *(empty)* | Immich server URL — can also be set per-user in the UI |
 | `IMMICH_API_KEY` | *(empty)* | Immich API key — can also be set per-user in the UI |
