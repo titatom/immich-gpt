@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Image } from "lucide-react";
 import { getThumbnailUrl } from "../services/api";
+import styles from "./Thumbnail.module.css";
 
 interface Props {
   assetId: string;
@@ -9,53 +10,35 @@ interface Props {
   className?: string;
 }
 
-export default function Thumbnail({ assetId, size = 80, onClick }: Props) {
+export default function Thumbnail({ assetId, size = 80, onClick, className }: Props) {
   const [error, setError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  const rootStyle = { width: size, height: size };
+  const iconSize = Math.round(size / 3);
+
   if (error) {
     return (
-      <div style={{
-        width: size,
-        height: size,
-        background: "#1e293b",
-        borderRadius: 8,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        border: "1px solid #334155",
-      }}>
-        <Image size={size / 3} color="#475569" />
+      <div
+        className={[styles.root, className].filter(Boolean).join(" ")}
+        style={rootStyle}
+      >
+        <div className={styles.placeholder}>
+          <Image size={iconSize} color="var(--text-faint)" />
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 8,
-        overflow: "hidden",
-        flexShrink: 0,
-        background: "#1e293b",
-        cursor: onClick ? "pointer" : "default",
-        border: "1px solid #334155",
-        position: "relative",
-      }}
+      className={[styles.root, onClick ? styles.rootClickable : "", className].filter(Boolean).join(" ")}
+      style={rootStyle}
       onClick={onClick}
     >
       {!loaded && (
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          background: "#1e293b",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-          <Image size={size / 3} color="#334155" />
+        <div className={styles.placeholder}>
+          <Image size={iconSize} color="var(--border)" />
         </div>
       )}
       <img
@@ -63,12 +46,8 @@ export default function Thumbnail({ assetId, size = 80, onClick }: Props) {
         alt=""
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          display: loaded ? "block" : "none",
-        }}
+        className={styles.img}
+        style={{ display: loaded ? "block" : "none" }}
       />
     </div>
   );

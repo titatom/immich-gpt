@@ -1,0 +1,350 @@
+@import "../styles/tokens.css";
+
+.page {
+  padding: var(--space-8) var(--space-10);
+  max-width: 1100px;
+}
+
+.statsRow {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.statCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.statCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.statLabel {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* Immich status banner */
+.statusBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 10px;
+  margin-bottom: var(--space-6);
+  font-size: var(--text-base);
+}
+
+.statusBannerOk {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.19);
+  color: var(--color-success-text);
+}
+
+.statusBannerErr {
+  background: var(--color-error-dim);
+  border: 1px solid rgba(220, 38, 38, 0.19);
+  color: var(--color-error-text);
+}
+
+.statusBannerLink {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Sync panel */
+.syncPanel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: var(--space-8);
+}
+
+.syncPanelLabel {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.scopeRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.scopeBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.scopeBtnActive {
+  background: var(--color-blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.scopeBtnInactive {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.scopeDesc {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+
+/* Album picker */
+.albumPickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-raised);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.albumPickerHeaderText {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.albumBadge {
+  margin-left: var(--space-2);
+  background: var(--color-blue);
+  color: #93c5fd;
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-size: var(--text-xs);
+}
+
+.albumList {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.albumSearch {
+  padding: var(--space-2) 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.albumSearchInput {
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.albumScroll {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.albumEmpty {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--text-muted);
+}
+
+.albumRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--bg-surface);
+  transition: background var(--transition-fast);
+}
+
+.albumRow:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.albumRowSelected {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.albumCheckbox {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 2px solid var(--text-faint);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.albumCheckboxSelected {
+  border-color: #3b82f6;
+  background: #3b82f6;
+}
+
+.albumName {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.albumCount {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Action buttons row */
+.actionsRow {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+}
+
+/* Active job */
+.section {
+  margin-bottom: var(--space-6);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sectionLink {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.jobCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.jobCardHeader {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.jobCardDetail {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--bg-surface);
+}
+
+.jobList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Clear jobs */
+.clearRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.clearConfirmText {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Bucket stats */
+.bucketStatRow {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bucketStatName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.bucketStatTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+
+.bucketStatTotal {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  width: 32px;
+  text-align: right;
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}

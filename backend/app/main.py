@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +15,25 @@ from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
 from .config import settings as app_settings
 
+logger = logging.getLogger(__name__)
+
+_SECRET_KEY_WARNING = """
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚠  SECURITY WARNING: SECRET_KEY is set to the default value.  ║
+║                                                                  ║
+║  Session tokens can be forged with this key.                    ║
+║  Set a strong random SECRET_KEY in your .env or environment     ║
+║  before exposing this service to any network.                   ║
+║                                                                  ║
+║  Generate one with:  python -c "import secrets; print(secrets.token_hex(32))"  ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if app_settings.secret_key_is_default:
+        logger.warning(_SECRET_KEY_WARNING)
     init_db()
     _bootstrap_admin()
     yield
@@ -47,10 +64,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = app_settings.cors_origins_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    # When specific origins are configured we can safely allow credentials.
+    # Falling back to ["*"] with allow_credentials=True is rejected by browsers
+    # per the CORS spec, so we only set credentials when origins are explicit.
+    allow_origins=_cors_origins if _cors_origins else ["*"],
+    allow_credentials=bool(_cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

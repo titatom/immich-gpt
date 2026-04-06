@@ -28,12 +28,12 @@ describe("TagList", () => {
 
   it("renders input field in editable mode", () => {
     render(<TagList tags={[]} editable />);
-    expect(screen.getByPlaceholderText("Add tag...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Add tag…")).toBeInTheDocument();
   });
 
   it("does not render input in read-only mode", () => {
     render(<TagList tags={["a"]} />);
-    expect(screen.queryByPlaceholderText("Add tag...")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Add tag…")).not.toBeInTheDocument();
   });
 
   it("renders remove buttons in editable mode", () => {
@@ -52,7 +52,7 @@ describe("TagList", () => {
   it("adds a tag on Enter key press", async () => {
     const onChange = vi.fn();
     render(<TagList tags={[]} editable onChange={onChange} />);
-    const input = screen.getByPlaceholderText("Add tag...");
+    const input = screen.getByPlaceholderText("Add tag…");
     await userEvent.type(input, "newtag{Enter}");
     expect(onChange).toHaveBeenCalledWith(["newtag"]);
   });
@@ -60,7 +60,7 @@ describe("TagList", () => {
   it("does not add duplicate tags", async () => {
     const onChange = vi.fn();
     render(<TagList tags={["existing"]} editable onChange={onChange} />);
-    const input = screen.getByPlaceholderText("Add tag...");
+    const input = screen.getByPlaceholderText("Add tag…");
     await userEvent.type(input, "existing{Enter}");
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -68,7 +68,7 @@ describe("TagList", () => {
   it("strips trailing comma when adding via comma key", async () => {
     const onChange = vi.fn();
     render(<TagList tags={[]} editable onChange={onChange} />);
-    const input = screen.getByPlaceholderText("Add tag...");
+    const input = screen.getByPlaceholderText("Add tag…");
     await userEvent.type(input, "comma,");
     expect(onChange).toHaveBeenCalledWith(["comma"]);
   });

@@ -37,9 +37,12 @@ interface ReviewCardProps {
   onApprove: (assetId: string, data: ApproveData) => void;
   onReject: (assetId: string) => void;
   onReanalyse: (assetId: string) => void;
+  approving?: boolean;
+  rejecting?: boolean;
+  reanalysing?: boolean;
 }
 
-function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse }: ReviewCardProps) {
+function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse, approving, rejecting, reanalysing }: ReviewCardProps) {
   const [showMeta, setShowMeta] = useState(false);
   const [editDescription, setEditDescription] = useState(item.description_suggestion ?? item.current_description ?? "");
   const [editTags, setEditTags] = useState<string[]>(item.tags_suggestion ?? item.current_tags ?? []);
@@ -47,7 +50,31 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse }:
   const [editSubalbum, setEditSubalbum] = useState(item.subalbum_suggestion ?? "");
   const [lightbox, setLightbox] = useState(false);
 
+  // Reset editable state when the underlying asset changes (e.g. after queue refreshes).
+  // The parent supplies a stable `key={item.asset_id}` so this component is entirely
+  // re-mounted when the asset changes — making this effect run only for subsequent
+  // in-place updates (rare). Listing every item field would trigger spurious resets.
+  const {
+    asset_id,
+    description_suggestion,
+    current_description,
+    tags_suggestion,
+    current_tags,
+    suggested_bucket_id,
+    subalbum_suggestion,
+  } = item;
+  React.useEffect(() => {
+    setEditDescription(description_suggestion ?? current_description ?? "");
+    setEditTags(tags_suggestion ?? current_tags ?? []);
+    setSelectedBucketId(suggested_bucket_id ?? "");
+    setEditSubalbum(subalbum_suggestion ?? "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset_id]);
+
+  const busy = approving || rejecting || reanalysing;
+
   const handleApprove = () => {
+    if (busy) return;
     const bucket = buckets.find((b) => b.id === selectedBucketId);
     onApprove(item.asset_id, {
       approved_bucket_id: selectedBucketId || item.suggested_bucket_id,
@@ -202,34 +229,45 @@ function ReviewCard({ item, buckets, albums, onApprove, onReject, onReanalyse }:
         <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
           <button
             onClick={handleApprove}
+            disabled={busy}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "8px 14px", borderRadius: 8, border: "none",
-              background: "#16a34a", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              background: approving ? "#166534" : "#16a34a",
+              color: "white", fontSize: 13, fontWeight: 600,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy && !approving ? 0.5 : 1,
             }}
           >
-            <CheckCircle size={14} /> Approve
+            <CheckCircle size={14} /> {approving ? "Approving…" : "Approve"}
           </button>
           <button
-            onClick={() => onReject(item.asset_id)}
+            onClick={() => { if (!busy) onReject(item.asset_id); }}
+            disabled={busy}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "8px 14px", borderRadius: 8, border: "1px solid #334155",
-              background: "transparent", color: "#94a3b8", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              background: "transparent", color: rejecting ? "#94a3b8" : "#94a3b8",
+              fontSize: 13, fontWeight: 500,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy && !rejecting ? 0.5 : 1,
             }}
           >
-            <XCircle size={14} /> Reject
+            <XCircle size={14} /> {rejecting ? "Rejecting…" : "Reject"}
           </button>
           <button
-            onClick={() => onReanalyse(item.asset_id)}
+            onClick={() => { if (!busy) onReanalyse(item.asset_id); }}
+            disabled={busy}
             title="Re-run AI analysis on this asset"
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "8px 14px", borderRadius: 8, border: "1px solid #334155",
-              background: "transparent", color: "#7c3aed", fontSize: 13, fontWeight: 500, cursor: "pointer",
+              background: "transparent", color: "#7c3aed", fontSize: 13, fontWeight: 500,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy && !reanalysing ? 0.5 : 1,
             }}
           >
-            <RefreshCw size={14} /> Re-analyse
+            <RefreshCw size={14} /> {reanalysing ? "Starting…" : "Re-analyse"}
           </button>
         </div>
       </div>
@@ -266,6 +304,7 @@ export default function Review() {
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [loadingAllIds, setLoadingAllIds] = useState(false);
   const [reanalyseMessage, setReanalyseMessage] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const pageSize = 20;
 
   function setParam(key: string, value: string) {
@@ -297,16 +336,28 @@ export default function Review() {
   const approveMutation = useMutation({
     mutationFn: ({ assetId, data }: { assetId: string; data: ApproveData }) => approveAsset(assetId, data),
     onSuccess: () => {
+      setMutationError(null);
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setMutationError(detail || "Failed to approve asset. Please try again.");
+      setTimeout(() => setMutationError(null), 6000);
     },
   });
 
   const rejectMutation = useMutation({
     mutationFn: rejectAsset,
     onSuccess: () => {
+      setMutationError(null);
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setMutationError(detail || "Failed to reject asset. Please try again.");
+      setTimeout(() => setMutationError(null), 6000);
     },
   });
 
@@ -314,10 +365,16 @@ export default function Review() {
     mutationFn: (action: "approve_all" | "reject_all") =>
       bulkReview({ asset_ids: Array.from(selected), action, trigger_writeback: true }),
     onSuccess: () => {
+      setMutationError(null);
       setSelected(new Set());
       setSelectAllPages(false);
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-count"] });
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setMutationError(detail || "Bulk action failed. Please try again.");
+      setTimeout(() => setMutationError(null), 6000);
     },
   });
 
@@ -383,6 +440,19 @@ export default function Review() {
           {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       </div>
+
+      {/* Mutation error banner */}
+      {mutationError && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
+          fontSize: 13, color: "#fca5a5",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span>{mutationError}</span>
+          <button onClick={() => setMutationError(null)} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {/* Re-analyse message */}
       {reanalyseMessage && (
@@ -500,6 +570,9 @@ export default function Review() {
               onApprove={(assetId, data) => approveMutation.mutate({ assetId, data })}
               onReject={(assetId) => rejectMutation.mutate(assetId)}
               onReanalyse={(assetId) => reclassifyMut.mutate([assetId])}
+              approving={approveMutation.isPending && approveMutation.variables?.assetId === item.asset_id}
+              rejecting={rejectMutation.isPending && rejectMutation.variables === item.asset_id}
+              reanalysing={reclassifyMut.isPending && reclassifyMut.variables?.length === 1 && reclassifyMut.variables[0] === item.asset_id}
             />
           </div>
         ))

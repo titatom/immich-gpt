@@ -1,0 +1,109 @@
+@import "../styles/tokens.css";
+
+.root {
+  min-height: 100vh;
+  background: var(--bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-8);
+}
+
+.logoTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.logoSub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.heading {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-6);
+}
+
+.formGroup {
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  display: block;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px var(--space-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+}
+
+.errorBox {
+  background: var(--color-error-dim);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-3);
+  color: #f87171;
+  font-size: var(--text-base);
+  margin-bottom: var(--space-4);
+}
+
+.submitBtn {
+  width: 100%;
+  padding: 11px var(--space-4);
+  background: var(--accent-hover);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.submitBtn:disabled {
+  background: #1e3a5f;
+  cursor: not-allowed;
+}
+
+.forgotLink {
+  display: block;
+  margin-top: var(--space-5);
+  text-align: center;
+  color: var(--accent);
+  font-size: var(--text-base);
+  text-decoration: none;
+}

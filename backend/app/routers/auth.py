@@ -8,7 +8,7 @@ from typing import Optional
 
 from ..database import get_db
 from ..config import settings
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, require_admin
 from ..services.auth_service import (
     authenticate_user,
     create_session,
@@ -136,18 +136,21 @@ def change_password_endpoint(
 
 
 @router.post("/forgot-password")
-def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(
+    body: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
     """
     Generate a password-reset token for the given email address.
 
-    The token is returned in the response body — suitable for admin-managed
-    workflows (admin creates accounts and resets passwords for users).
+    Requires admin authentication. The token is returned in the response body
+    so the admin can share it with the user securely out-of-band.
     A future iteration can add email/SMTP delivery instead.
     """
     user = get_user_by_email(db, body.email)
     if not user or not user.is_active:
-        # Return success regardless to avoid email enumeration
-        return {"message": "If that email is registered, a reset token has been issued"}
+        raise HTTPException(status_code=404, detail="User not found or inactive")
 
     raw_token = create_reset_token(db, user.id)
     return {

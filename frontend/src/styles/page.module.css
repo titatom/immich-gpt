@@ -1,0 +1,221 @@
+/*
+ * Shared page-level layout utilities.
+ * Import in each page alongside its own page-specific module.
+ */
+@import "./tokens.css";
+
+.page {
+  padding: var(--space-8) var(--space-10);
+}
+
+.pageNarrow {
+  max-width: 700px;
+}
+
+.pageMedium {
+  max-width: 900px;
+}
+
+.pageWide {
+  max-width: 1100px;
+}
+
+.pageHeader {
+  margin-bottom: var(--space-8);
+}
+
+.pageHeader h1 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.pageHeader p {
+  font-size: var(--text-md);
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.pageHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+/* ── Cards / surfaces ── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+.cardSm {
+  padding: var(--space-4);
+}
+
+/* ── Status banners ── */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 10px;
+  margin-bottom: var(--space-6);
+  font-size: var(--text-base);
+}
+
+.bannerSuccess {
+  background: var(--color-success-dim);
+  border: 1px solid rgba(22, 163, 74, 0.19);
+  color: var(--color-success-text);
+}
+
+.bannerError {
+  background: var(--color-error-dim);
+  border: 1px solid rgba(220, 38, 38, 0.19);
+  color: var(--color-error-text);
+}
+
+.bannerInfo {
+  background: var(--accent-dim);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #7dd3fc;
+}
+
+.bannerPurple {
+  background: var(--color-purple-dim);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: var(--color-purple-text);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px var(--space-4);
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btnPrimary {
+  background: var(--color-blue);
+  color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-blue-hover);
+}
+
+.btnSuccess {
+  background: #16a34a;
+  color: #fff;
+}
+
+.btnSuccess:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.btnPurple {
+  background: var(--color-purple);
+  color: #fff;
+}
+
+.btnPurple:hover:not(:disabled) {
+  background: #6d28d9;
+}
+
+.btnGhost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btnGhost:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.btnDanger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btnSm {
+  padding: 6px var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btnXs {
+  padding: 3px var(--space-2);
+  font-size: var(--text-xs);
+}
+
+/* ── Form controls ── */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.input,
+.select,
+.textarea {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  padding: 8px var(--space-3);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--border-focus);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+/* ── Empty / loading states ── */
+.emptyState {
+  text-align: center;
+  padding: 64px var(--space-8);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.loadingState {
+  color: var(--text-muted);
+  padding: 32px;
+  text-align: center;
+}

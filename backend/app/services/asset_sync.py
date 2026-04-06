@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..models.asset import Asset
 from ..services.immich_client import ImmichClient
+from datetime import timezone
 
 
 def _parse_dt(val: Any) -> Optional[datetime]:
@@ -107,6 +108,8 @@ class AssetSyncService:
         synced = total_created + total_updated
         return {"synced": synced, "created": total_created, "updated": total_updated, "errors": total_errors}
 
+    _COMMIT_BATCH_SIZE = 100
+
     def _sync_paged(
         self,
         fetch_fn,
@@ -116,7 +119,8 @@ class AssetSyncService:
     ) -> Dict[str, int]:
         created = updated = errors = 0
         page = 1
-        synced_at = datetime.utcnow()
+        synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        pending = 0  # rows flushed but not yet committed
 
         while True:
             # Cooperative stop check (pause/cancel)
@@ -142,12 +146,21 @@ class AssetSyncService:
                     c, u = self._upsert_asset(raw, synced_at)
                     created += c
                     updated += u
+                    pending += 1
                 except Exception:
                     errors += 1
+
+                if pending >= self._COMMIT_BATCH_SIZE:
+                    self.db.commit()
+                    pending = 0
 
             if len(raw_assets) < page_size:
                 break
             page += 1
+
+        # Commit any remaining rows
+        if pending:
+            self.db.commit()
 
         return {"synced": created + updated, "created": created, "updated": updated, "errors": errors}
 
@@ -191,10 +204,8 @@ class AssetSyncService:
         if existing:
             for k, v in data.items():
                 setattr(existing, k, v)
-            self.db.commit()
             return 0, 1
         else:
             asset = Asset(id=str(uuid.uuid4()), user_id=self.user_id, **data)
             self.db.add(asset)
-            self.db.commit()
             return 1, 0

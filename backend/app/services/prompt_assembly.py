@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from ..models.prompt_template import PromptTemplate
 from ..models.bucket import Bucket
-from ..models.app_setting import AppSetting
+from ..services.settings_utils import get_behaviour_setting
 
 
 DEFAULT_GLOBAL_CLASSIFICATION = (
@@ -49,13 +49,7 @@ class PromptAssemblyService:
         self.user_id = user_id
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
-        q = self.db.query(AppSetting).filter(AppSetting.key == key)
-        if self.user_id:
-            q = q.filter(AppSetting.user_id == self.user_id)
-        row = q.first()
-        if row is None:
-            return default
-        return row.value.lower() not in ("false", "0", "no")
+        return get_behaviour_setting(self.db, key, default, user_id=self.user_id)
 
     def _get_prompt(self, prompt_type: str, bucket_id: Optional[str] = None) -> Optional[str]:
         q = self.db.query(PromptTemplate).filter(
