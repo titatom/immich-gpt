@@ -70,12 +70,18 @@ function ReviewCard({
 
   const busy = approving || rejecting || reanalysing;
 
+  const selectedBucket = buckets.find((b) => b.id === editState.bucketId);
+
+  // Determine whether the subalbum field should be shown/editable for this bucket mode
+  const isTrashBucket = selectedBucket?.mapping_mode === "immich_trash";
+  const isImmichAlbum = selectedBucket?.mapping_mode === "immich_album";
+  const showSubalbum = !isTrashBucket;
+
   const handleApprove = () => {
     if (busy) return;
-    const bucket = buckets.find((b) => b.id === editState.bucketId);
     onApprove(item.asset_id, {
       approved_bucket_id: editState.bucketId || item.suggested_bucket_id,
-      approved_bucket_name: bucket?.name || item.suggested_bucket_name,
+      approved_bucket_name: selectedBucket?.name || item.suggested_bucket_name,
       approved_description: editState.description,
       approved_tags: editState.tags,
       approved_subalbum: editState.subalbum || undefined,
@@ -83,6 +89,20 @@ function ReviewCard({
       trigger_writeback: true,
     });
   };
+
+  function handleBucketChange(newBucketId: string) {
+    const newBucket = buckets.find((b) => b.id === newBucketId);
+    let newSubalbum: string;
+    if (newBucket?.mapping_mode === "immich_album" && newBucket.immich_album_id) {
+      const album = albums.find((a) => a.id === newBucket.immich_album_id);
+      newSubalbum = album?.albumName ?? "";
+    } else if (newBucket?.mapping_mode === "immich_trash") {
+      newSubalbum = "";
+    } else {
+      newSubalbum = editState.subalbum;
+    }
+    onEditChange(item.asset_id, { bucketId: newBucketId, subalbum: newSubalbum });
+  }
 
   return (
     <div style={{
@@ -111,7 +131,7 @@ function ReviewCard({
             <span style={{ fontSize: 11, color: "#64748b", flexShrink: 0 }}>Bucket:</span>
             <select
               value={editState.bucketId}
-              onChange={(e) => onEditChange(item.asset_id, { bucketId: e.target.value })}
+              onChange={(e) => handleBucketChange(e.target.value)}
               style={{
                 background: "#0f172a", border: "1px solid #334155",
                 borderRadius: 6, color: "#38bdf8", fontSize: 12,
@@ -128,16 +148,6 @@ function ReviewCard({
               <span style={{ fontSize: 11, color: "#475569" }}>via {item.provider_name}</span>
             )}
           </div>
-
-          {/* Explanation */}
-          {item.explanation && (
-            <div style={{
-              fontSize: 12, color: "#94a3b8", background: "#0f172a",
-              borderRadius: 6, padding: "6px 10px", lineHeight: 1.5,
-            }}>
-              {item.explanation}
-            </div>
-          )}
 
           {/* Description — always editable */}
           <div>
@@ -165,45 +175,53 @@ function ReviewCard({
             />
           </div>
 
-          {/* Sub-album — always editable with existing album suggestions */}
-          <div>
-            <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 3 }}>
-              Sub-album / Album
-              {item.subalbum_suggestion && (
-                <span style={{ marginLeft: 6, color: "#64748b", fontWeight: 400 }}>
-                  (suggested: <button
-                    onClick={() => onEditChange(item.asset_id, { subalbum: item.subalbum_suggestion! })}
-                    style={{ background: "none", border: "none", color: "#38bdf8", fontSize: 11, cursor: "pointer", padding: 0 }}
-                  >{item.subalbum_suggestion}</button>)
-                </span>
-              )}
-            </label>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                value={editState.subalbum}
-                onChange={(e) => onEditChange(item.asset_id, { subalbum: e.target.value })}
-                placeholder="Album name or leave empty"
-                style={{
-                  flex: 1, background: "#0f172a", border: "1px solid #334155",
-                  borderRadius: 6, color: "#f1f5f9", fontSize: 12,
-                  padding: "6px 10px", outline: "none",
-                }}
-              />
-              {albums.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => { if (e.target.value) onEditChange(item.asset_id, { subalbum: e.target.value }); }}
+          {/* Sub-album — hidden for Trash bucket, auto-filled for Immich Album mode */}
+          {showSubalbum && (
+            <div>
+              <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 3 }}>
+                {isImmichAlbum ? "Album" : "Sub-album / Album"}
+                {!isImmichAlbum && item.subalbum_suggestion && (
+                  <span style={{ marginLeft: 6, color: "#64748b", fontWeight: 400 }}>
+                    (suggested: <button
+                      onClick={() => onEditChange(item.asset_id, { subalbum: item.subalbum_suggestion! })}
+                      style={{ background: "none", border: "none", color: "#38bdf8", fontSize: 11, cursor: "pointer", padding: 0 }}
+                    >{item.subalbum_suggestion}</button>)
+                  </span>
+                )}
+                {isImmichAlbum && (
+                  <span style={{ marginLeft: 6, fontSize: 10, color: "#475569", fontWeight: 400 }}>mapped from bucket</span>
+                )}
+              </label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  value={editState.subalbum}
+                  onChange={(e) => onEditChange(item.asset_id, { subalbum: e.target.value })}
+                  placeholder={isImmichAlbum ? "Album name" : "Album name or leave empty"}
+                  readOnly={isImmichAlbum}
                   style={{
-                    background: "#0f172a", border: "1px solid #334155", borderRadius: 6,
-                    color: "#64748b", fontSize: 12, padding: "6px 10px",
+                    flex: 1, background: isImmichAlbum ? "#0a1628" : "#0f172a",
+                    border: "1px solid #334155",
+                    borderRadius: 6, color: isImmichAlbum ? "#64748b" : "#f1f5f9", fontSize: 12,
+                    padding: "6px 10px", outline: "none",
+                    cursor: isImmichAlbum ? "default" : "text",
                   }}
-                >
-                  <option value="">Existing albums…</option>
-                  {albums.map((a) => <option key={a.id} value={a.albumName}>{a.albumName}</option>)}
-                </select>
-              )}
+                />
+                {!isImmichAlbum && albums.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => { if (e.target.value) onEditChange(item.asset_id, { subalbum: e.target.value }); }}
+                    style={{
+                      background: "#0f172a", border: "1px solid #334155", borderRadius: 6,
+                      color: "#64748b", fontSize: 12, padding: "6px 10px",
+                    }}
+                  >
+                    <option value="">Existing albums…</option>
+                    {albums.map((a) => <option key={a.id} value={a.albumName}>{a.albumName}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Metadata toggle */}
           <button
@@ -296,12 +314,29 @@ function ReviewCard({
 }
 
 /** Build an EditState from a ReviewItem's suggestion values. */
-function buildDefaultEditState(item: ReviewItem): EditState {
+function buildDefaultEditState(
+  item: ReviewItem,
+  buckets?: Bucket[],
+  albums?: Array<{ id: string; albumName: string }>,
+): EditState {
+  const bucketId = item.suggested_bucket_id ?? "";
+  let subalbum = item.subalbum_suggestion ?? "";
+
+  if (buckets && albums && bucketId) {
+    const bucket = buckets.find((b) => b.id === bucketId);
+    if (bucket?.mapping_mode === "immich_album" && bucket.immich_album_id) {
+      const album = albums.find((a) => a.id === bucket.immich_album_id);
+      subalbum = album?.albumName ?? subalbum;
+    } else if (bucket?.mapping_mode === "immich_trash") {
+      subalbum = "";
+    }
+  }
+
   return {
     description: item.description_suggestion ?? item.current_description ?? "",
     tags: item.tags_suggestion ?? item.current_tags ?? [],
-    bucketId: item.suggested_bucket_id ?? "",
-    subalbum: item.subalbum_suggestion ?? "",
+    bucketId,
+    subalbum,
   };
 }
 
@@ -372,13 +407,13 @@ export default function Review() {
       let changed = false;
       for (const item of items) {
         if (!next.has(item.asset_id)) {
-          next.set(item.asset_id, buildDefaultEditState(item));
+          next.set(item.asset_id, buildDefaultEditState(item, buckets, albums));
           changed = true;
         }
       }
       return changed ? next : prev;
     });
-  }, [items]);
+  }, [items, buckets, albums]);
 
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["review-count"],
@@ -629,7 +664,7 @@ export default function Review() {
               item={item}
               buckets={buckets}
               albums={albums}
-              editState={editStates.get(item.asset_id) ?? buildDefaultEditState(item)}
+              editState={editStates.get(item.asset_id) ?? buildDefaultEditState(item, buckets, albums)}
               onEditChange={handleEditChange}
               onApprove={(assetId, data) => approveMutation.mutate({ assetId, data })}
               onReject={(assetId) => rejectMutation.mutate(assetId)}

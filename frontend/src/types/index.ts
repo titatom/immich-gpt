@@ -45,6 +45,8 @@ export interface Asset {
   is_external_library: boolean;
   synced_at?: string;
   created_at: string;
+  classification_bucket?: string | null;
+  classification_status?: string | null;
 }
 
 export interface AssetClassification {

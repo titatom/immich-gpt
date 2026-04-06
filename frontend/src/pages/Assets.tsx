@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   getAssets, getAssetCount, getAllAssetIds, getAssetDetail, getThumbnailUrl,
-  getBuckets, reclassifyAssets,
+  getBuckets, reclassifyAssets, UNSCANNED_BUCKET_FILTER,
 } from "../services/api";
 import type { Asset, AssetDetail, Bucket } from "../types";
 import {
@@ -333,6 +333,12 @@ function AssetDetailPanel({
   );
 }
 
+const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
+  approved:       { color: "#22c55e", bg: "rgba(34,197,94,0.12)",   label: "Approved" },
+  pending_review: { color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  label: "Pending" },
+  rejected:       { color: "#ef4444", bg: "rgba(239,68,68,0.12)",   label: "Rejected" },
+};
+
 function AssetCard({
   asset, onClick, selected, onSelect,
 }: {
@@ -340,6 +346,7 @@ function AssetCard({
 }) {
   const [imgError, setImgError] = React.useState(false);
   const location = [asset.city, asset.country].filter(Boolean).join(", ");
+  const statusCfg = asset.classification_status ? STATUS_CONFIG[asset.classification_status] : null;
   return (
     <div
       onClick={onClick}
@@ -367,6 +374,27 @@ function AssetCard({
         {selected && <CheckCircle size={14} color="#0f172a" />}
       </div>
 
+      {/* Classification status badge — top-right overlay */}
+      {statusCfg && (
+        <div style={{
+          position: "absolute", top: 6, right: 6, zIndex: 10,
+          fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 4,
+          background: statusCfg.bg, color: statusCfg.color,
+          textTransform: "uppercase", letterSpacing: "0.04em",
+        }}>
+          {statusCfg.label}
+        </div>
+      )}
+      {!statusCfg && !asset.is_favorite && (
+        <div style={{
+          position: "absolute", top: 6, right: 6, zIndex: 10,
+          fontSize: 9, fontWeight: 600, padding: "2px 5px", borderRadius: 4,
+          background: "rgba(100,116,139,0.18)", color: "#64748b",
+        }}>
+          Unscanned
+        </div>
+      )}
+
       <div style={{ width: "100%", aspectRatio: "1", background: "#0f172a", position: "relative", overflow: "hidden" }}>
         {imgError ? (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -384,25 +412,35 @@ function AssetCard({
           <Star size={12} color="#fbbf24" fill="#fbbf24" style={{ position: "absolute", top: 6, right: 6 }} />
         )}
       </div>
-      <div style={{ padding: "10px 12px" }}>
-        <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ padding: "8px 10px" }}>
+        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {asset.original_filename || asset.immich_id}
         </div>
-        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+
+        {/* Bucket + status row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, minHeight: 18 }}>
+          {asset.classification_bucket ? (
+            <span style={{
+              fontSize: 10, fontWeight: 600, color: "#38bdf8",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+            }}>
+              {asset.classification_bucket}
+            </span>
+          ) : (
+            <span style={{ fontSize: 10, color: "#475569", fontStyle: "italic", flex: 1 }}>No bucket</span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 5, marginTop: 3, flexWrap: "wrap" }}>
           {asset.asset_type && (
-            <span style={{ fontSize: 10, background: "#0ea5e918", color: "#38bdf8", border: "1px solid #0ea5e930", borderRadius: 4, padding: "1px 6px" }}>
+            <span style={{ fontSize: 9, background: "#0ea5e918", color: "#38bdf8", border: "1px solid #0ea5e930", borderRadius: 4, padding: "1px 5px" }}>
               {asset.asset_type}
             </span>
           )}
-          {location && <span style={{ fontSize: 10, color: "#64748b" }}>{location}</span>}
+          {location && <span style={{ fontSize: 9, color: "#64748b" }}>{location}</span>}
         </div>
-        {(asset.tags ?? []).length > 0 && (
-          <div style={{ fontSize: 10, color: "#64748b", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {asset.tags!.slice(0, 3).join(", ")}{asset.tags!.length > 3 ? " …" : ""}
-          </div>
-        )}
         {asset.description && (
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 10, color: "#64748b", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {asset.description}
           </div>
         )}
@@ -623,6 +661,7 @@ export default function Assets() {
           style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "8px 12px", fontSize: 13 }}
         >
           <option value="">All buckets</option>
+          <option value={UNSCANNED_BUCKET_FILTER}>— Not AI scanned yet —</option>
           {buckets.map((b) => (
             <option key={b.id} value={b.name}>{b.name}</option>
           ))}
