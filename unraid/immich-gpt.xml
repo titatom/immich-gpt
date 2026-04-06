@@ -74,38 +74,50 @@
   <Config
     Name="Admin Email"
     Target="ADMIN_EMAIL"
-    Default=""
+    Default="admin"
     Mode=""
-    Description="Email address for the admin account created automatically on first startup. You will use this to log in for the first time."
+    Description="Email / username for the admin account created automatically on first startup. Defaults to 'admin' if left blank. You will use this to log in for the first time."
     Type="Variable"
     Display="always"
-    Required="true"
+    Required="false"
     Mask="false"
-  ></Config>
+  >admin</Config>
 
   <Config
     Name="Admin Password"
     Target="ADMIN_PASSWORD"
-    Default=""
+    Default="admin"
     Mode=""
-    Description="Initial password for the admin account. You will be forced to change it on first login. Use a temporary value here."
+    Description="Initial password for the admin account. Defaults to 'admin' if left blank. You will be forced to change it on first login."
     Type="Variable"
     Display="always"
-    Required="true"
+    Required="false"
     Mask="true"
-  ></Config>
+  >admin</Config>
 
   <Config
     Name="Admin Username"
     Target="ADMIN_USERNAME"
     Default="admin"
     Mode=""
-    Description="Username for the auto-created admin account."
+    Description="Username for the auto-created admin account. Defaults to 'admin' if left blank."
     Type="Variable"
     Display="advanced"
     Required="false"
     Mask="false"
   >admin</Config>
+
+  <Config
+    Name="Skip Admin Bootstrap"
+    Target="ADMIN_SKIP_BOOTSTRAP"
+    Default="false"
+    Mode=""
+    Description="Set to 'true' to skip automatic admin account creation on first startup (advanced). Leave 'false' for a normal installation."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >false</Config>
 
   <!-- ── Immich connection ─────────────────────────────────────────────── -->
   <Config
