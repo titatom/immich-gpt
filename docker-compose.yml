@@ -48,10 +48,9 @@ services:
       # ── Authentication ─────────────────────────────────────────────────
       # Admin bootstrap: creates the first admin account on startup (if none
       # exist). The admin must change the password on first login.
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      AUTH_ENABLED: ${AUTH_ENABLED:-false}
       # Cryptographic key for signing session cookies. Change this in
       # production — any long random string works.
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
