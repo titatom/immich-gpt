@@ -12,8 +12,8 @@ from ..models.suggested_metadata import SuggestedMetadata
 from ..models.review_decision import ReviewDecision
 from ..models.audit_log import AuditLog
 from ..models.bucket import Bucket
-from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
+from ..services.settings_utils import get_behaviour_setting
 
 
 class WritebackResult:
@@ -138,13 +138,7 @@ class ReviewDecisionService:
         self.db.commit()
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
-        q = self.db.query(AppSetting).filter(AppSetting.key == key)
-        if self.user_id:
-            q = q.filter(AppSetting.user_id == self.user_id)
-        row = q.first()
-        if row is None:
-            return default
-        return row.value.lower() not in ("false", "0", "no")
+        return get_behaviour_setting(self.db, key, default, user_id=self.user_id)
 
     def _do_writeback(
         self,

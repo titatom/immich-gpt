@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
+
+
+_DEFAULT_SECRET_KEY = "change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -36,15 +39,31 @@ class Settings(BaseSettings):
     SESSION_COOKIE_SECURE: bool = False  # Set True in production (HTTPS)
     SESSION_COOKIE_SAMESITE: str = "lax"
 
-    # Admin bootstrap: if no users exist on startup, create this admin account
-    ADMIN_EMAIL: str = ""
-    ADMIN_PASSWORD: str = ""
+    # Secret used for signing tokens / CSRF (must be changed in production)
+    SECRET_KEY: str = _DEFAULT_SECRET_KEY
+
+    # CORS — comma-separated list of allowed origins, e.g. "http://localhost:3000,https://myapp.example.com"
+    # Set to "*" only in local dev where credentials are not used.
+    # When left empty the default tightens to same-origin only (no explicit CORS headers).
+    CORS_ORIGINS: str = ""
+
+    # Admin bootstrap: credentials used when no users exist on startup.
+    # Defaults to admin / admin so a fresh install is immediately usable.
+    # The user is forced to change the password on first login.
+    ADMIN_EMAIL: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
     ADMIN_USERNAME: str = "admin"
 
-    # Admin bootstrap: if no users exist on startup, create this admin account
-    ADMIN_EMAIL: str = ""
-    ADMIN_PASSWORD: str = ""
-    ADMIN_USERNAME: str = "admin"
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Return the parsed list of allowed CORS origins."""
+        if not self.CORS_ORIGINS:
+            return []
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def secret_key_is_default(self) -> bool:
+        return self.SECRET_KEY == _DEFAULT_SECRET_KEY
 
     class Config:
         env_file = ".env"

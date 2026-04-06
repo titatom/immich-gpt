@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy import select as sa_select
+from typing import List, Optional, Dict
 
 from ..database import get_db
 from ..dependencies import require_active_user
@@ -58,7 +59,6 @@ def get_review_queue(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    from sqlalchemy import select as sa_select
     user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
 
     q = db.query(SuggestedClassification).filter(
@@ -76,34 +76,34 @@ def get_review_queue(
     if not classifications:
         return []
 
-    # Batch-fetch assets and latest metadata to avoid N+1 queries
+    # Batch-load assets and metadata to avoid N+1 queries
     asset_ids = [cls.asset_id for cls in classifications]
-    assets_by_id = {
-        a.id: a
-        for a in db.query(Asset).filter(Asset.id.in_(asset_ids)).all()
+
+    assets_by_id: Dict[str, Asset] = {
+        a.id: a for a in db.query(Asset).filter(Asset.id.in_(asset_ids)).all()
     }
 
-    # Latest metadata per asset (one query, not N)
-    from sqlalchemy import func as sa_func
+    # Fetch the most-recent metadata row per asset in a single query using a subquery
+    from sqlalchemy import func
     latest_meta_subq = (
         db.query(
             SuggestedMetadata.asset_id,
-            sa_func.max(SuggestedMetadata.created_at).label("latest"),
+            func.max(SuggestedMetadata.created_at).label("max_created"),
         )
         .filter(SuggestedMetadata.asset_id.in_(asset_ids))
         .group_by(SuggestedMetadata.asset_id)
         .subquery()
     )
-    metas = (
+    meta_rows = (
         db.query(SuggestedMetadata)
         .join(
             latest_meta_subq,
             (SuggestedMetadata.asset_id == latest_meta_subq.c.asset_id)
-            & (SuggestedMetadata.created_at == latest_meta_subq.c.latest),
+            & (SuggestedMetadata.created_at == latest_meta_subq.c.max_created),
         )
         .all()
     )
-    meta_by_asset = {m.asset_id: m for m in metas}
+    meta_by_asset: Dict[str, SuggestedMetadata] = {m.asset_id: m for m in meta_rows}
 
     items = []
     for cls in classifications:
@@ -122,7 +122,6 @@ def get_review_count(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    from sqlalchemy import select as sa_select
     user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     count = db.query(SuggestedClassification).filter(
         SuggestedClassification.status == status,
@@ -138,7 +137,6 @@ def get_review_queue_ids(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    from sqlalchemy import select as sa_select
     user_asset_ids_stmt = sa_select(Asset.id).where(Asset.user_id == current_user.id)
     q = db.query(SuggestedClassification.asset_id).filter(
         SuggestedClassification.status == status,
@@ -231,27 +229,57 @@ def bulk_review(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
+    from sqlalchemy import func
+
     svc = ReviewDecisionService(db)
-    results = []
-    for asset_id in body.asset_ids:
-        # Verify asset ownership
-        asset = db.query(Asset).filter(
-            Asset.id == asset_id,
+    asset_ids = body.asset_ids
+
+    # Batch-load all owned assets in one query
+    owned_assets: Dict[str, Asset] = {
+        a.id: a
+        for a in db.query(Asset).filter(
+            Asset.id.in_(asset_ids),
             Asset.user_id == current_user.id,
-        ).first()
-        if not asset:
+        ).all()
+    }
+
+    # Batch-load pending classifications
+    cls_by_asset: Dict[str, SuggestedClassification] = {
+        c.asset_id: c
+        for c in db.query(SuggestedClassification).filter(
+            SuggestedClassification.asset_id.in_(asset_ids),
+            SuggestedClassification.status == "pending_review",
+        ).all()
+    }
+
+    # Batch-load most-recent metadata per asset
+    latest_meta_subq = (
+        db.query(
+            SuggestedMetadata.asset_id,
+            func.max(SuggestedMetadata.created_at).label("max_created"),
+        )
+        .filter(SuggestedMetadata.asset_id.in_(asset_ids))
+        .group_by(SuggestedMetadata.asset_id)
+        .subquery()
+    )
+    meta_by_asset: Dict[str, SuggestedMetadata] = {
+        m.asset_id: m
+        for m in db.query(SuggestedMetadata).join(
+            latest_meta_subq,
+            (SuggestedMetadata.asset_id == latest_meta_subq.c.asset_id)
+            & (SuggestedMetadata.created_at == latest_meta_subq.c.max_created),
+        ).all()
+    }
+
+    results = []
+    for asset_id in asset_ids:
+        if asset_id not in owned_assets:
             results.append({"asset_id": asset_id, "status": "error", "error": "Asset not found"})
             continue
         try:
             if body.action == "approve_all":
-                cls = db.query(SuggestedClassification).filter(
-                    SuggestedClassification.asset_id == asset_id,
-                    SuggestedClassification.status == "pending_review",
-                ).first()
-                meta = db.query(SuggestedMetadata).filter(
-                    SuggestedMetadata.asset_id == asset_id,
-                ).order_by(SuggestedMetadata.created_at.desc()).first()
-
+                cls = cls_by_asset.get(asset_id)
+                meta = meta_by_asset.get(asset_id)
                 result = svc.approve_asset(
                     asset_id=asset_id,
                     approved_bucket_id=cls.suggested_bucket_id if cls else None,

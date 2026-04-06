@@ -1,4 +1,5 @@
 import React from "react";
+import styles from "./TagList.module.css";
 
 interface Props {
   tags?: string[];
@@ -28,60 +29,25 @@ export default function TagList({ tags = [], editable = false, onChange, maxVisi
   };
 
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+    <div className={styles.root}>
       {visible.map((tag, i) => (
-        <span
-          key={i}
-          style={{
-            background: "#0ea5e918",
-            color: "#38bdf8",
-            border: "1px solid #0ea5e930",
-            borderRadius: 6,
-            padding: "2px 8px",
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
+        <span key={i} className={styles.tag}>
           #{tag}
           {editable && (
-            <button
-              onClick={() => removeTag(i)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#64748b",
-                padding: 0,
-                lineHeight: 1,
-                fontSize: 14,
-              }}
-            >
-              ×
-            </button>
+            <button className={styles.removeBtn} onClick={() => removeTag(i)}>×</button>
           )}
         </span>
       ))}
       {hidden > 0 && !editable && (
-        <span style={{ fontSize: 12, color: "#64748b" }}>+{hidden} more</span>
+        <span className={styles.overflow}>+{hidden} more</span>
       )}
       {editable && (
         <input
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={addTag}
-          placeholder="Add tag..."
-          style={{
-            background: "transparent",
-            border: "1px solid #334155",
-            borderRadius: 6,
-            padding: "2px 8px",
-            fontSize: 12,
-            color: "#94a3b8",
-            outline: "none",
-            width: 100,
-          }}
+          placeholder="Add tag…"
+          className={styles.addInput}
         />
       )}
     </div>

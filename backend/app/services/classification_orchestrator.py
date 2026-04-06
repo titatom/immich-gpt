@@ -18,6 +18,7 @@ from ..services.image_preparation import ImagePreparationService
 from ..services.ai_provider import AIProvider, AIClassificationResult
 from ..services.prompt_assembly import PromptAssemblyService
 from ..services.job_progress import JobProgressService
+from ..services.settings_utils import get_behaviour_setting
 
 
 class ClassificationOrchestrator:
@@ -37,14 +38,7 @@ class ClassificationOrchestrator:
         self.job_service = JobProgressService(db)
 
     def _get_behaviour_setting(self, key: str, default: bool) -> bool:
-        from ..models.app_setting import AppSetting
-        q = self.db.query(AppSetting).filter(AppSetting.key == key)
-        if self.user_id:
-            q = q.filter(AppSetting.user_id == self.user_id)
-        row = q.first()
-        if row is None:
-            return default
-        return row.value.lower() not in ("false", "0", "no")
+        return get_behaviour_setting(self.db, key, default, user_id=self.user_id)
 
     def _fetch_immich_tags(self) -> Optional[List[str]]:
         """Fetch all tag names from Immich. Returns None on failure."""

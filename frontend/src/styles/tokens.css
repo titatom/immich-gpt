@@ -1,0 +1,68 @@
+/*
+ * Design tokens — single source of truth for colours, spacing, radii, etc.
+ * Import this file once in main.tsx; components read tokens via CSS modules.
+ */
+:root {
+  /* Backgrounds */
+  --bg-base:    #0f172a;
+  --bg-surface: #1e293b;
+  --bg-raised:  #0f172a;
+
+  /* Borders */
+  --border:       #334155;
+  --border-focus: #38bdf8;
+
+  /* Text */
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --text-faint:     #475569;
+
+  /* Brand / accent */
+  --accent:        #38bdf8;
+  --accent-hover:  #0ea5e9;
+  --accent-dim:    rgba(56, 189, 248, 0.1);
+
+  /* Semantic colours */
+  --color-success:       #22c55e;
+  --color-success-dim:   rgba(34, 197, 94, 0.1);
+  --color-success-text:  #86efac;
+  --color-warning:       #f59e0b;
+  --color-warning-dim:   rgba(245, 158, 11, 0.1);
+  --color-error:         #ef4444;
+  --color-error-dim:     rgba(239, 68, 68, 0.1);
+  --color-error-text:    #fca5a5;
+  --color-purple:        #7c3aed;
+  --color-purple-dim:    rgba(124, 58, 237, 0.12);
+  --color-purple-text:   #c4b5fd;
+  --color-blue:          #1e40af;
+  --color-blue-hover:    #1d4ed8;
+
+  /* Radii */
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+
+  /* Spacing */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+
+  /* Font sizes */
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   18px;
+  --text-2xl:  24px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+}

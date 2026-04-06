@@ -1,0 +1,146 @@
+@import "../styles/tokens.css";
+
+.page {
+  padding: var(--space-8) var(--space-10);
+  max-width: 900px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-md);
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px var(--space-4);
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnBlue   { background: var(--color-blue);   color: #fff; }
+.btnPurple { background: var(--color-purple);  color: #fff; }
+
+.filter {
+  margin-bottom: var(--space-5);
+}
+
+.filterSelect {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  padding: 7px var(--space-3);
+  font-size: var(--text-base);
+  outline: none;
+}
+
+.jobList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.jobCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.jobCardHeader {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.jobCardDetail {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--bg-surface);
+}
+
+.jobActions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.iconBtn {
+  padding: 5px var(--space-2);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.confirmRow {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.confirmText {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.confirmYes {
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: none;
+  background: #dc2626;
+  color: white;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirmNo {
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.empty {
+  text-align: center;
+  padding: 64px;
+  color: var(--text-muted);
+}
+
+.loading {
+  color: var(--text-muted);
+  padding: 32px;
+  text-align: center;
+}

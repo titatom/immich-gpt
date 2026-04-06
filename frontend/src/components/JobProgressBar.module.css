@@ -1,0 +1,103 @@
+@import "../styles/tokens.css";
+
+.root {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.rootCompact {
+  padding: var(--space-3) var(--space-4);
+}
+
+.rootFull {
+  padding: var(--space-4) var(--space-5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.headerCompact {
+  margin-bottom: var(--space-2);
+}
+
+.headerFull {
+  margin-bottom: var(--space-3);
+}
+
+.jobType {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.statusBadge {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.track {
+  height: 6px;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.trackCompact {
+  margin-bottom: var(--space-2);
+}
+
+.trackFull {
+  margin-bottom: var(--space-3);
+}
+
+.fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.statCount {
+  color: var(--text-secondary);
+}
+
+.statSuccess {
+  color: var(--color-success);
+}
+
+.statError {
+  color: var(--color-error);
+}
+
+.statStep {
+  color: var(--text-muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statPercent {
+  color: var(--text-faint);
+  margin-left: auto;
+}
+
+.message {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}

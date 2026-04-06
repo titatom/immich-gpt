@@ -39,15 +39,16 @@ describe("Thumbnail", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("renders with pointer cursor when onClick is provided", () => {
+  it("renders with clickable class when onClick is provided", () => {
     const { container } = render(<Thumbnail assetId="a" onClick={() => {}} />);
     const wrapper = container.querySelector("div") as HTMLDivElement;
-    expect(wrapper.style.cursor).toBe("pointer");
+    // Cursor is now applied via a CSS module class rather than inline style
+    expect(wrapper.className).toMatch(/rootClickable/);
   });
 
-  it("renders with default cursor when no onClick", () => {
+  it("does not apply clickable class when no onClick", () => {
     const { container } = render(<Thumbnail assetId="a" />);
     const wrapper = container.querySelector("div") as HTMLDivElement;
-    expect(wrapper.style.cursor).toBe("default");
+    expect(wrapper.className).not.toMatch(/rootClickable/);
   });
 });

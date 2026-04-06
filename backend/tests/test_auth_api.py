@@ -84,7 +84,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "login@test.com", "password": "goodpass"})
+                r = c.post("/api/auth/login", json={"username": "login@test.com", "password": "goodpass"})
 
         app.dependency_overrides.clear()
 
@@ -108,7 +108,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "bad@test.com", "password": "wrong"})
+                r = c.post("/api/auth/login", json={"username": "bad@test.com", "password": "wrong"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401
@@ -124,7 +124,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "nobody@test.com", "password": "x"})
+                r = c.post("/api/auth/login", json={"username": "nobody@test.com", "password": "x"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401
@@ -142,7 +142,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "disabled@test.com", "password": "pass"})
+                r = c.post("/api/auth/login", json={"username": "disabled@test.com", "password": "pass"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401
@@ -292,16 +292,22 @@ class TestForcePasswordChangeGate:
 
 class TestPasswordReset:
     def test_forgot_password_returns_token_for_known_email(self, db):
+        """Admin can generate a reset token for a known user."""
         from app.main import app
         from app.database import get_db
+        from app.dependencies import get_current_user, require_active_user, require_admin
         from fastapi.testclient import TestClient
 
-        _make_user(db, email="reset@test.com", password="pass")
+        admin = _make_user(db, email="fpadmin@test.com", username="fpadmin", password="adminpass", role="admin")
+        _make_user(db, email="reset@test.com", username="resetuser", password="pass")
 
         def override_get_db():
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
+        app.dependency_overrides[get_current_user] = lambda: admin
+        app.dependency_overrides[require_active_user] = lambda: admin
+        app.dependency_overrides[require_admin] = lambda: admin
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/forgot-password", json={"email": "reset@test.com"})
@@ -310,8 +316,31 @@ class TestPasswordReset:
         assert r.status_code == 200
         assert "token" in r.json()
 
-    def test_forgot_password_unknown_email_returns_200(self, db):
-        """Should not reveal whether the email exists."""
+    def test_forgot_password_unknown_email_returns_404(self, db):
+        """Admin gets a 404 for a user that does not exist (admin-only endpoint)."""
+        from app.main import app
+        from app.database import get_db
+        from app.dependencies import get_current_user, require_active_user, require_admin
+        from fastapi.testclient import TestClient
+
+        admin = _make_user(db, email="fpadmin2@test.com", username="fpadmin2", password="adminpass", role="admin")
+
+        def override_get_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_get_db
+        app.dependency_overrides[get_current_user] = lambda: admin
+        app.dependency_overrides[require_active_user] = lambda: admin
+        app.dependency_overrides[require_admin] = lambda: admin
+        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+            with TestClient(app) as c:
+                r = c.post("/api/auth/forgot-password", json={"email": "nobody@test.com"})
+
+        app.dependency_overrides.clear()
+        assert r.status_code == 404
+
+    def test_forgot_password_requires_admin(self, db):
+        """Unauthenticated callers receive 401."""
         from app.main import app
         from app.database import get_db
         from fastapi.testclient import TestClient
@@ -322,12 +351,10 @@ class TestPasswordReset:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/forgot-password", json={"email": "nobody@test.com"})
+                r = c.post("/api/auth/forgot-password", json={"email": "anyone@test.com"})
 
         app.dependency_overrides.clear()
-        assert r.status_code == 200
-        # No token field for unknown email
-        assert "token" not in r.json()
+        assert r.status_code == 401
 
     def test_reset_password_with_valid_token(self, db):
         from app.main import app
