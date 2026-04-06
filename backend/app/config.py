@@ -47,9 +47,6 @@ class Settings(BaseSettings):
     # When left empty the default tightens to same-origin only (no explicit CORS headers).
     CORS_ORIGINS: str = ""
 
-    # Legacy single-user auth (deprecated — no longer used for user auth)
-    AUTH_ENABLED: bool = False
-
     # Admin bootstrap: if no users exist on startup, create this admin account
     ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""

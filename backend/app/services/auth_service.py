@@ -155,7 +155,7 @@ def consume_reset_token(db: Session, raw_token: str) -> Optional[str]:
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     """Return User on success; None on failure."""
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == email.lower().strip()).first()
     if not user or not user.is_active:
         return None
     if not verify_password(password, user.hashed_password):
