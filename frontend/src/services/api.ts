@@ -149,6 +149,9 @@ export const updatePrompt = (id: string, data: Partial<PromptTemplate>): Promise
 export const deletePrompt = (id: string) =>
   api.delete(`/prompts/${id}`).then((r) => r.data);
 
+// Sentinel value for filtering assets that have not been AI-scanned yet
+export const UNSCANNED_BUCKET_FILTER = "__unscanned__";
+
 // --- Assets ---
 export const getAssets = (params?: {
   page?: number;
