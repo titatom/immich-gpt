@@ -84,7 +84,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "login@test.com", "password": "goodpass"})
+                r = c.post("/api/auth/login", json={"username": "login@test.com", "password": "goodpass"})
 
         app.dependency_overrides.clear()
 
@@ -108,7 +108,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "bad@test.com", "password": "wrong"})
+                r = c.post("/api/auth/login", json={"username": "bad@test.com", "password": "wrong"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401
@@ -124,7 +124,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "nobody@test.com", "password": "x"})
+                r = c.post("/api/auth/login", json={"username": "nobody@test.com", "password": "x"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401
@@ -142,7 +142,7 @@ class TestLogin:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
             with TestClient(app) as c:
-                r = c.post("/api/auth/login", json={"email": "disabled@test.com", "password": "pass"})
+                r = c.post("/api/auth/login", json={"username": "disabled@test.com", "password": "pass"})
 
         app.dependency_overrides.clear()
         assert r.status_code == 401

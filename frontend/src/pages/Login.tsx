@@ -7,7 +7,7 @@ import styles from "./Login.module.css";
 export default function Login() {
   const { user, login, loading } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,13 +21,13 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(username, password);
       navigate("/", { replace: true });
     } catch (err: unknown) {
       const msg = err && typeof err === "object" && "response" in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : null;
-      setError(msg || "Invalid email or password");
+      setError(msg || "Invalid username or password");
     } finally {
       setSubmitting(false);
     }
@@ -46,17 +46,32 @@ export default function Login() {
 
         <h1 className={styles.heading}>Sign in</h1>
 
+        <div style={{
+          background: "rgba(56,189,248,0.08)",
+          border: "1px solid rgba(56,189,248,0.25)",
+          borderRadius: 8,
+          padding: "10px 12px",
+          color: "#7dd3fc",
+          fontSize: 12,
+          marginBottom: 20,
+          lineHeight: 1.5,
+        }}>
+          Default credentials: <strong>admin</strong> / <strong>admin</strong>.
+          You will be asked to set a new password after first login.
+        </div>
+
         <form onSubmit={handleSubmit}>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Email</label>
+            <label className={styles.label}>Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
               autoFocus
+              autoComplete="username"
               className={styles.input}
-              placeholder="admin@example.com"
+              placeholder="admin"
             />
           </div>
 
