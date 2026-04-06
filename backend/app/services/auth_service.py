@@ -153,9 +153,16 @@ def consume_reset_token(db: Session, raw_token: str) -> Optional[str]:
 # User login helper
 # ---------------------------------------------------------------------------
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
-    """Return User on success; None on failure."""
-    user = db.query(User).filter(User.email == email.lower().strip()).first()
+def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
+    """Return User on success; None on failure.
+
+    Accepts either a username or an email address in the ``username`` argument.
+    """
+    needle = username.strip()
+    if "@" in needle:
+        user = db.query(User).filter(User.email == needle.lower()).first()
+    else:
+        user = db.query(User).filter(User.username == needle).first()
     if not user or not user.is_active:
         return None
     if not verify_password(password, user.hashed_password):

@@ -40,8 +40,8 @@ export interface AuthUser {
   force_password_change: boolean;
 }
 
-export const login = (email: string, password: string): Promise<AuthUser> =>
-  api.post("/auth/login", { email, password }).then(r => r.data);
+export const login = (username: string, password: string): Promise<AuthUser> =>
+  api.post("/auth/login", { username, password }).then(r => r.data);
 
 export const logout = () =>
   api.post("/auth/logout").then(r => r.data);
