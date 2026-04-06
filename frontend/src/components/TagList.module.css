@@ -1,0 +1,55 @@
+@import "../styles/tokens.css";
+
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tag {
+  background: rgba(14, 165, 233, 0.09);
+  color: var(--accent);
+  border: 1px solid rgba(14, 165, 233, 0.19);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+}
+
+.removeBtn:hover {
+  color: var(--color-error);
+}
+
+.overflow {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.addInput {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  outline: none;
+  width: 100px;
+  transition: border-color var(--transition-fast);
+}
+
+.addInput:focus {
+  border-color: var(--border-focus);
+}

@@ -1,0 +1,29 @@
+@import "../styles/tokens.css";
+
+.root {
+  background: var(--bg-raised);
+  border: 1px solid var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.empty {
+  color: var(--border);
+}
+
+.lineError {
+  color: #f87171;
+}
+
+.lineSuccess {
+  color: #86efac;
+}
+
+.lineDefault {
+  color: var(--text-muted);
+}

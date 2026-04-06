@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getJob } from "../services/api";
 import LogPanel from "./LogPanel";
+import styles from "./JobDetail.module.css";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 
@@ -19,30 +20,29 @@ export default function JobDetail({ jobId }: Props) {
       return TERMINAL.has(d.status) || d.status === "paused" ? false : 2000;
     },
   });
+
   if (!job) return null;
+
+  const hasLogs = job.log_lines && job.log_lines.length > 0;
+
   return (
-    <div style={{ padding: "12px 0" }}>
-      <div style={{
-        display: "flex", gap: 16, fontSize: 12, color: "#64748b", flexWrap: "wrap",
-        marginBottom: job.log_lines && job.log_lines.length > 0 ? 12 : 0,
-      }}>
+    <div className={styles.root}>
+      <div className={[styles.stats, hasLogs ? "" : styles.statsEmpty].join(" ")}>
         {job.total_count > 0 && (
-          <span style={{ color: "#94a3b8" }}>{job.processed_count} / {job.total_count} assets</span>
+          <span className={styles.statCount}>{job.processed_count} / {job.total_count} assets</span>
         )}
         {job.success_count > 0 && (
-          <span style={{ color: "#22c55e" }}>✓ {job.success_count} succeeded</span>
+          <span className={styles.statSuccess}>✓ {job.success_count} succeeded</span>
         )}
         {job.error_count > 0 && (
-          <span style={{ color: "#ef4444" }}>✗ {job.error_count} failed</span>
+          <span className={styles.statError}>✗ {job.error_count} failed</span>
         )}
-        {job.message && (
-          <span style={{ color: "#64748b" }}>{job.message}</span>
-        )}
-        <span style={{ color: "#475569", marginLeft: "auto" }}>{Math.round(job.progress_percent)}% complete</span>
+        {job.message && <span className={styles.statMsg}>{job.message}</span>}
+        <span className={styles.statPercent}>{Math.round(job.progress_percent)}% complete</span>
       </div>
-      {job.log_lines && job.log_lines.length > 0 && (
+      {hasLogs && (
         <div>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>Log</div>
+          <div className={styles.logLabel}>Log</div>
           <LogPanel lines={job.log_lines} maxHeight={250} />
         </div>
       )}

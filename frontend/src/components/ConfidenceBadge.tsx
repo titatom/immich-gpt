@@ -1,4 +1,5 @@
 import React from "react";
+import styles from "./ConfidenceBadge.module.css";
 
 interface Props {
   confidence?: number;
@@ -13,17 +14,10 @@ export default function ConfidenceBadge({ confidence }: Props) {
     "#ef4444";
 
   return (
-    <span style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 4,
-      fontSize: 12,
-      fontWeight: 700,
-      color,
-      background: `${color}18`,
-      padding: "2px 8px",
-      borderRadius: 6,
-    }}>
+    <span
+      className={styles.badge}
+      style={{ color, background: `${color}18` }}
+    >
       {pct}%
     </span>
   );

@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from "react";
+import styles from "./LogPanel.module.css";
 
 interface Props {
   lines?: string[];
@@ -14,38 +15,19 @@ export default function LogPanel({ lines = [], maxHeight = 200 }: Props) {
     }
   }, [lines]);
 
+  function lineClass(line: string) {
+    if (line.includes("✗") || line.includes("error") || line.includes("Error")) return styles.lineError;
+    if (line.includes("✓") || line.includes("completed") || line.includes("Completed")) return styles.lineSuccess;
+    return styles.lineDefault;
+  }
+
   return (
-    <div
-      ref={ref}
-      style={{
-        background: "#0f172a",
-        border: "1px solid #1e293b",
-        borderRadius: 8,
-        padding: "12px 16px",
-        maxHeight,
-        overflowY: "auto",
-        fontFamily: "monospace",
-        fontSize: 12,
-        lineHeight: 1.6,
-        color: "#64748b",
-      }}
-    >
+    <div ref={ref} className={styles.root} style={{ maxHeight }}>
       {lines.length === 0 ? (
-        <span style={{ color: "#334155" }}>No logs yet.</span>
+        <span className={styles.empty}>No logs yet.</span>
       ) : (
         lines.map((line, i) => (
-          <div
-            key={i}
-            style={{
-              color: line.includes("✗") || line.includes("error") || line.includes("Error")
-                ? "#f87171"
-                : line.includes("✓") || line.includes("completed") || line.includes("Completed")
-                ? "#86efac"
-                : "#64748b",
-            }}
-          >
-            {line}
-          </div>
+          <div key={i} className={lineClass(line)}>{line}</div>
         ))
       )}
     </div>

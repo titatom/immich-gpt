@@ -1,0 +1,11 @@
+@import "../styles/tokens.css";
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}

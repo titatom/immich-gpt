@@ -1,0 +1,30 @@
+@import "../styles/tokens.css";
+
+.root {
+  padding: var(--space-3) 0;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.statsEmpty {
+  margin-bottom: 0;
+}
+
+.statCount { color: var(--text-secondary); }
+.statSuccess { color: var(--color-success); }
+.statError { color: var(--color-error); }
+.statPercent { color: var(--text-faint); margin-left: auto; }
+.statMsg { color: var(--text-muted); }
+
+.logLabel {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
