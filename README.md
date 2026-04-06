@@ -1,75 +1,87 @@
 # immich-gpt
 
-> AI-assisted metadata enrichment and review for Immich.
+> Turn your Immich library into something you can actually browse, search, and clean up without handing the steering wheel to AI.
 
-`immich-gpt` connects to your Immich library, sends thumbnails and metadata to an AI provider, and stages the resulting bucket, description, and tag suggestions for human review before anything is written back.
+`immich-gpt` is a self-hosted review workflow for Immich. It syncs your assets, asks AI to suggest buckets, descriptions, and tags, then puts every suggestion in front of you before anything gets written back.
 
-## Highlights
+It is built for people who like smart automation, but still want veto power.
 
-- Sync assets from Immich without exposing your Immich credentials to the AI provider
-- Classify assets into editable buckets and generate descriptions and tags
-- Review every suggestion before write-back
-- Track long-running sync/classification jobs in the web UI
-- Run as a simple single-container app by default, or with Redis + a dedicated worker for higher throughput
+## Why this repo is useful
 
-## How it works
+Immich is great at storing your photos. `immich-gpt` helps with the messy part after that:
 
-1. Sign in to the web app.
-2. Add or confirm your Immich connection and AI provider settings.
-3. Sync assets from Immich.
-4. Run AI classification jobs.
-5. Review, edit, approve, or reject suggestions.
-6. Write approved metadata back to Immich.
+- turning a giant camera-roll backlog into something categorized
+- adding descriptions and tags without editing every asset by hand
+- spotting low-value shots without auto-deleting anything
+- keeping Immich credentials server-side instead of sending them to the AI provider
+- giving you a human-in-the-loop review queue instead of "hope the bot got it right"
 
-Nothing is written automatically. Review stays in the loop.
+## Why it feels safe
 
-## Deployment modes
+- Nothing is written back automatically
+- Every suggestion can be reviewed, edited, approved, or rejected
+- `Trash` is non-destructive
+- Thumbnails are fetched server-side, so raw Immich URLs and credentials stay private
 
-### Single-container mode (default)
+This is the "AI assistant, not AI intern with production access" version of photo organization.
 
-- One container
-- No Redis required
-- Background jobs run in-process via `ThreadPoolExecutor`
-- Best fit for home servers, Unraid, Synology, and local evaluation
+## What you get
 
-Start it with plain `docker compose up -d`.
+- Bucket suggestions for assets like Documents, Business, Personal, and Trash
+- AI-generated descriptions and tags
+- A review queue built for fast approve/edit/reject workflows
+- Job progress in the UI for sync and classification runs
+- A simple single-container Docker deployment by default
+- An optional Redis + worker setup for larger libraries and heavier workloads
+
+## Pick your deployment style
+
+### Single-container mode (recommended)
+
+One container, no Redis, no worker to babysit.
+
+- best for home servers, Unraid, Synology, Portainer, and quick trials
+- background jobs run in-process via `ThreadPoolExecutor`
+- started with plain `docker compose up -d`
 
 ### Full-stack mode
 
-- Separate API container
-- Separate worker container
-- Redis-backed job queue
-- Better fit for larger libraries or heavier sustained workloads
+Separate API, worker, and Redis containers.
 
-Start it with `docker compose --profile full up -d`.
+- better when you classify large libraries regularly
+- useful when you want a dedicated worker process
+- started with `docker compose --profile full up -d`
 
-More deployment examples are in `DOCKER.md`.
+`DOCKER.md` has the deeper deployment guide, including Unraid, manual `docker run`, volumes, and upgrades.
 
 ## Quick start
 
-### 1. Create your env file
+### 1. Copy the starter env file
 
 ```bash
 cp .env.example .env
 ```
 
-### 2. Edit the required values
+### 2. Fill in the important values
 
-At minimum, set:
+Required on a fresh install:
 
-- `IMMICH_URL`
-- `IMMICH_API_KEY`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 
-Optional but usually useful on day one:
+Usually required before your first real sync:
+
+- `IMMICH_URL`
+- `IMMICH_API_KEY`
+
+Optional, but useful if you want OpenAI working immediately:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 
-The admin bootstrap values are important on a fresh database. If no users exist yet, the backend creates that first admin account automatically on startup.
+On a brand-new database, the backend uses `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_USERNAME` to create your first admin user automatically.
 
-### 3. Build or pull the app image
+### 3. Build or pull the image
 
 Build locally:
 
@@ -77,39 +89,52 @@ Build locally:
 docker build -f Dockerfile.unraid -t immich-gpt:latest .
 ```
 
-Or use the published image:
+Or pull the published image:
 
 ```bash
 docker pull ghcr.io/titatom/immich-gpt:latest
 docker tag ghcr.io/titatom/immich-gpt:latest immich-gpt:latest
 ```
 
-### 4. Start the app
+### 4. Start it
 
-Single-container mode:
+Recommended single-container launch:
 
 ```bash
 docker compose up -d
 ```
 
-Full-stack mode:
+Higher-throughput full-stack launch:
 
 ```bash
 docker compose --profile full up -d
 ```
 
-### 5. Sign in and run your first job
+### 5. Open the app and do the fun part
 
 1. Open `http://localhost:8000`
-2. Sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`
-3. Go to `Settings` if you want to finish configuring Immich or the AI provider in the UI
+2. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+3. Go to `Settings` if you want to finish configuring Immich or your AI provider in the UI
 4. Go to `Dashboard` and run `Sync Assets`
 5. Start `Run AI Classification`
-6. Review results in `Review`
+6. Open `Review` and start approving, editing, or rejecting suggestions
+
+## First-run experience
+
+If you just want to see the app come to life quickly:
+
+1. boot the single-container version
+2. sign in with the bootstrap admin account
+3. add your Immich connection
+4. kick off a sync
+5. let the AI make suggestions
+6. keep the good ones, fix the weird ones, reject the bad ones
+
+That is the core loop, and it is the whole point of the project.
 
 ## Environment variables
 
-`README` lists the most important variables; `.env.example` contains the full starter file with comments.
+The README covers the high-value knobs. `.env.example` includes the full commented starter config.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -123,9 +148,23 @@ docker compose --profile full up -d
 | `APP_PORT` | `8000` | Host port published by Docker Compose |
 | `WORKER_CONCURRENCY` | `2` | In-process worker threads in single-container mode |
 | `REDIS_URL` | empty | Enable Redis/RQ mode for custom or multi-process deployments |
-| `DATABASE_URL` | `sqlite:///./data/immich_gpt.db` | Backend DB URL for local/custom runs |
+| `DATABASE_URL` | `sqlite:///./data/immich_gpt.db` | Backend DB URL for local or custom runs |
 | `AUTH_ENABLED` | `false` | Optional extra Bearer-token gate on API requests |
-| `SECRET_KEY` | `change-me-in-production` | Secret for tokens and optional Bearer-token gate |
+| `SECRET_KEY` | `change-me-in-production` | Secret for tokens and the optional Bearer-token gate |
+
+## Data and storage
+
+The Docker deployment stores app state in `/data`.
+
+That includes:
+
+- the SQLite database
+- saved settings
+- prompt templates
+- review decisions
+- AI suggestions
+
+Back up `/data` if you care about your curation work.
 
 ## Local development
 
@@ -139,7 +178,7 @@ export PATH="$HOME/.local/bin:$PATH"
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-For local single-process development, leave `REDIS_URL` empty. If you want Redis-backed jobs locally, start Redis and the RQ worker separately.
+Leave `REDIS_URL` empty for simple local development. If you want Redis-backed jobs locally, start Redis and the RQ worker separately.
 
 ### Frontend
 
@@ -169,21 +208,6 @@ npm run lint
 npx tsc --noEmit
 ```
 
-## API surface
-
-Key endpoints:
-
-- `GET /api/health`
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET/POST /api/settings/immich`
-- `GET/POST /api/settings/providers`
-- `POST /api/jobs/sync`
-- `POST /api/jobs/classify`
-- `GET /api/review/queue`
-- `POST /api/review/item/{id}/approve`
-- `POST /api/review/item/{id}/reject`
-
 ## Default buckets
 
 | Bucket | Purpose |
@@ -193,7 +217,17 @@ Key endpoints:
 | Personal | Family, travel, events, and daily life |
 | Trash | Blurry, accidental, or low-value shots |
 
-`Trash` is non-destructive. Nothing is deleted automatically.
+`Trash` is still just a suggestion bucket. Nothing is deleted automatically.
+
+## More Docker details
+
+See `DOCKER.md` for:
+
+- Unraid and home-server deployment notes
+- manual `docker run` examples
+- full-stack Redis/worker setup
+- image build details
+- upgrade commands
 
 ## Roadmap
 
