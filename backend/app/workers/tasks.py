@@ -43,7 +43,11 @@ def run_asset_sync(
         from ..models.job_run import JobRun as _JobRun
 
         job_svc = JobProgressService(db)
-        job_svc.reset_for_retry(job_id)
+        # Only reset counters for RQ automatic retries (job is in "failed" state).
+        # For user-initiated resumes the job is already "queued" — preserve prior progress.
+        current_job = job_svc.get_job(job_id)
+        if current_job and current_job.status == "failed":
+            job_svc.reset_for_retry(job_id)
         job_svc.start_job(job_id)
 
         scope_label = {

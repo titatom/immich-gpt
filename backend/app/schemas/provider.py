@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, ConfigDict
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, Dict
 from datetime import datetime
 
@@ -38,7 +38,7 @@ class ProviderConfigOut(BaseModel):
 
 class ImmichSettingsUpdate(BaseModel):
     immich_url: str
-    immich_api_key: str
+    immich_api_key: Optional[str] = None
 
 
 class ImmichSettingsOut(BaseModel):
