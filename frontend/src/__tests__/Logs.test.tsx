@@ -69,9 +69,9 @@ describe("Logs page", () => {
     await waitFor(() => expect(screen.getByText("Logs")).toBeInTheDocument());
     expect(screen.getByText("Recent job output")).toBeInTheDocument();
     expect(screen.getByText("Activity log")).toBeInTheDocument();
-    expect(screen.getByText("writeback_description")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("writeback_description")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByText("Classification job"));
+    await userEvent.click(await screen.findByText("Classification job"));
 
     await waitFor(() => expect(screen.getByText("[12:00:00] Starting classification")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Show matching activity" })).toBeInTheDocument();
