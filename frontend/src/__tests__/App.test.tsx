@@ -95,6 +95,7 @@ describe("App routing", () => {
     expect(screen.getAllByText("Review").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -160,6 +161,6 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getAllByText("Audit Logs").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1));
   });
 });
