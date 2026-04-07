@@ -16,7 +16,7 @@ const navItems = [
   { path: "/buckets", label: "Buckets", icon: FolderKanban },
   { path: "/prompts", label: "Prompts", icon: MessageSquare },
   { path: "/jobs", label: "Jobs", icon: Activity },
-  { path: "/logs", label: "Audit Logs", icon: ClipboardList },
+  { path: "/logs", label: "Logs", icon: ClipboardList },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 
