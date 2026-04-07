@@ -192,25 +192,28 @@ class ClassificationOrchestrator:
                 log_line=f"  Warning: image prep failed ({e}), proceeding without image",
             )
 
-        # Step 2: assemble prompt
+        # Step 2: assemble prompt (single pass — record reuses the already-built messages)
         self.job_service.update_progress(job_id, status="classifying_ai")
         messages = self.prompt_service.assemble_classification_messages(
             metadata, buckets,
             available_tags=available_tags,
             available_albums=available_albums,
         )
-        prompt_record = self.prompt_service.get_assembled_prompt_record(
-            metadata, buckets,
-            available_tags=available_tags,
-            available_albums=available_albums,
-        )
+        prompt_record = {
+            "messages": messages,
+            "bucket_names": [b.name for b in buckets if b.enabled],
+            "metadata_summary": self.prompt_service._build_metadata_summary(metadata),
+        }
 
         # Step 3: AI call
+        _model_attr = getattr(self.provider, "model", None) or getattr(self.provider, "_model", None)
+        model_name = _model_attr if isinstance(_model_attr, str) else None
         prompt_run = PromptRun(
             id=str(uuid.uuid4()),
             asset_id=asset.id,
             job_run_id=job_id,
             provider_name=self.provider.provider_name,
+            model_name=model_name,
             assembled_prompt_json=prompt_record,
             status="pending",
         )
@@ -288,13 +291,16 @@ class ClassificationOrchestrator:
         bucket: Optional[Bucket],
         prompt_run_id: str,
     ) -> None:
-        # Remove any previous pending suggestions for this asset
+        # Remove any previous pending suggestions for this asset.
+        # Only delete metadata that has never been written back (writeback_status == "pending"),
+        # so that previously approved/written metadata is preserved.
         self.db.query(SuggestedClassification).filter(
             SuggestedClassification.asset_id == asset.id,
             SuggestedClassification.status == "pending_review",
         ).delete()
         self.db.query(SuggestedMetadata).filter(
             SuggestedMetadata.asset_id == asset.id,
+            SuggestedMetadata.writeback_status == "pending",
         ).delete()
 
         classification = SuggestedClassification(

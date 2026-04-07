@@ -1,6 +1,7 @@
 import uuid
 import json
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from ..models.job_run import JobRun
 from ..schemas.job import JobRunOut, JobStartResponse, SyncJobRequest
 from ..services.job_progress import JobProgressService
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -49,7 +52,11 @@ def _enqueue(fn, *args):
             q.enqueue(fn, *args, retry=Retry(max=3, interval=[10, 30, 60]))
             return
         except Exception:
-            pass
+            logger.warning(
+                "Redis enqueue failed (REDIS_URL=%s); falling back to in-process executor.",
+                settings.REDIS_URL,
+                exc_info=True,
+            )
     from ..workers.executor import submit
     submit(fn, *args)
 

@@ -259,7 +259,14 @@ class OllamaProvider(AIProvider):
         # Strip markdown code fences some models add even in JSON mode
         stripped = raw.strip()
         if stripped.startswith("```"):
-            stripped = stripped.lstrip("`").lstrip("json").strip()
+            stripped = stripped[3:]  # remove opening ```
+            # Remove optional language tag (json, JSON, etc.) on the same line
+            newline = stripped.find("\n")
+            if newline != -1:
+                lang_tag = stripped[:newline].strip().lower()
+                if lang_tag in ("json", ""):
+                    stripped = stripped[newline + 1:]
+            stripped = stripped.strip()
             if stripped.endswith("```"):
                 stripped = stripped[:-3].strip()
 
@@ -361,7 +368,14 @@ class OpenRouterProvider(AIProvider):
         # Strip markdown fences some models include
         stripped = raw.strip()
         if stripped.startswith("```"):
-            stripped = stripped.lstrip("`").lstrip("json").strip()
+            stripped = stripped[3:]  # remove opening ```
+            # Remove optional language tag (json, JSON, etc.) on the same line
+            newline = stripped.find("\n")
+            if newline != -1:
+                lang_tag = stripped[:newline].strip().lower()
+                if lang_tag in ("json", ""):
+                    stripped = stripped[newline + 1:]
+            stripped = stripped.strip()
             if stripped.endswith("```"):
                 stripped = stripped[:-3].strip()
 

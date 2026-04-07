@@ -91,6 +91,8 @@ class ImagePreparationService:
 
             buf = io.BytesIO()
             save_fmt = "JPEG" if fmt not in {"PNG", "GIF", "WEBP"} else fmt
+            # Keep MIME type in sync with the actual saved format
+            mime_type = f"image/{save_fmt.lower()}"
             img.save(buf, format=save_fmt, quality=85)
             return mime_type, buf.getvalue()
 

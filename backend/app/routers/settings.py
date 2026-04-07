@@ -73,8 +73,11 @@ def save_immich_settings(
     _set_setting(db, current_user.id, _KEY_IMMICH_URL, body.immich_url)
     if body.immich_api_key:
         _set_setting(db, current_user.id, _KEY_IMMICH_API_KEY, body.immich_api_key)
+    # Re-read credentials so the connectivity test always uses the stored (possibly
+    # previously saved) API key even when none was submitted in this request.
+    _, effective_api_key = _get_immich_credentials(db, current_user.id)
     try:
-        client = ImmichClient(body.immich_url, body.immich_api_key)
+        client = ImmichClient(body.immich_url, effective_api_key)
         client.check_connectivity()
         count = client.get_asset_count()
         return ImmichSettingsOut(immich_url=body.immich_url, connected=True, asset_count=count)
