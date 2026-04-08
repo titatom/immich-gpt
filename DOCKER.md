@@ -42,7 +42,7 @@ docker run -d \
 ### Docker Compose
 
 ```bash
-cp .env.example .env   # fill in DATA_DIR, IMMICH_URL, IMMICH_API_KEY at minimum
+cp .env.example .env   # fill in DATA_DIR, ADMIN_EMAIL, ADMIN_PASSWORD, IMMICH_URL, IMMICH_API_KEY
 docker compose up -d
 ```
 
