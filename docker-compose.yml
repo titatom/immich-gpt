@@ -47,10 +47,11 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       # ── Authentication ─────────────────────────────────────────────────
       # Admin bootstrap: creates the first admin account on startup (if none
-      # exist). The admin must change the password on first login.
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      # exist) only when explicit credentials are configured. The bootstrap
+      # account must change the password on first login.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       # Cryptographic key for signing session cookies. Change this in
       # production — any long random string works.
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}

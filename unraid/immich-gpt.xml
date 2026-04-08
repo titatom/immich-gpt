@@ -74,38 +74,38 @@
   <Config
     Name="Admin Email"
     Target="ADMIN_EMAIL"
-    Default="admin"
+    Default=""
     Mode=""
-    Description="Login identifier (email or username) for the admin account created automatically on first startup. Defaults to 'admin' if left blank. You will use this to log in for the first time."
+    Description="Login email for the admin account created automatically on first startup. Required for a fresh install; no default admin account is created if this is left blank."
     Type="Variable"
     Display="always"
     Required="false"
     Mask="false"
-  >admin</Config>
+  ></Config>
 
   <Config
     Name="Admin Password"
     Target="ADMIN_PASSWORD"
-    Default="admin"
+    Default=""
     Mode=""
-    Description="Initial password for the admin account. Defaults to 'admin' if left blank, and you will be forced to change it on first login."
+    Description="Initial password for the admin account. Required for a fresh install and must be at least 8 characters. The admin will be forced to change it on first login."
     Type="Variable"
     Display="always"
     Required="false"
     Mask="true"
-  >admin</Config>
+  ></Config>
 
   <Config
     Name="Admin Username"
     Target="ADMIN_USERNAME"
-    Default="admin"
+    Default=""
     Mode=""
-    Description="Username for the auto-created admin account. Defaults to 'admin' if left blank."
+    Description="Optional username for the auto-created admin account. Leave blank to reuse Admin Email as the login username."
     Type="Variable"
     Display="advanced"
     Required="false"
     Mask="false"
-  >admin</Config>
+  ></Config>
 
   <Config
     Name="Skip Admin Bootstrap"

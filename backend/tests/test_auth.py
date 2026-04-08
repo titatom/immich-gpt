@@ -150,7 +150,7 @@ def test_login_sets_session_cookie(raw_client):
 
 
 # ---------------------------------------------------------------------------
-# Bootstrap / default credentials
+# Bootstrap / first-start credentials
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -171,25 +171,35 @@ def empty_db():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_bootstrap_admin_admin(empty_db):
-    """ensure_admin_exists with default admin/admin creates a working account."""
+def test_bootstrap_admin_with_explicit_credentials(empty_db):
+    """ensure_admin_exists creates a working admin when explicit creds are supplied."""
     from app.services.user_service import ensure_admin_exists
     from app.services.auth_service import authenticate_user
 
-    ensure_admin_exists(empty_db, email="admin", password="admin", username="admin")
+    ensure_admin_exists(
+        empty_db,
+        email="owner@example.com",
+        password="strongpass123",
+        username="owner",
+    )
 
-    user = authenticate_user(empty_db, "admin", "admin")
+    user = authenticate_user(empty_db, "owner", "strongpass123")
     assert user is not None
-    assert user.username == "admin"
+    assert user.username == "owner"
     assert user.role == "admin"
     assert user.force_password_change is True
 
 
 def test_bootstrap_admin_login_via_api(empty_db):
-    """Full HTTP login with admin/admin credentials after bootstrap."""
+    """Full HTTP login works with explicit bootstrap credentials."""
     from app.services.user_service import ensure_admin_exists
 
-    ensure_admin_exists(empty_db, email="admin", password="admin", username="admin")
+    ensure_admin_exists(
+        empty_db,
+        email="owner@example.com",
+        password="strongpass123",
+        username="owner",
+    )
 
     def override_get_db():
         try:
@@ -201,49 +211,79 @@ def test_bootstrap_admin_login_via_api(empty_db):
 
     with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
         with TestClient(app, raise_server_exceptions=True) as c:
-            resp = c.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+            resp = c.post("/api/auth/login", json={"username": "owner", "password": "strongpass123"})
 
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["username"] == "admin"
+    assert data["username"] == "owner"
     assert data["force_password_change"] is True
 
 
 # ---------------------------------------------------------------------------
-# Empty-env-var fallback (Unraid / Docker blank placeholder regression)
+# Missing / weak bootstrap credentials
 # ---------------------------------------------------------------------------
 
-def test_bootstrap_admin_empty_email_falls_back(empty_db):
-    """_bootstrap_admin falls back to admin/admin/admin when env vars are empty strings.
-
-    This is the regression test for the Unraid CA template shipping
-    ADMIN_EMAIL="" and ADMIN_PASSWORD="" as blank Docker env vars, which
-    previously caused the bootstrap to skip entirely and left the UI locked
-    on first boot.
-    """
+def test_bootstrap_admin_missing_credentials_fail_closed(empty_db):
+    """_bootstrap_admin must not create a default admin when creds are missing."""
     from app.main import _bootstrap_admin
     from app.services.auth_service import authenticate_user
     from app.models.user import User
 
-    # Patch the settings object used inside _bootstrap_admin, and redirect
-    # SessionLocal (imported lazily inside the function) to our empty_db.
     mock_settings = type("S", (), {
         "ADMIN_SKIP_BOOTSTRAP": False,
-        "ADMIN_EMAIL": "",      # blank — simulates empty Docker env var
-        "ADMIN_PASSWORD": "",   # blank
-        "ADMIN_USERNAME": "",   # blank
+        "ADMIN_EMAIL": "",
+        "ADMIN_PASSWORD": "",
+        "ADMIN_USERNAME": "",
     })()
 
     with patch("app.main.app_settings", mock_settings), \
          patch("app.database.SessionLocal", return_value=empty_db):
         _bootstrap_admin()
 
-    # The fallback should have created admin/admin
-    user = authenticate_user(empty_db, "admin", "admin")
-    assert user is not None, "admin/admin must work after bootstrap with empty env vars"
-    assert user.role == "admin"
+    assert empty_db.query(User).count() == 0
+    assert authenticate_user(empty_db, "admin", "admin") is None
+
+
+def test_bootstrap_admin_short_password_fail_closed(empty_db):
+    """_bootstrap_admin must reject bootstrap passwords shorter than 8 chars."""
+    from app.main import _bootstrap_admin
+    from app.models.user import User
+
+    mock_settings = type("S", (), {
+        "ADMIN_SKIP_BOOTSTRAP": False,
+        "ADMIN_EMAIL": "owner@example.com",
+        "ADMIN_PASSWORD": "short",
+        "ADMIN_USERNAME": "owner",
+    })()
+
+    with patch("app.main.app_settings", mock_settings), \
+         patch("app.database.SessionLocal", return_value=empty_db):
+        _bootstrap_admin()
+
+    assert empty_db.query(User).count() == 0
+
+
+def test_bootstrap_admin_username_defaults_to_email(empty_db):
+    """ADMIN_USERNAME may be blank; bootstrap falls back to ADMIN_EMAIL."""
+    from app.main import _bootstrap_admin
+    from app.services.auth_service import authenticate_user
+
+    mock_settings = type("S", (), {
+        "ADMIN_SKIP_BOOTSTRAP": False,
+        "ADMIN_EMAIL": "owner@example.com",
+        "ADMIN_PASSWORD": "strongpass123",
+        "ADMIN_USERNAME": "",
+    })()
+
+    with patch("app.main.app_settings", mock_settings), \
+         patch("app.database.SessionLocal", return_value=empty_db):
+        _bootstrap_admin()
+
+    user = authenticate_user(empty_db, "owner@example.com", "strongpass123")
+    assert user is not None
+    assert user.username == "owner@example.com"
 
 
 def test_bootstrap_admin_skip_flag(empty_db):

@@ -48,13 +48,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = ""
 
     # Admin bootstrap: credentials used when no users exist on startup.
-    # Defaults to admin / admin so a fresh install is immediately usable.
-    # The user is forced to change the password on first login.
-    # Empty strings are treated as "not configured" — built-in defaults apply.
+    # These must be configured explicitly for a fresh install; otherwise
+    # bootstrap is skipped and the app logs a warning instead of creating
+    # a predictable default admin account.
+    # ADMIN_USERNAME is optional and falls back to ADMIN_EMAIL when blank.
     # Set ADMIN_SKIP_BOOTSTRAP=true to suppress auto-creation entirely.
-    ADMIN_EMAIL: str = "admin"
-    ADMIN_PASSWORD: str = "admin"
-    ADMIN_USERNAME: str = "admin"
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+    ADMIN_USERNAME: str = ""
     ADMIN_SKIP_BOOTSTRAP: bool = False
 
     @property

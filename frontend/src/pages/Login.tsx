@@ -56,8 +56,8 @@ export default function Login() {
           marginBottom: 20,
           lineHeight: 1.5,
         }}>
-          Default credentials: <strong>admin</strong> / <strong>admin</strong>.
-          You will be asked to set a new password after first login.
+          Use the admin credentials configured before first start.
+          First-boot accounts are asked to set a new password after sign-in.
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -71,7 +71,7 @@ export default function Login() {
               autoFocus
               autoComplete="username"
               className={styles.input}
-              placeholder="admin"
+              placeholder="your username or email"
             />
           </div>
 

@@ -29,6 +29,19 @@ _SECRET_KEY_WARNING = """
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
+_ADMIN_BOOTSTRAP_WARNING = """
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚠  ADMIN BOOTSTRAP SKIPPED                                    ║
+║                                                                  ║
+║  No users exist yet, but ADMIN_EMAIL or ADMIN_PASSWORD is       ║
+║  missing/invalid. Set explicit bootstrap credentials before     ║
+║  first start instead of relying on a default admin account.     ║
+║                                                                  ║
+║  Required: ADMIN_EMAIL, ADMIN_PASSWORD                          ║
+║  Optional: ADMIN_USERNAME (falls back to ADMIN_EMAIL)           ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,22 +53,25 @@ async def lifespan(app: FastAPI):
 
 
 def _bootstrap_admin() -> None:
-    """Create the default admin account from env vars if no users exist.
-
-    Empty ADMIN_EMAIL / ADMIN_PASSWORD values fall back to the built-in
-    'admin'/'admin' defaults so that a vanilla first boot (or a Docker
-    template that ships blank placeholders) is always usable out of the box.
-    Set ADMIN_SKIP_BOOTSTRAP=true to suppress auto-creation entirely.
-    """
+    """Create the first admin account from explicit env vars if configured."""
     if app_settings.ADMIN_SKIP_BOOTSTRAP:
         return
-    email = app_settings.ADMIN_EMAIL.strip() or "admin"
-    password = app_settings.ADMIN_PASSWORD.strip() or "admin"
-    username = app_settings.ADMIN_USERNAME.strip() or "admin"
     from .database import SessionLocal
+    from .models.user import User
     from .services.user_service import ensure_admin_exists
     db = SessionLocal()
     try:
+        if db.query(User).count() != 0:
+            return
+
+        email = app_settings.ADMIN_EMAIL.strip()
+        password = app_settings.ADMIN_PASSWORD.strip()
+        username = app_settings.ADMIN_USERNAME.strip() or email
+
+        if not email or len(password) < 8:
+            logger.warning(_ADMIN_BOOTSTRAP_WARNING)
+            return
+
         ensure_admin_exists(db, email=email, password=password, username=username)
     finally:
         db.close()
