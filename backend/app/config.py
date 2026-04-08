@@ -1,8 +1,19 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
-from typing import Optional, List
+from typing import List
 
+# Minimum acceptable length for SECRET_KEY (256-bit entropy when hex-encoded).
+_SECRET_KEY_MIN_LENGTH = 32
 
-_DEFAULT_SECRET_KEY = "change-me-in-production"
+# Well-known placeholder values that must never be used in production.
+_WEAK_SECRET_KEYS = {
+    "change-me-in-production",
+    "secret",
+    "changeme",
+    "insecure",
+    "dev",
+    "",
+}
 
 
 class Settings(BaseSettings):
@@ -11,22 +22,20 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.2.0"
     DEBUG: bool = False
 
-    # Database — PostgreSQL recommended for production; SQLite for dev/test
+    # Database — PostgreSQL required for production; SQLite supported for dev/test only.
     DATABASE_URL: str = "sqlite:///./data/immich_gpt.db"
 
     # Redis / RQ
-    # Set to empty string "" to disable Redis entirely and use the built-in
-    # in-process thread-pool executor (suitable for single-container dev only).
     REDIS_URL: str = ""
 
     # Worker concurrency for the in-process executor (ignored when Redis is used)
     WORKER_CONCURRENCY: int = 2
 
-    # Immich (legacy env-var fallback for single-user dev setups only)
+    # Immich
     IMMICH_URL: str = ""
     IMMICH_API_KEY: str = ""
 
-    # OpenAI (legacy env-var fallback)
+    # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
 
@@ -34,18 +43,36 @@ class Settings(BaseSettings):
     MAX_IMAGE_BYTES: int = 20 * 1024 * 1024  # 20 MB
     THUMBNAIL_SIZE: tuple = (512, 512)
 
-    # Session cookie
+    # Session cookie — secure=True and samesite=strict are the secure defaults.
+    # Override SESSION_COOKIE_SECURE=false only when running behind a plain HTTP
+    # reverse proxy that is not Internet-exposed (e.g. local dev).
     SESSION_COOKIE_NAME: str = "session_id"
-    SESSION_COOKIE_SECURE: bool = False  # Set True in production (HTTPS)
-    SESSION_COOKIE_SAMESITE: str = "lax"
+    SESSION_COOKIE_SECURE: bool = True
+    SESSION_COOKIE_SAMESITE: str = "strict"
 
-    # Secret used for signing tokens / CSRF (must be changed in production)
-    SECRET_KEY: str = _DEFAULT_SECRET_KEY
+    # Secret key used for signing session tokens.
+    # Must be set explicitly to a strong random value.
+    # Generate with:  python -c "import secrets; print(secrets.token_hex(32))"
+    SECRET_KEY: str = ""
 
     # CORS — comma-separated list of allowed origins, e.g. "http://localhost:3000,https://myapp.example.com"
-    # Set to "*" only in local dev where credentials are not used.
-    # When left empty the default tightens to same-origin only (no explicit CORS headers).
     CORS_ORIGINS: str = ""
+
+    @model_validator(mode="after")
+    def _validate_secret_key(self) -> "Settings":
+        key = self.SECRET_KEY
+        if key in _WEAK_SECRET_KEYS:
+            raise ValueError(
+                "SECRET_KEY is not set or uses a known weak placeholder. "
+                "Set a strong random value in your .env or environment. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        if len(key) < _SECRET_KEY_MIN_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be at least {_SECRET_KEY_MIN_LENGTH} characters long. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return self
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -53,10 +80,6 @@ class Settings(BaseSettings):
         if not self.CORS_ORIGINS:
             return []
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
-
-    @property
-    def secret_key_is_default(self) -> bool:
-        return self.SECRET_KEY == _DEFAULT_SECRET_KEY
 
     class Config:
         env_file = ".env"

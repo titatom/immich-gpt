@@ -18,7 +18,7 @@ immich-gpt is a self-hosted web app with a Python/FastAPI backend and React/Type
 ### Running tests
 
 ```bash
-# Backend (155 tests — all use in-memory SQLite, no external services required)
+# Backend (238 tests — all use in-memory SQLite, no external services required)
 cd backend && python3 -m pytest tests/ -v
 
 # Frontend (48 tests — Vitest + React Testing Library, jsdom)
@@ -64,6 +64,8 @@ cd frontend && npx vite build
 ### Key gotchas
 
 - The `pip install` bin directory (`~/.local/bin`) must be on `PATH` for `uvicorn`, `pytest`, `alembic`, etc. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
+- **`SECRET_KEY` is required and validated at startup.** The app refuses to start without a non-empty, non-placeholder key of at least 32 characters. Generate one with: `python -c "import secrets; print(secrets.token_hex(32))"`. Tests inject this automatically via `backend/conftest.py`.
+- **Session cookies default to `secure=True` and `samesite=strict`.** Set `SESSION_COOKIE_SECURE=false` only when running behind a plain HTTP reverse proxy in a non-Internet-exposed environment (e.g. local dev).
 - Redis is **optional**. Set `REDIS_URL=""` (or leave unset) and jobs run in-process via `ThreadPoolExecutor`. Only set `REDIS_URL` when using the full multi-container stack.
 - The backend `config.py` reads `.env` from CWD, so run the backend from `backend/` directory.
 - External services (Immich server, OpenAI API) require secrets (`IMMICH_URL`, `IMMICH_API_KEY`, `OPENAI_API_KEY`) but are not needed for tests or basic UI development.

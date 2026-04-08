@@ -17,23 +17,9 @@ from .config import settings as app_settings
 
 logger = logging.getLogger(__name__)
 
-_SECRET_KEY_WARNING = """
-╔══════════════════════════════════════════════════════════════════╗
-║  ⚠  SECURITY WARNING: SECRET_KEY is set to the default value.  ║
-║                                                                  ║
-║  Session tokens can be forged with this key.                    ║
-║  Set a strong random SECRET_KEY in your .env or environment     ║
-║  before exposing this service to any network.                   ║
-║                                                                  ║
-║  Generate one with:  python -c "import secrets; print(secrets.token_hex(32))"  ║
-╚══════════════════════════════════════════════════════════════════╝
-"""
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if app_settings.secret_key_is_default:
-        logger.warning(_SECRET_KEY_WARNING)
     init_db()
     yield
 
