@@ -18,7 +18,7 @@ Search for **Immich GPT** in the CA plugin.  The template pre-fills all required
 |-------|-------|
 | **Data Directory** | `/mnt/user/appdata/immich-gpt` |
 | **Admin Email** | `your-admin@example.com` |
-| **Admin Password** | `choose-a-strong-password` *(minimum 8 characters; you will be forced to change it on first login)* |
+| **Admin Password** | `choose-a-strong-password` *(minimum 8 characters)* |
 | **Immich URL** | `http://192.168.1.x:2283` *(can also be set in the UI after first login)* |
 | **Immich API Key** | *(create in Immich → Account → API Keys — can also be set in the UI)* |
 
@@ -56,9 +56,8 @@ docker compose up -d
 
 1. Open `http://your-server:8000` in a browser.
 2. Sign in with the bootstrap credentials you set via environment variables before first start.
-3. You will be prompted to **change your password** immediately — this is enforced for all admin-bootstrapped accounts.
-4. Once logged in, go to **Settings → Immich Connection** to configure your Immich URL and API key if you did not set them via environment variables.
-5. Create additional user accounts via **Users** (admin sidebar link).
+3. Once logged in, go to **Settings → Immich Connection** to configure your Immich URL and API key if you did not set them via environment variables.
+4. Create additional user accounts via **Users** (admin sidebar link).
 
 If no users exist and `ADMIN_EMAIL` / `ADMIN_PASSWORD` are missing, Immich GPT skips bootstrap and logs a startup warning instead of creating a default admin account.
 
@@ -128,7 +127,7 @@ DATA_DIR=/mnt/user/appdata/immich-gpt   # Unraid default
 |----------|---------|-------------|
 | `DATA_DIR` | `/mnt/user/appdata/immich-gpt` | Host path bind-mounted to `/data` (Compose only) |
 | `ADMIN_EMAIL` | *(empty)* | Login email for the auto-created admin account on first startup; required for a fresh install |
-| `ADMIN_PASSWORD` | *(empty)* | Initial password for the admin account (minimum 8 characters, forced change on first login); required for a fresh install |
+| `ADMIN_PASSWORD` | *(empty)* | Initial password for the admin account (minimum 8 characters); required for a fresh install |
 | `ADMIN_USERNAME` | *(empty)* | Optional username for the auto-created admin account; falls back to `ADMIN_EMAIL` when blank |
 | `SECRET_KEY` | `change-me-in-production` | Cryptographic key for signing session cookies — change before going to production |
 | `SESSION_COOKIE_SECURE` | `false` | Set `true` when running behind HTTPS (internet-exposed) |

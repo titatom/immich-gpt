@@ -47,8 +47,7 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       # ── Authentication ─────────────────────────────────────────────────
       # Admin bootstrap: creates the first admin account on startup (if none
-      # exist) only when explicit credentials are configured. The bootstrap
-      # account must change the password on first login.
+      # exist) only when explicit credentials are configured.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}

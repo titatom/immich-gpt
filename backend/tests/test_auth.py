@@ -187,7 +187,7 @@ def test_bootstrap_admin_with_explicit_credentials(empty_db):
     assert user is not None
     assert user.username == "owner"
     assert user.role == "admin"
-    assert user.force_password_change is True
+    assert user.force_password_change is False
 
 
 def test_bootstrap_admin_login_via_api(empty_db):
@@ -218,7 +218,7 @@ def test_bootstrap_admin_login_via_api(empty_db):
     assert resp.status_code == 200
     data = resp.json()
     assert data["username"] == "owner"
-    assert data["force_password_change"] is True
+    assert data["force_password_change"] is False
 
 
 # ---------------------------------------------------------------------------

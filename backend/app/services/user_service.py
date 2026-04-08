@@ -174,7 +174,7 @@ def ensure_admin_exists(db: Session, email: str, password: str, username: str = 
             username=username,
             password=password,
             role="admin",
-            force_password_change=True,
+            force_password_change=False,
         )
 
 

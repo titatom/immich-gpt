@@ -57,7 +57,7 @@ export default function Login() {
           lineHeight: 1.5,
         }}>
           Use the admin credentials configured before first start.
-          First-boot accounts are asked to set a new password after sign-in.
+          Bootstrap accounts can sign in immediately once those credentials are set.
         </div>
 
         <form onSubmit={handleSubmit}>
