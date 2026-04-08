@@ -59,7 +59,7 @@ def _auth_client(app, db, user):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[require_active_user] = override_require_active_user
 
-    with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+    with patch("app.main.init_db"):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
@@ -82,7 +82,7 @@ class TestLogin:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/login", json={"username": "login@test.com", "password": "goodpass"})
 
@@ -106,7 +106,7 @@ class TestLogin:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/login", json={"username": "bad@test.com", "password": "wrong"})
 
@@ -122,7 +122,7 @@ class TestLogin:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/login", json={"username": "nobody@test.com", "password": "x"})
 
@@ -140,7 +140,7 @@ class TestLogin:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/login", json={"username": "disabled@test.com", "password": "pass"})
 
@@ -168,7 +168,7 @@ class TestMe:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/auth/me")
 
@@ -246,7 +246,7 @@ class TestForcePasswordChangeGate:
         app.dependency_overrides[get_db] = override_get_db
         app.dependency_overrides[get_current_user] = override_get_current_user
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/buckets")
 
@@ -274,7 +274,7 @@ class TestForcePasswordChangeGate:
         app.dependency_overrides[get_db] = override_get_db
         app.dependency_overrides[get_current_user] = override_get_current_user
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post(
                     "/api/auth/change-password",
@@ -308,7 +308,7 @@ class TestPasswordReset:
         app.dependency_overrides[get_current_user] = lambda: admin
         app.dependency_overrides[require_active_user] = lambda: admin
         app.dependency_overrides[require_admin] = lambda: admin
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/forgot-password", json={"email": "reset@test.com"})
 
@@ -332,7 +332,7 @@ class TestPasswordReset:
         app.dependency_overrides[get_current_user] = lambda: admin
         app.dependency_overrides[require_active_user] = lambda: admin
         app.dependency_overrides[require_admin] = lambda: admin
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/forgot-password", json={"email": "nobody@test.com"})
 
@@ -349,7 +349,7 @@ class TestPasswordReset:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post("/api/auth/forgot-password", json={"email": "anyone@test.com"})
 
@@ -369,7 +369,7 @@ class TestPasswordReset:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post(
                     "/api/auth/reset-password",
@@ -391,7 +391,7 @@ class TestPasswordReset:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.post(
                     "/api/auth/reset-password",
@@ -414,7 +414,7 @@ class TestPasswordReset:
             yield db
 
         app.dependency_overrides[get_db] = override_get_db
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 c.post("/api/auth/reset-password", json={"token": raw_token, "new_password": "pass1234"})
                 r2 = c.post("/api/auth/reset-password", json={"token": raw_token, "new_password": "pass5678"})

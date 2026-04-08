@@ -143,7 +143,7 @@ def client(db, test_user):
     app.dependency_overrides[get_current_user] = override_get_current_user
     app.dependency_overrides[require_active_user] = override_require_active_user
 
-    with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+    with patch("app.main.init_db"):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
@@ -175,7 +175,7 @@ def admin_client(db, test_admin):
     app.dependency_overrides[require_active_user] = override_require_active_user
     app.dependency_overrides[require_admin] = override_require_admin
 
-    with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+    with patch("app.main.init_db"):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
