@@ -1,6 +1,8 @@
 """
-Authentication router: login, logout, me, password flows.
+Authentication router: login, logout, me, password flows, and first-run setup.
 """
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -9,6 +11,8 @@ from typing import Optional
 from ..database import get_db
 from ..config import settings
 from ..dependencies import get_current_user, require_admin
+from ..models.user import User
+from ..models.audit_log import AuditLog
 from ..services.auth_service import (
     authenticate_user,
     create_session,
@@ -19,9 +23,12 @@ from ..services.auth_service import (
 )
 from ..services.user_service import (
     change_password,
+    create_user,
     get_user_by_email,
     get_user_by_id,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -75,6 +82,12 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class SetupRequest(BaseModel):
+    email: str
+    username: str
+    password: str
 
 
 # ---------------------------------------------------------------------------
@@ -175,3 +188,86 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 
     change_password(db, user_id, body.new_password, clear_force_flag=True)
     return {"message": "Password has been reset. Please log in."}
+
+
+# ---------------------------------------------------------------------------
+# First-run setup: create the initial admin account
+# ---------------------------------------------------------------------------
+
+@router.get("/setup/status")
+def setup_status(db: Session = Depends(get_db)):
+    """Return whether the application needs initial setup.
+
+    Returns ``{"setup_required": true}`` when no users exist yet.
+    Once at least one user exists the flag is ``false``.  This endpoint is
+    always public so the frontend can conditionally show the setup screen.
+    """
+    user_count = db.query(User).count()
+    return {"setup_required": user_count == 0}
+
+
+@router.post("/setup", response_model=UserOut, status_code=201)
+def create_first_admin(
+    body: SetupRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """Create the first admin account — available only when no users exist.
+
+    Once any user exists this endpoint returns **403** so it cannot be used
+    to bypass normal user-management flows.  The newly created account is
+    logged to the audit trail and the caller receives a session cookie so
+    they are immediately logged in.
+    """
+    user_count = db.query(User).count()
+    if user_count > 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Setup already completed. Use admin user management to create additional users.",
+        )
+
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    if not body.email.strip():
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    if not body.username.strip():
+        raise HTTPException(status_code=400, detail="Username is required")
+
+    user = create_user(
+        db,
+        email=body.email,
+        username=body.username,
+        password=body.password,
+        role="admin",
+        force_password_change=False,
+    )
+
+    import uuid as _uuid
+    db.add(AuditLog(
+        id=str(_uuid.uuid4()),
+        user_id=user.id,
+        action="first_admin_created",
+        status="success",
+        level="info",
+        source="setup",
+        details_json={"email": user.email, "username": user.username},
+    ))
+    db.commit()
+
+    logger.info("First admin account created via setup endpoint: %s", user.email)
+
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    session = create_session(db, user.id, ip_address=ip, user_agent=ua)
+    _set_session_cookie(response, session.id)
+
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        role=user.role,
+        force_password_change=user.force_password_change,
+    )

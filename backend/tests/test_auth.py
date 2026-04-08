@@ -67,7 +67,7 @@ def raw_client(auth_db):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+    with patch("app.main.init_db"):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
@@ -150,7 +150,7 @@ def test_login_sets_session_cookie(raw_client):
 
 
 # ---------------------------------------------------------------------------
-# Bootstrap / default credentials
+# First-run setup endpoint
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -171,25 +171,180 @@ def empty_db():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_bootstrap_admin_admin(empty_db):
-    """ensure_admin_exists with default admin/admin creates a working account."""
-    from app.services.user_service import ensure_admin_exists
-    from app.services.auth_service import authenticate_user
+def test_setup_status_no_users(empty_db):
+    """GET /api/auth/setup/status returns setup_required=true when DB is empty."""
+    def override_get_db():
+        try:
+            yield empty_db
+        finally:
+            pass
 
-    ensure_admin_exists(empty_db, email="admin", password="admin", username="admin")
+    app.dependency_overrides[get_db] = override_get_db
 
-    user = authenticate_user(empty_db, "admin", "admin")
-    assert user is not None
-    assert user.username == "admin"
-    assert user.role == "admin"
-    assert user.force_password_change is True
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.get("/api/auth/setup/status")
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json() == {"setup_required": True}
 
 
-def test_bootstrap_admin_login_via_api(empty_db):
-    """Full HTTP login with admin/admin credentials after bootstrap."""
-    from app.services.user_service import ensure_admin_exists
+def test_setup_status_with_existing_users(auth_db):
+    """GET /api/auth/setup/status returns setup_required=false when users exist."""
+    def override_get_db():
+        try:
+            yield auth_db
+        finally:
+            pass
 
-    ensure_admin_exists(empty_db, email="admin", password="admin", username="admin")
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.get("/api/auth/setup/status")
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json() == {"setup_required": False}
+
+
+def test_setup_creates_first_admin(empty_db):
+    """POST /api/auth/setup creates the first admin and returns a session cookie."""
+    def override_get_db():
+        try:
+            yield empty_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.post("/api/auth/setup", json={
+                "email": "owner@example.com",
+                "username": "owner",
+                "password": "securepassword",
+            })
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["email"] == "owner@example.com"
+    assert data["username"] == "owner"
+    assert data["role"] == "admin"
+    assert data["force_password_change"] is False
+    assert "session_id" in resp.cookies
+
+
+def test_setup_blocked_when_users_exist(auth_db):
+    """POST /api/auth/setup returns 403 when at least one user already exists."""
+    def override_get_db():
+        try:
+            yield auth_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.post("/api/auth/setup", json={
+                "email": "attacker@example.com",
+                "username": "attacker",
+                "password": "password123",
+            })
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 403
+
+
+def test_setup_short_password_rejected(empty_db):
+    """POST /api/auth/setup rejects passwords shorter than 8 characters."""
+    def override_get_db():
+        try:
+            yield empty_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.post("/api/auth/setup", json={
+                "email": "a@b.com",
+                "username": "owner",
+                "password": "short",
+            })
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 400
+
+
+def test_setup_can_login_after_creation(empty_db):
+    """After setup, the created admin can log in via the normal login endpoint."""
+    def override_get_db():
+        try:
+            yield empty_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            c.post("/api/auth/setup", json={
+                "email": "first@example.com",
+                "username": "firstadmin",
+                "password": "mypassword1",
+            })
+            resp = c.post("/api/auth/login", json={
+                "username": "firstadmin",
+                "password": "mypassword1",
+            })
+
+    app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "admin"
+
+
+def test_setup_idempotency_blocked_on_second_call(empty_db):
+    """Calling POST /api/auth/setup twice: second call must return 403."""
+    def override_get_db():
+        try:
+            yield empty_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with patch("app.main.init_db"):
+        with TestClient(app, raise_server_exceptions=True) as c:
+            c.post("/api/auth/setup", json={
+                "email": "first@example.com",
+                "username": "firstadmin",
+                "password": "mypassword1",
+            })
+            resp2 = c.post("/api/auth/setup", json={
+                "email": "second@example.com",
+                "username": "second",
+                "password": "mypassword2",
+            })
+
+    app.dependency_overrides.clear()
+
+    assert resp2.status_code == 403
+
+
+def test_setup_audit_log_created(empty_db):
+    """Creating the first admin via setup must write an audit log entry."""
+    from app.models.audit_log import AuditLog
 
     def override_get_db():
         try:
@@ -199,64 +354,18 @@ def test_bootstrap_admin_login_via_api(empty_db):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+    with patch("app.main.init_db"):
         with TestClient(app, raise_server_exceptions=True) as c:
-            resp = c.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+            c.post("/api/auth/setup", json={
+                "email": "audit@example.com",
+                "username": "auditadmin",
+                "password": "password123",
+            })
 
     app.dependency_overrides.clear()
 
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["username"] == "admin"
-    assert data["force_password_change"] is True
-
-
-# ---------------------------------------------------------------------------
-# Empty-env-var fallback (Unraid / Docker blank placeholder regression)
-# ---------------------------------------------------------------------------
-
-def test_bootstrap_admin_empty_email_falls_back(empty_db):
-    """_bootstrap_admin falls back to admin/admin/admin when env vars are empty strings.
-
-    This is the regression test for the Unraid CA template shipping
-    ADMIN_EMAIL="" and ADMIN_PASSWORD="" as blank Docker env vars, which
-    previously caused the bootstrap to skip entirely and left the UI locked
-    on first boot.
-    """
-    from app.main import _bootstrap_admin
-    from app.services.auth_service import authenticate_user
-    from app.models.user import User
-
-    # Patch the settings object used inside _bootstrap_admin, and redirect
-    # SessionLocal (imported lazily inside the function) to our empty_db.
-    mock_settings = type("S", (), {
-        "ADMIN_SKIP_BOOTSTRAP": False,
-        "ADMIN_EMAIL": "",      # blank — simulates empty Docker env var
-        "ADMIN_PASSWORD": "",   # blank
-        "ADMIN_USERNAME": "",   # blank
-    })()
-
-    with patch("app.main.app_settings", mock_settings), \
-         patch("app.database.SessionLocal", return_value=empty_db):
-        _bootstrap_admin()
-
-    # The fallback should have created admin/admin
-    user = authenticate_user(empty_db, "admin", "admin")
-    assert user is not None, "admin/admin must work after bootstrap with empty env vars"
-    assert user.role == "admin"
-
-
-def test_bootstrap_admin_skip_flag(empty_db):
-    """ADMIN_SKIP_BOOTSTRAP=true suppresses auto-creation entirely."""
-    from app.main import _bootstrap_admin
-    from app.models.user import User
-
-    mock_settings = type("S", (), {
-        "ADMIN_SKIP_BOOTSTRAP": True,
-    })()
-
-    with patch("app.main.app_settings", mock_settings):
-        _bootstrap_admin()
-
-    assert empty_db.query(User).count() == 0, \
-        "no user should be created when ADMIN_SKIP_BOOTSTRAP is true"
+    log = empty_db.query(AuditLog).filter(
+        AuditLog.action == "first_admin_created"
+    ).first()
+    assert log is not None
+    assert log.source == "setup"

@@ -118,7 +118,7 @@ class TestBucketIsolation:
         user_a = isolation_db.query(User).filter(User.id == USER_A_ID).first()
         _make_client_for_user(app, isolation_db, user_a)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/buckets")
 
@@ -135,7 +135,7 @@ class TestBucketIsolation:
         bucket_a = isolation_db.query(Bucket).filter(Bucket.name == "BucketA").first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get(f"/api/buckets/{bucket_a.id}")
 
@@ -149,7 +149,7 @@ class TestBucketIsolation:
         bucket_a = isolation_db.query(Bucket).filter(Bucket.name == "BucketA").first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.patch(f"/api/buckets/{bucket_a.id}", json={"description": "hacked"})
 
@@ -163,7 +163,7 @@ class TestBucketIsolation:
         bucket_a = isolation_db.query(Bucket).filter(Bucket.name == "BucketA").first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.delete(f"/api/buckets/{bucket_a.id}")
 
@@ -184,7 +184,7 @@ class TestAssetIsolation:
         user_a = isolation_db.query(User).filter(User.id == USER_A_ID).first()
         _make_client_for_user(app, isolation_db, user_a)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/assets")
 
@@ -200,7 +200,7 @@ class TestAssetIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/assets/asset-a-1")
 
@@ -213,7 +213,7 @@ class TestAssetIsolation:
         user_a = isolation_db.query(User).filter(User.id == USER_A_ID).first()
         _make_client_for_user(app, isolation_db, user_a)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/assets/count")
 
@@ -233,7 +233,7 @@ class TestJobIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/jobs")
 
@@ -248,7 +248,7 @@ class TestJobIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/jobs/job-a-1")
 
@@ -268,7 +268,7 @@ class TestSettingsIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.get("/api/settings/providers")
 
@@ -283,7 +283,7 @@ class TestSettingsIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 r = c.delete("/api/settings/providers/openai")
 
@@ -302,7 +302,7 @@ class TestSettingsIsolation:
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
         _make_client_for_user(app, isolation_db, user_b)
 
-        with patch("app.main.init_db"), patch("app.main._bootstrap_admin"):
+        with patch("app.main.init_db"):
             with TestClient(app) as c:
                 # Patch out env fallback too
                 with patch("app.routers.settings._get_immich_credentials", return_value=("", "")):

@@ -161,24 +161,6 @@ def delete_user(db: Session, user_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Bootstrap: ensure at least one admin exists on startup
-# ---------------------------------------------------------------------------
-
-def ensure_admin_exists(db: Session, email: str, password: str, username: str = "admin") -> None:
-    """Create the initial admin account if no users exist yet."""
-    count = db.query(User).count()
-    if count == 0:
-        create_user(
-            db,
-            email=email,
-            username=username,
-            password=password,
-            role="admin",
-            force_password_change=True,
-        )
-
-
-# ---------------------------------------------------------------------------
 # Default seeding for new users
 # ---------------------------------------------------------------------------
 
