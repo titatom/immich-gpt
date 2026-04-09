@@ -48,9 +48,12 @@ services:
       # ── Authentication ─────────────────────────────────────────────────
       # The first admin account is created through the web setup wizard
       # the first time you visit the app (no users exist yet).
-      # Cryptographic key for signing session cookies. Change this in
-      # production — any long random string works.
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      # Cryptographic key for signing session cookies.
+      # If not set here, the entrypoint auto-generates a key on first boot
+      # and saves it to /data/.secret_key so it survives restarts.
+      # For production deployments you can supply your own key via .env:
+      #   SECRET_KEY=$(openssl rand -hex 32)
+      SECRET_KEY: ${SECRET_KEY:-}
       # Set true when running behind HTTPS (internet-exposed deployments).
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       # ── Worker ─────────────────────────────────────────────────────────
