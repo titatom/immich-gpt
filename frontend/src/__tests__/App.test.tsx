@@ -19,6 +19,8 @@ vi.mock("../services/api", async (importOriginal) => {
     }),
     login: vi.fn().mockResolvedValue({ id: "test-user", email: "test@example.com", username: "testuser", role: "user", force_password_change: false }),
     logout: vi.fn().mockResolvedValue(undefined),
+    getSetupStatus: vi.fn().mockResolvedValue({ setup_required: false }),
+    setupCreateAdmin: noop,
     getHealth: vi.fn().mockResolvedValue({ status: "ok" }),
     getImmichSettings: vi.fn().mockResolvedValue({ immich_url: "", connected: false }),
     testImmichConnection: noop,

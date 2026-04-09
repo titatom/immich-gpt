@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
+import { getSetupStatus } from "../services/api";
 import { Zap } from "lucide-react";
 import styles from "./Login.module.css";
 
@@ -11,6 +12,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getSetupStatus()
+      .then(({ setup_required }) => {
+        if (setup_required) {
+          navigate("/setup", { replace: true });
+        }
+      })
+      .catch(() => {
+        // Ignore — if setup status is unreachable just show the login form
+      });
+  }, [navigate]);
 
   if (!loading && user) {
     return <Navigate to="/" replace />;
@@ -45,20 +58,6 @@ export default function Login() {
         </div>
 
         <h1 className={styles.heading}>Sign in</h1>
-
-        <div style={{
-          background: "rgba(56,189,248,0.08)",
-          border: "1px solid rgba(56,189,248,0.25)",
-          borderRadius: 8,
-          padding: "10px 12px",
-          color: "#7dd3fc",
-          fontSize: 12,
-          marginBottom: 20,
-          lineHeight: 1.5,
-        }}>
-          Default credentials: <strong>admin</strong> / <strong>admin</strong>.
-          You will be asked to set a new password after first login.
-        </div>
 
         <form onSubmit={handleSubmit}>
           <div className={styles.formGroup}>

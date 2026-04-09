@@ -58,6 +58,12 @@ export const forgotPassword = (email: string) =>
 export const resetPassword = (token: string, new_password: string) =>
   api.post("/auth/reset-password", { token, new_password }).then(r => r.data);
 
+export const getSetupStatus = (): Promise<{ setup_required: boolean }> =>
+  api.get("/auth/setup/status").then(r => r.data);
+
+export const setupCreateAdmin = (data: { email: string; username: string; password: string }): Promise<AuthUser> =>
+  api.post("/auth/setup", data).then(r => r.data);
+
 // --- Admin ---
 export const adminListUsers = () =>
   api.get("/admin/users").then(r => r.data);

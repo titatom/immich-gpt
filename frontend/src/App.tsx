@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Assets from "./pages/Assets";
 import Logs from "./pages/Logs";
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import ForcePasswordChange from "./pages/ForcePasswordChange";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -27,6 +28,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         {/* Public routes */}
+        <Route path="/setup" element={<Setup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
