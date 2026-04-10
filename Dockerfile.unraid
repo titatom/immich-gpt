@@ -62,9 +62,11 @@ COPY backend/alembic.ini ./alembic.ini
 # Copy built frontend assets from stage 1
 COPY --from=frontend-builder /build/backend/static ./static
 
-# Persistent data directory (mount a named volume here in Unraid)
+# Persistent directories.
+# /data — SQLite database, settings, job history (required volume mount).
+# /logs — rotating log files (optional; mount a host path to persist logs).
 RUN mkdir -p /data /logs
-VOLUME ["/data"]
+VOLUME ["/data", "/logs"]
 
 # Environment defaults — override via Unraid template variables
 ENV DATABASE_URL=sqlite:////data/immich_gpt.db \
@@ -85,4 +87,4 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # tini as PID-1 → clean shutdown, correct signal forwarding
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

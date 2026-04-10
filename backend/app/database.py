@@ -12,7 +12,8 @@ if _db_url.startswith("sqlite:///"):
     if _db_dir:
         os.makedirs(_db_dir, exist_ok=True)
 
-# SQLite requires check_same_thread=False; PostgreSQL does not accept it.
+# check_same_thread=False is required for SQLite when multiple threads share
+# the same connection (FastAPI's thread-pool request handling).
 _connect_args = {}
 if _db_url.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}

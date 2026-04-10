@@ -1,6 +1,6 @@
 # Docker Deployment Guide
 
-Immich GPT ships as a **single Docker image**.  Background jobs run in-process via a Python `ThreadPoolExecutor`, so no extra services are needed.  If you already run Redis, you can point `REDIS_URL` at it and jobs will be dispatched through RQ instead — still the same single image.
+Immich GPT ships as a **single Docker image**.  Background jobs run in-process via a Python `ThreadPoolExecutor` — no extra services needed.  If you already run Redis on your home lab, you can point `REDIS_URL` at it and jobs will be dispatched through RQ instead — still the same single image.
 
 ---
 
@@ -12,16 +12,6 @@ One image, one container, zero extra services.
 
 Search for **Immich GPT** in the CA plugin.  The template pre-fills all required fields.
 
-**Minimum configuration:**
-
-| Field | Value |
-|-------|-------|
-| **Data Directory** | `/mnt/user/appdata/immich-gpt` |
-| **Admin Email** | `admin` *(or override it if you prefer a different bootstrap login identifier)* |
-| **Admin Password** | `admin` *(you will be forced to change it on first login)* |
-| **Immich URL** | `http://192.168.1.x:2283` *(can also be set in the UI after first login)* |
-| **Immich API Key** | *(create in Immich → Account → API Keys — can also be set in the UI)* |
-
 ### Manual Docker run
 
 ```bash
@@ -30,8 +20,6 @@ docker run -d \
   --restart unless-stopped \
   -p 8000:8000 \
   -v /path/to/appdata/immich-gpt:/data \
-  -e ADMIN_EMAIL=admin \
-  -e ADMIN_PASSWORD=admin \
   -e IMMICH_URL=http://192.168.1.x:2283 \
   -e IMMICH_API_KEY=your-key \
   -e OPENAI_API_KEY=sk-... \
@@ -54,18 +42,15 @@ docker compose up -d
 ## First login
 
 1. Open `http://your-server:8000` in a browser.
-2. Sign in with `admin` / `admin` unless you overrode the bootstrap credentials in the env file.
-3. You will be prompted to **change your password** immediately — this is enforced for all admin-bootstrapped accounts.
-4. Once logged in, go to **Settings → Immich Connection** to configure your Immich URL and API key if you did not set them via environment variables.
-5. Create additional user accounts via **Users** (admin sidebar link).
+2. The **setup wizard** appears on first visit (when no users exist yet).  Create the initial admin account with your chosen email, username, and password.
+3. Once logged in, go to **Settings → Immich Connection** to configure your Immich URL and API key if you did not set them via environment variables.
+4. Create additional user accounts via **Users** (admin sidebar link).
 
 ---
 
-## Multi-container stack (full stack)
+## Optional: Redis for background workers
 
-If you already run Redis (e.g. for another service on the same host), you can have Immich GPT dispatch background jobs through it instead of the built-in thread pool.  No extra containers are added — it is still the same single image.
-
-Set `REDIS_URL` in your `.env` or in the Unraid template:
+If you already run Redis on your home lab and want to dispatch jobs through it instead of the built-in thread pool, set `REDIS_URL` in your `.env` or in the Unraid template:
 
 ```dotenv
 REDIS_URL=redis://192.168.1.x:6379/0
@@ -105,6 +90,7 @@ The script avoids `docker compose build`, so it still works on older Docker inst
 | Host path (default) | Container path | Purpose |
 |---------------------|----------------|---------|
 | `DATA_DIR` → `/mnt/user/appdata/immich-gpt` | `/data` | SQLite database (`immich_gpt.db`), settings, job history, user accounts |
+| *(optional)* | `/logs` | Rotating log files — mount a host path to persist logs across restarts |
 
 The Compose file uses a **bind-mount** (not a named Docker volume) so the data directory is directly browsable on the host — ideal for Unraid, where `/mnt/user/appdata` is the standard location for container data.
 
@@ -124,30 +110,28 @@ DATA_DIR=/mnt/user/appdata/immich-gpt   # Unraid default
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATA_DIR` | `/mnt/user/appdata/immich-gpt` | Host path bind-mounted to `/data` (Compose only) |
-| `ADMIN_EMAIL` | `admin` | Login identifier for the auto-created admin account on first startup |
-| `ADMIN_PASSWORD` | `admin` | Initial password for the admin account (forced change on first login) |
-| `ADMIN_USERNAME` | `admin` | Username for the auto-created admin account |
-| `SECRET_KEY` | `change-me-in-production` | Cryptographic key for signing session cookies — change before going to production |
-| `SESSION_COOKIE_SECURE` | `false` | Set `true` when running behind HTTPS (internet-exposed) |
+| `SECRET_KEY` | *(auto-generated)* | Cryptographic key for session cookies — auto-generated on first boot and saved to `/data/.secret_key` |
+| `SESSION_COOKIE_SECURE` | `false` | Set `true` when running behind HTTPS |
 | `IMMICH_URL` | *(empty)* | Immich server URL — can also be set per-user in the UI |
 | `IMMICH_API_KEY` | *(empty)* | Immich API key — can also be set per-user in the UI |
 | `OPENAI_API_KEY` | *(empty)* | OpenAI key (optional — configure via UI per user) |
 | `OPENAI_MODEL` | `gpt-4o` | Default model when using env-based OpenAI config |
-| `WORKER_CONCURRENCY` | `2` | Background job threads (single-container only) |
-| `REDIS_URL` | *(empty)* | Set to `redis://host:6379/0` to enable RQ distributed workers |
-| `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLAlchemy DB URL (SQLite default; PostgreSQL supported) |
+| `WORKER_CONCURRENCY` | `2` | Background job threads (built-in thread pool only) |
+| `REDIS_URL` | *(empty)* | Optional — set to `redis://host:6379/0` to enable RQ workers |
+| `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLite database path |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `APP_PORT` | `8000` | Host port (Compose only) |
 | `IMMICH_GPT_IMAGE` | `ghcr.io/titatom/immich-gpt:latest` | Image tag used by `docker-compose.yml` |
 
 ### Internet-exposed deployments
 
-If you expose Immich GPT to the internet, set:
+If you expose Immich GPT to the internet (e.g. through a reverse proxy), set:
 
 ```env
 SESSION_COOKIE_SECURE=true
 ```
 
-This marks the session cookie `Secure`, ensuring it is only sent over HTTPS.
+This marks the session cookie `Secure`, ensuring it is only sent over HTTPS.  See [`docs/reverse-proxy.md`](docs/reverse-proxy.md) for Nginx and Caddy configuration examples.
 
 ---
 

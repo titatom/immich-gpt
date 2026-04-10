@@ -2,17 +2,18 @@
 # Immich GPT — Docker Compose
 # =============================================================================
 #
-# Single-container deployment — one image, no bundled Redis.
+# Single-container deployment — one image, no extra services required.
 #
 #   Background jobs run in-process via a ThreadPoolExecutor by default.
-#   If you already run Redis, point REDIS_URL at it and background jobs
-#   will be dispatched through RQ instead (WORKER_CONCURRENCY is ignored
-#   in that case).
+#   No Redis needed.  If you already run Redis on your home lab, set
+#   REDIS_URL to dispatch jobs through RQ instead (WORKER_CONCURRENCY is
+#   ignored in that case).
 #
 # Quick start:
-#   cp .env.example .env   # fill in at minimum: DATA_DIR, ADMIN_EMAIL,
-#                          # ADMIN_PASSWORD, IMMICH_URL, IMMICH_API_KEY
+#   cp .env.example .env   # fill in at minimum: DATA_DIR, IMMICH_URL
 #   docker compose up -d
+#
+# On first visit, a web setup wizard will create the initial admin account.
 #
 # Unraid users: DATA_DIR defaults to /mnt/user/appdata/immich-gpt.
 # All persistent data (SQLite DB, settings, job history) lives there.
@@ -36,6 +37,9 @@ services:
       # host (important for Unraid users browsing /mnt/user/appdata).
       # Override DATA_DIR in .env to point at any host path you prefer.
       - ${DATA_DIR:-/mnt/user/appdata/immich-gpt}:/data
+      # Optional: bind-mount a host directory to persist rotating log files.
+      # Uncomment and set LOG_DIR in .env to enable persistent logs.
+      # - ${LOG_DIR:-/mnt/user/appdata/immich-gpt/logs}:/logs
     environment:
       DATABASE_URL: sqlite:////data/immich_gpt.db
       # ── Immich connection ──────────────────────────────────────────────
@@ -46,21 +50,21 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
       # ── Authentication ─────────────────────────────────────────────────
-      # The first admin account is created through the web setup wizard
-      # the first time you visit the app (no users exist yet).
-      # Cryptographic key for signing session cookies.
-      # If not set here, the entrypoint auto-generates a key on first boot
-      # and saves it to /data/.secret_key so it survives restarts.
-      # For production deployments you can supply your own key via .env:
-      #   SECRET_KEY=$(openssl rand -hex 32)
+      # The first admin account is created via the web setup wizard on first visit.
+      # Cryptographic key for session cookies — auto-generated on first boot
+      # and persisted to /data/.secret_key if not set here.
+      # Supply your own: SECRET_KEY=$(openssl rand -hex 32)
       SECRET_KEY: ${SECRET_KEY:-}
-      # Set true when running behind HTTPS (internet-exposed deployments).
+      # Set true when running behind HTTPS (e.g. Nginx/Caddy reverse proxy).
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       # ── Worker ─────────────────────────────────────────────────────────
-      # Leave REDIS_URL empty to use the built-in thread-pool (recommended
-      # for Unraid). Set it to dispatch jobs through an existing Redis.
+      # Jobs run in-process by default — no Redis required.
+      # Set REDIS_URL only if you already run Redis on your home lab.
       REDIS_URL: ${REDIS_URL:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      # ── Logging ────────────────────────────────────────────────────────
+      # Valid values: DEBUG, INFO, WARNING, ERROR
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
