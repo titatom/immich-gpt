@@ -22,13 +22,18 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.2.0"
     DEBUG: bool = False
 
-    # Database — PostgreSQL required for production; SQLite supported for dev/test only.
+    # Database — SQLite is the supported and recommended database.
+    # The path inside the container should always be under /data so it lands
+    # on the mounted persistent volume.
     DATABASE_URL: str = "sqlite:///./data/immich_gpt.db"
 
-    # Redis / RQ
+    # Redis / RQ — optional.  Leave blank (default) to run jobs in-process
+    # via the built-in ThreadPoolExecutor.  Set to a Redis URL only if you
+    # already run Redis on your home lab and want distributed workers.
     REDIS_URL: str = ""
 
-    # Worker concurrency for the in-process executor (ignored when Redis is used)
+    # Number of background job threads (in-process executor).
+    # Ignored when REDIS_URL is set.
     WORKER_CONCURRENCY: int = 2
 
     # Immich
@@ -41,22 +46,40 @@ class Settings(BaseSettings):
 
     # Image limits
     MAX_IMAGE_BYTES: int = 20 * 1024 * 1024  # 20 MB
-    THUMBNAIL_SIZE: tuple = (512, 512)
+    THUMBNAIL_WIDTH: int = 512
+    THUMBNAIL_HEIGHT: int = 512
 
-    # Session cookie — secure=True and samesite=strict are the secure defaults.
-    # Override SESSION_COOKIE_SECURE=false only when running behind a plain HTTP
-    # reverse proxy that is not Internet-exposed (e.g. local dev).
+    # Session cookie
+    # SESSION_COOKIE_SECURE controls whether the Set-Cookie header includes the
+    # Secure flag, which browsers require when the cookie is sent over HTTPS.
+    #
+    # The hard-coded default here is True (secure by default), but the shipped
+    # docker-compose.yml and .env.example override it to False for LAN-only
+    # HTTP deployments.  Set SESSION_COOKIE_SECURE=true whenever you expose
+    # the app over HTTPS (e.g. behind a reverse proxy with TLS).
     SESSION_COOKIE_NAME: str = "session_id"
     SESSION_COOKIE_SECURE: bool = True
     SESSION_COOKIE_SAMESITE: str = "strict"
 
-    # Secret key used for signing session tokens.
-    # Must be set explicitly to a strong random value.
-    # Generate with:  python -c "import secrets; print(secrets.token_hex(32))"
+    # Secret key — must be a strong random value (≥ 32 chars).
+    # The Docker entrypoint auto-generates and persists one in /data/.secret_key
+    # when this is not supplied.  Generate manually with:
+    #   python -c "import secrets; print(secrets.token_hex(32))"
     SECRET_KEY: str = ""
 
-    # CORS — comma-separated list of allowed origins, e.g. "http://localhost:3000,https://myapp.example.com"
+    # CORS — comma-separated list of allowed origins.
+    # Leave blank when the frontend is served by the same origin as the API
+    # (the normal single-container case).  Set explicitly if you run the
+    # frontend dev server separately:
+    #   CORS_ORIGINS=http://localhost:3000,https://myapp.example.com
     CORS_ORIGINS: str = ""
+
+    # Logging — controls the root logger level.
+    # Valid values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    LOG_LEVEL: str = "INFO"
+
+    # Rate limiting — disable in test environments to avoid shared-IP collisions.
+    RATELIMIT_ENABLED: bool = True
 
     @model_validator(mode="after")
     def _validate_secret_key(self) -> "Settings":
@@ -80,6 +103,10 @@ class Settings(BaseSettings):
         if not self.CORS_ORIGINS:
             return []
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def thumbnail_size(self) -> tuple:
+        return (self.THUMBNAIL_WIDTH, self.THUMBNAIL_HEIGHT)
 
     class Config:
         env_file = ".env"

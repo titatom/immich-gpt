@@ -1,12 +1,18 @@
 import os
 import logging
+import logging.handlers
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+
 from .database import init_db
+from .limiter import limiter
 from .routers import (
     settings, buckets, prompts, assets, jobs, review,
     thumbnails, albums, audit_logs,
@@ -15,13 +21,81 @@ from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
 from .config import settings as app_settings
 
+
+def _configure_logging() -> None:
+    """Set up root logger with level from config and a RotatingFileHandler.
+
+    Logs are written to /logs/immich-gpt.log when that directory exists
+    (mounted volume in production), and always to stdout via StreamHandler.
+    """
+    level = getattr(logging, app_settings.LOG_LEVEL.upper(), logging.INFO)
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    log_dir = "/logs"
+    if os.path.isdir(log_dir):
+        log_file = os.path.join(log_dir, "immich-gpt.log")
+        handlers.append(
+            logging.handlers.RotatingFileHandler(
+                log_file,
+                maxBytes=10 * 1024 * 1024,  # 10 MB per file
+                backupCount=5,
+                encoding="utf-8",
+            )
+        )
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+        handlers=handlers,
+    )
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _cleanup_expired_tokens()
     yield
+
+
+def _cleanup_expired_tokens() -> None:
+    """Delete expired sessions and password-reset tokens on startup.
+
+    Prevents unbounded table growth on long-running home-server installs.
+    """
+    from datetime import datetime, timezone
+    from .database import SessionLocal
+    from .models.session import UserSession, PasswordResetToken
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        sessions_deleted = (
+            db.query(UserSession)
+            .filter(UserSession.expires_at < now)
+            .delete(synchronize_session=False)
+        )
+        tokens_deleted = (
+            db.query(PasswordResetToken)
+            .filter(PasswordResetToken.expires_at < now)
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        if sessions_deleted or tokens_deleted:
+            logger.info(
+                "Startup cleanup: removed %d expired sessions, %d expired reset tokens",
+                sessions_deleted,
+                tokens_deleted,
+            )
+    except Exception:
+        logger.warning("Startup token cleanup failed — skipping", exc_info=True)
+        db.rollback()
+    finally:
+        db.close()
 
 
 app = FastAPI(
@@ -30,6 +104,10 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 _cors_origins = app_settings.cors_origins_list
 app.add_middleware(

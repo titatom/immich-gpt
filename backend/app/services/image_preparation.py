@@ -34,7 +34,7 @@ class ImagePreparationService:
     def __init__(self, immich_client: Optional[ImmichClient] = None):
         self.immich_client = immich_client or ImmichClient()
         self.max_bytes = settings.MAX_IMAGE_BYTES
-        self.target_size: Tuple[int, int] = tuple(settings.THUMBNAIL_SIZE)  # type: ignore
+        self.target_size: Tuple[int, int] = settings.thumbnail_size
 
     def prepare_for_provider(
         self,

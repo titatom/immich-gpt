@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from ..limiter import limiter
+
 from ..database import get_db
 from ..config import settings
 from ..dependencies import get_current_user, require_admin
@@ -95,6 +97,7 @@ class SetupRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/login", response_model=UserOut)
+@limiter.limit("10/minute")
 def login(body: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     user = authenticate_user(db, body.username, body.password)
     if not user:
@@ -207,6 +210,7 @@ def setup_status(db: Session = Depends(get_db)):
 
 
 @router.post("/setup", response_model=UserOut, status_code=201)
+@limiter.limit("5/minute")
 def create_first_admin(
     body: SetupRequest,
     request: Request,

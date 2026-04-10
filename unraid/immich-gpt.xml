@@ -26,7 +26,10 @@
     to Immich — all from a clean web UI.
 
     Multi-user: each person manages their own Immich connection, AI providers,
-    buckets, and assets. An admin account is created automatically on first start.
+    buckets, and assets.
+
+    On first visit, a web setup wizard will guide you through creating the
+    initial admin account — no environment variables required.
 
     Single-container — no Redis, no separate worker process required.
     All jobs run in-process using a lightweight thread pool.
@@ -63,61 +66,25 @@
     Target="/data"
     Default="/mnt/user/appdata/immich-gpt"
     Mode="rw"
-    Description="Persistent storage for the SQLite database. All user accounts, settings, job history, and AI suggestions are stored here. Back this up."
+    Description="Persistent storage for the SQLite database. All user accounts, settings, job history, and AI suggestions are stored here. Back this up regularly."
     Type="Path"
     Display="always"
     Required="true"
     Mask="false"
   >/mnt/user/appdata/immich-gpt</Config>
 
-  <!-- ── Admin account bootstrap ───────────────────────────────────────── -->
+  <!-- ── Logs volume (optional) ────────────────────────────────────────── -->
   <Config
-    Name="Admin Email"
-    Target="ADMIN_EMAIL"
-    Default="admin"
-    Mode=""
-    Description="Login identifier (email or username) for the admin account created automatically on first startup. Defaults to 'admin' if left blank. You will use this to log in for the first time."
-    Type="Variable"
-    Display="always"
-    Required="false"
-    Mask="false"
-  >admin</Config>
-
-  <Config
-    Name="Admin Password"
-    Target="ADMIN_PASSWORD"
-    Default="admin"
-    Mode=""
-    Description="Initial password for the admin account. Defaults to 'admin' if left blank, and you will be forced to change it on first login."
-    Type="Variable"
-    Display="always"
-    Required="false"
-    Mask="true"
-  >admin</Config>
-
-  <Config
-    Name="Admin Username"
-    Target="ADMIN_USERNAME"
-    Default="admin"
-    Mode=""
-    Description="Username for the auto-created admin account. Defaults to 'admin' if left blank."
-    Type="Variable"
+    Name="Log Directory (optional)"
+    Target="/logs"
+    Default="/mnt/user/appdata/immich-gpt/logs"
+    Mode="rw"
+    Description="Optional: mount a host directory to persist rotating log files. Leave blank to discard logs when the container is removed."
+    Type="Path"
     Display="advanced"
     Required="false"
     Mask="false"
-  >admin</Config>
-
-  <Config
-    Name="Skip Admin Bootstrap"
-    Target="ADMIN_SKIP_BOOTSTRAP"
-    Default="false"
-    Mode=""
-    Description="Set to 'true' to skip automatic admin account creation on first startup (advanced). Leave 'false' for a normal installation."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="false"
-  >false</Config>
+  ></Config>
 
   <!-- ── Immich connection ─────────────────────────────────────────────── -->
   <Config
@@ -197,15 +164,28 @@
 
   <!-- ── Redis (optional, power-user) ──────────────────────────────────── -->
   <Config
-    Name="Redis URL"
+    Name="Redis URL (optional)"
     Target="REDIS_URL"
     Default=""
     Mode=""
-    Description="Leave blank to use the built-in thread-pool worker (recommended for Unraid). Set to redis://host:6379/0 only if you run a separate Redis container and want distributed workers."
+    Description="Leave blank to use the built-in thread-pool worker (recommended for Unraid). Set to redis://host:6379/0 only if you already run Redis on your home lab and want distributed workers."
     Type="Variable"
     Display="advanced"
     Required="false"
     Mask="false"
   ></Config>
+
+  <!-- ── Logging ────────────────────────────────────────────────────────── -->
+  <Config
+    Name="Log Level"
+    Target="LOG_LEVEL"
+    Default="INFO"
+    Mode=""
+    Description="Logging verbosity. INFO is suitable for normal use. Use DEBUG for troubleshooting. Valid values: DEBUG, INFO, WARNING, ERROR"
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false"
+  >INFO</Config>
 
 </Container>
