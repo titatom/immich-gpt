@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { getCurrentUser, login as apiLogin, logout as apiLogout } from "../services/api";
 import { AuthContext, type AuthUser } from "./authContextDef";
 
@@ -9,20 +9,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Held so that login() can abort the in-flight initial probe, preventing a
+  // stale 401 from that probe triggering the global interceptor redirect after
+  // the user has already successfully authenticated.
+  const initAbortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    initAbortRef.current = controller;
+
     const load = async () => {
       try {
-        const data = await getCurrentUser();
-        if (!cancelled) setUser(data);
+        const data = await getCurrentUser(controller.signal);
+        if (!controller.signal.aborted) setUser(data);
       } catch {
-        if (!cancelled) setUser(null);
+        if (!controller.signal.aborted) setUser(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, []);
 
   const refresh = useCallback(async () => {
@@ -35,8 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
+    // Cancel the initial auth probe so its eventual 401 cannot trigger a
+    // redirect after we have already established a session via login.
+    initAbortRef.current?.abort();
     const data = await apiLogin(username, password);
     setUser(data);
+    setLoading(false);
   }, []);
 
   const logout = useCallback(async () => {
