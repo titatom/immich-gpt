@@ -70,7 +70,7 @@ function makeClient() {
 vi.mock("../components/BrandLogo", () => ({
   default: ({ subtitle = "Review-first AI library organization" }: { subtitle?: string }) => (
     <div>
-      <img src="/logo.svg" alt="immich-gpt logo" />
+      <img src="/logo.png" alt="immich-gpt logo" />
       <div>Immich GPT</div>
       <div>{subtitle}</div>
     </div>

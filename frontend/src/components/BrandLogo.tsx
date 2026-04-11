@@ -44,7 +44,7 @@ export default function BrandLogo({
       ].join(" ").trim()}
       style={{ "--brand-logo-size": resolveSize(size), ...style } as React.CSSProperties}
     >
-      <img src="/logo.svg" alt={alt} className={styles.mark} />
+      <img src="/logo.png" alt={alt} className={styles.mark} />
       {showSubtitle && subtitle && <div className={styles.subtitle}>{subtitle}</div>}
     </div>
   );
