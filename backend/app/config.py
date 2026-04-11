@@ -51,14 +51,15 @@ class Settings(BaseSettings):
 
     # Session cookie
     # SESSION_COOKIE_SECURE controls whether the Set-Cookie header includes the
-    # Secure flag, which browsers require when the cookie is sent over HTTPS.
+    # Secure flag.  Browsers silently discard Secure cookies over plain HTTP,
+    # which breaks login entirely on non-TLS deployments.
     #
-    # The hard-coded default here is True (secure by default), but the shipped
-    # docker-compose.yml and .env.example override it to False for LAN-only
-    # HTTP deployments.  Set SESSION_COOKIE_SECURE=true whenever you expose
-    # the app over HTTPS (e.g. behind a reverse proxy with TLS).
+    # Default is False so that out-of-the-box HTTP deployments (Unraid, home
+    # lab, Docker on a LAN) work without any extra configuration.
+    # Set SESSION_COOKIE_SECURE=true when the app is served over HTTPS
+    # (e.g. behind an Nginx / Caddy reverse proxy with TLS).
     SESSION_COOKIE_NAME: str = "session_id"
-    SESSION_COOKIE_SECURE: bool = True
+    SESSION_COOKIE_SECURE: bool = False
     SESSION_COOKIE_SAMESITE: str = "strict"
 
     # Secret key — must be a strong random value (≥ 32 chars).

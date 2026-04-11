@@ -20,11 +20,17 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Redirect to login on 401
+// Public paths where a 401 is expected and must not trigger a redirect.
+const PUBLIC_PATHS = ["/login", "/setup", "/forgot-password", "/reset-password"];
+
+// Redirect to login on 401, but only when the user is on a protected page.
+// Cancelled requests (AbortController) are silently ignored.
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err?.response?.status === 401 && !window.location.pathname.startsWith("/login")) {
+    if (axios.isCancel(err)) return Promise.reject(err);
+    const isPublicPath = PUBLIC_PATHS.some(p => window.location.pathname.startsWith(p));
+    if (err?.response?.status === 401 && !isPublicPath) {
       window.location.href = "/login";
     }
     return Promise.reject(err);
@@ -46,8 +52,8 @@ export const login = (username: string, password: string): Promise<AuthUser> =>
 export const logout = () =>
   api.post("/auth/logout").then(r => r.data);
 
-export const getCurrentUser = (): Promise<AuthUser> =>
-  api.get("/auth/me").then(r => r.data);
+export const getCurrentUser = (signal?: AbortSignal): Promise<AuthUser> =>
+  api.get("/auth/me", { signal }).then(r => r.data);
 
 export const changePassword = (current_password: string, new_password: string) =>
   api.post("/auth/change-password", { current_password, new_password }).then(r => r.data);

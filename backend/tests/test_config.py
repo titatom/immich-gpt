@@ -87,13 +87,18 @@ class TestSecretKeyValidation:
 # ---------------------------------------------------------------------------
 
 class TestCookieSecurityDefaults:
-    def test_session_cookie_secure_defaults_to_true(self):
-        """SESSION_COOKIE_SECURE must default to True (requires HTTPS)."""
+    def test_session_cookie_secure_defaults_to_false(self):
+        """SESSION_COOKIE_SECURE must default to False.
+
+        Browsers silently discard Secure cookies over plain HTTP, which breaks
+        login for the majority of self-hosted (LAN/HTTP) deployments. The safe
+        default is False; operators serving over HTTPS must opt in explicitly.
+        """
         s = _make_settings(
             SECRET_KEY="a" * 64,
             SESSION_COOKIE_SECURE=None,  # remove override — use default
         )
-        assert s.SESSION_COOKIE_SECURE is True
+        assert s.SESSION_COOKIE_SECURE is False
 
     def test_session_cookie_samesite_defaults_to_strict(self):
         """SESSION_COOKIE_SAMESITE must default to 'strict'."""
