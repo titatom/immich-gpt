@@ -22,7 +22,10 @@
 # =============================================================================
 
 # ── Stage 1: build the React/Vite frontend ───────────────────────────────────
-FROM node:20-alpine AS frontend-builder
+# Static frontend assets are architecture-independent, so build them once on the
+# native BuildKit host. This avoids npm/rollup optional-dependency failures when
+# the final image matrix includes arm64 under QEMU emulation.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-builder
 
 WORKDIR /build/frontend
 
