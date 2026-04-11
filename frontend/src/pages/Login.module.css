@@ -20,9 +20,8 @@
 
 .logoRow {
   display: flex;
-  align-items: center;
-  gap: 10px;
   margin-bottom: var(--space-8);
+  justify-content: center;
 }
 
 .logoTitle {
@@ -35,6 +34,7 @@
 .logoSub {
   font-size: var(--text-sm);
   color: var(--text-muted);
+  text-align: center;
 }
 
 .heading {

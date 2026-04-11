@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Zap } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import { forgotPassword } from "../services/api";
 import styles from "./Login.module.css";
 
@@ -27,10 +27,7 @@ export default function ForgotPassword() {
   return (
     <div className={styles.root}>
       <div className={styles.card}>
-        <div className={styles.logoRow}>
-          <Zap size={28} color="var(--accent)" />
-          <div className={styles.logoTitle}>Immich GPT</div>
-        </div>
+        <BrandLogo className={styles.logoRow} size="auth" showSubtitle={false} />
 
         <h1 className={styles.heading} style={{ marginBottom: 8 }}>Forgot password</h1>
         <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-base)", marginTop: 0, marginBottom: 24 }}>

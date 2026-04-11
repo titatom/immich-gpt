@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import App from "../App";
 
 // Mock every API export so pages mount without real HTTP calls.
 vi.mock("../services/api", async (importOriginal) => {
@@ -66,6 +67,16 @@ function makeClient() {
   });
 }
 
+vi.mock("../components/BrandLogo", () => ({
+  default: ({ subtitle = "Review-first AI library organization" }: { subtitle?: string }) => (
+    <div>
+      <img src="/logo.svg" alt="immich-gpt logo" />
+      <div>Immich GPT</div>
+      <div>{subtitle}</div>
+    </div>
+  ),
+}));
+
 function Wrapper({ children, path = "/" }: { children: React.ReactNode; path?: string }) {
   return (
     <QueryClientProvider client={makeClient()}>
@@ -73,8 +84,6 @@ function Wrapper({ children, path = "/" }: { children: React.ReactNode; path?: s
     </QueryClientProvider>
   );
 }
-
-import App from "../App";
 
 describe("App routing", () => {
   it("renders the app brand name", async () => {
@@ -107,7 +116,16 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    await waitFor(() => expect(screen.getByText("AI Metadata Enrichment")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Review-first AI library organization")).toBeInTheDocument());
+  });
+
+  it("renders the shared logo image", async () => {
+    render(
+      <Wrapper>
+        <App />
+      </Wrapper>
+    );
+    await waitFor(() => expect(screen.getByAltText("immich-gpt logo")).toBeInTheDocument());
   });
 
   it("renders the dashboard page by default", async () => {

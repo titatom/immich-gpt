@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
 import { changePassword } from "../services/api";
-import { Zap, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 
 export default function ForcePasswordChange() {
   const { refresh } = useAuth();
@@ -56,13 +57,12 @@ export default function ForcePasswordChange() {
         width: "100%",
         maxWidth: 400,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-          <Zap size={28} color="#38bdf8" />
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9" }}>Immich GPT</div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>AI Metadata Enrichment</div>
-          </div>
-        </div>
+        <BrandLogo
+          variant="stacked"
+          size="auth"
+          subtitle="AI metadata and album organization for Immich"
+          style={{ marginBottom: 32 }}
+        />
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <Lock size={18} color="#f59e0b" />
