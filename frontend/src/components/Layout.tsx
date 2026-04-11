@@ -21,6 +21,8 @@ const navItems = [
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 
+const REPOSITORY_URL = "https://github.com/titatom/immich-gpt";
+
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const { data: countData } = useQuery<{ count: number }>({
@@ -76,6 +78,17 @@ export default function Layout() {
               <div className={styles.userEmail}>{user.email}</div>
             </div>
           )}
+          <div className={styles.licenseNotice}>
+            <p className={styles.licenseText}>AGPL-3.0 licensed.</p>
+            <a
+              href={REPOSITORY_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.licenseLink}
+            >
+              Source code
+            </a>
+          </div>
           <button onClick={logout} className={styles.signOutBtn}>
             <LogOut size={13} />
             Sign out

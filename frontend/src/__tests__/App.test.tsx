@@ -108,6 +108,10 @@ describe("App routing", () => {
     expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("link", { name: "Source code" })).toHaveAttribute(
+      "href",
+      "https://github.com/titatom/immich-gpt",
+    );
   });
 
   it("renders AI metadata enrichment label", async () => {
