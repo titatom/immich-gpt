@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { getSetupStatus, setupCreateAdmin } from "../services/api";
 import { useAuth } from "../contexts/useAuth";
+import BrandLogo from "../components/BrandLogo";
 
 export default function Setup() {
   const navigate = useNavigate();
@@ -92,13 +93,12 @@ export default function Setup() {
         width: "100%",
         maxWidth: 420,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-          <Zap size={28} color="#38bdf8" />
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9" }}>Immich GPT</div>
-            <div style={{ fontSize: 12, color: "#64748b" }}>AI Metadata Enrichment</div>
-          </div>
-        </div>
+        <BrandLogo
+          variant="stacked"
+          size="auth"
+          subtitle="AI metadata and album organization for Immich"
+          style={{ marginBottom: 32 }}
+        />
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <UserPlus size={18} color="#38bdf8" />

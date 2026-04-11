@@ -1,17 +1,107 @@
 # immich-gpt
 
-> AI-first metadata enrichment and organization for Immich — "Paperless-GPT for Immich"
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="immich-gpt logo" width="320" />
+</p>
 
-A self-hosted web app that connects to your Immich instance, processes your photos one-by-one with AI, and suggests metadata enrichments for human review before writing anything back.
+**AI metadata enrichment and album organization for Immich.**
 
-## What it does
+immich-gpt is a self-hosted app that connects to your Immich library, uses AI to suggest descriptions, tags, and album placement, and lets you review every result before anything is written back.
 
-- **Connects** to your Immich instance and syncs asset metadata
-- **Fetches thumbnails** server-side (never exposes your Immich credentials to AI providers)
-- **Classifies** each asset into a user-defined Bucket using an AI vision model
-- **Generates** description and tag suggestions per asset
-- **Stages** all suggestions in a review queue — nothing is written automatically
-- **After approval**, writes descriptions and tags back to Immich
+## Why use it
+
+- Make large photo libraries easier to search
+- Add useful descriptions and tags with AI assistance
+- Organize assets into albums or sub-albums with bucket rules
+- Keep a human review step before write-back
+- Use OpenAI, OpenRouter, or local Ollama models
+
+## What it helps with
+
+### Better metadata
+
+immich-gpt analyzes each synced asset and suggests:
+
+- a bucket/category
+- a description
+- search-friendly tags
+- an album or sub-album name when relevant
+
+### Smarter album organization
+
+Buckets let you control what approval means for each kind of asset:
+
+- **Virtual** keeps the result inside immich-gpt only
+- **Immich Album** sends approved assets to a specific existing album
+- **Parent Group** lets AI suggest sub-albums under a broader bucket
+- **Immich Trash** supports review-first clean-up workflows
+
+### Review before write-back
+
+Nothing is written back automatically. In the review queue you can:
+
+- approve as-is
+- edit the bucket, description, tags, or album
+- reject the suggestion
+- re-run AI analysis on an asset
+
+## How to use it
+
+### 1. Connect Immich and your AI provider
+
+Go through the setup flow, then open **Settings** and configure:
+
+- your Immich URL and API key
+- an AI provider such as OpenAI, OpenRouter, or Ollama
+- whether AI may create new tags or new album names
+
+### 2. Create a few buckets
+
+Buckets are the categories the AI uses to organize your library. A simple starting point is:
+
+- **Family** -> Parent Group
+- **Travel** -> Parent Group
+- **Receipts** -> Virtual
+- **Favourites Archive** -> Immich Album
+- **Trash** -> Immich Trash
+
+Each bucket can have its own prompt, priority, and confidence threshold.
+
+### 3. Sync and run AI
+
+From the dashboard, choose a scope:
+
+- **All Photos & Videos**
+- **Favourites Only**
+- **Specific Albums**
+
+Then choose a workflow:
+
+- **Sync Only**
+- **Sync + AI**
+- **AI Only**
+
+For a first run, **Sync + AI** is usually the easiest option.
+
+### 4. Review and approve
+
+Open **Review** to check the suggestions. For each asset you can:
+
+- change the bucket
+- rewrite the description
+- add or remove tags
+- accept or change the album/sub-album
+- approve or reject the result
+
+### 5. Roll it out gradually
+
+A good first rollout is:
+
+1. start with a few clear buckets
+2. run on favourites or specific albums
+3. review results closely
+4. adjust prompts and priorities
+5. expand to more of your library
 
 ## Architecture
 

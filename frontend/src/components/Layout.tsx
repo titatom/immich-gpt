@@ -3,9 +3,10 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getReviewCount } from "../services/api";
 import { useAuth } from "../contexts/useAuth";
+import BrandLogo from "./BrandLogo";
 import {
   LayoutDashboard, Eye, FolderKanban, MessageSquare,
-  Settings, Activity, Zap, Images, ClipboardList, Users, LogOut,
+  Settings, Activity, Images, ClipboardList, Users, LogOut,
 } from "lucide-react";
 import styles from "./Layout.module.css";
 
@@ -32,11 +33,7 @@ export default function Layout() {
     <div className={styles.root}>
       <nav className={styles.sidebar}>
         <div className={styles.logo}>
-          <div className={styles.logoRow}>
-            <Zap size={22} color="var(--accent)" />
-            <span className={styles.logoTitle}>Immich GPT</span>
-          </div>
-          <div className={styles.logoSub}>AI Metadata Enrichment</div>
+          <BrandLogo size="sidebar" />
         </div>
 
         <div className={styles.nav}>

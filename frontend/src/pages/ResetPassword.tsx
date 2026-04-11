@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap } from "lucide-react";
 import { resetPassword } from "../services/api";
+import BrandLogo from "../components/BrandLogo";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -53,10 +53,7 @@ export default function ResetPassword() {
         width: "100%",
         maxWidth: 400,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-          <Zap size={28} color="#38bdf8" />
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#f1f5f9" }}>Immich GPT</div>
-        </div>
+        <BrandLogo variant="stacked" size="auth" showSubtitle={false} style={{ marginBottom: 32 }} />
 
         <h1 style={{ fontSize: 18, fontWeight: 600, color: "#f1f5f9", margin: "0 0 24px" }}>
           Reset password

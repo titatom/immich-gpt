@@ -22,26 +22,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.logoRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logoTitle {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.3px;
-}
-
-.logoSub {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  margin-top: 4px;
-  padding-left: 32px;
-}
-
 .nav {
   flex: 1;
   padding: var(--space-4) var(--space-3);

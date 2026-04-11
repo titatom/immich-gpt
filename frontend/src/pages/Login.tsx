@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
 import { getSetupStatus } from "../services/api";
-import { Zap } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import styles from "./Login.module.css";
 
 export default function Login() {
@@ -49,13 +49,12 @@ export default function Login() {
   return (
     <div className={styles.root}>
       <div className={styles.card}>
-        <div className={styles.logoRow}>
-          <Zap size={28} color="var(--accent)" />
-          <div>
-            <div className={styles.logoTitle}>Immich GPT</div>
-            <div className={styles.logoSub}>AI Metadata Enrichment</div>
-          </div>
-        </div>
+        <BrandLogo
+          variant="stacked"
+          size="auth"
+          subtitle="AI metadata and album organization for Immich"
+          className={styles.logoRow}
+        />
 
         <h1 className={styles.heading}>Sign in</h1>
 
