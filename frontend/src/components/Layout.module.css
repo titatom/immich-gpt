@@ -91,6 +91,32 @@
   border-top: 1px solid var(--border);
 }
 
+.licenseNotice {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.licenseText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.sourceLink {
+  color: var(--accent);
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+
+.sourceLink:hover {
+  text-decoration: underline;
+}
+
 .userInfo {
   margin-bottom: var(--space-2);
 }

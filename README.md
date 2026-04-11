@@ -291,6 +291,15 @@ npm test
 
 See [`docs/reverse-proxy.md`](docs/reverse-proxy.md) for Nginx and Caddy configuration examples, including the SSE stream endpoint and `SESSION_COOKIE_SECURE` guidance.
 
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0.
+See [`LICENSE`](LICENSE) for the full text.
+
+If you modify immich-gpt and let users interact with that modified version
+over a network, AGPL-3.0 requires you to make the corresponding source code
+of that version available to those users.
+
 ## Roadmap
 
 - [ ] Asset detail view
