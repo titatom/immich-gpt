@@ -30,7 +30,7 @@ export default function BrandLogo({
   variant = "stacked",
   size = "auth",
   subtitle = DEFAULT_SUBTITLE,
-  showSubtitle = true,
+  showSubtitle = false,
   alt = "Immich GPT logo",
   className = "",
   style,

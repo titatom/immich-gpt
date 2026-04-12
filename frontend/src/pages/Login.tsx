@@ -52,7 +52,6 @@ export default function Login() {
         <BrandLogo
           variant="stacked"
           size="auth"
-          subtitle="AI metadata and album organization for Immich"
           className={styles.logoRow}
         />
 
