@@ -133,6 +133,36 @@
   color: var(--text-muted);
 }
 
+.donateBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  margin-bottom: var(--space-2);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 6px;
+  color: #fbbf24;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.donateBtn:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28), rgba(239, 68, 68, 0.22));
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fcd34d;
+}
+
+.donateIcon {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
 .signOutBtn {
   display: flex;
   align-items: center;

@@ -6,7 +6,7 @@ import { useAuth } from "../contexts/useAuth";
 import BrandLogo from "./BrandLogo";
 import {
   LayoutDashboard, Eye, FolderKanban, MessageSquare,
-  Settings, Activity, Images, ClipboardList, Users, LogOut,
+  Settings, Activity, Images, ClipboardList, Users, LogOut, Heart,
 } from "lucide-react";
 import styles from "./Layout.module.css";
 
@@ -22,6 +22,8 @@ const navItems = [
 ];
 
 const REPOSITORY_URL = "https://github.com/titatom/immich-gpt";
+const DONATE_URL =
+  "https://www.paypal.com/donate/?business=P9PZB949MYSD8&no_recurring=0&item_name=Thanks+for+helping+me+continuing+to+develop+this+app+%21&currency_code=CAD";
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
@@ -89,6 +91,15 @@ export default function Layout() {
               Source code
             </a>
           </div>
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={styles.donateBtn}
+          >
+            <Heart size={13} className={styles.donateIcon} />
+            Donate
+          </a>
           <button onClick={logout} className={styles.signOutBtn}>
             <LogOut size={13} />
             Sign out
