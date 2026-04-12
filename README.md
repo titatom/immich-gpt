@@ -6,16 +6,19 @@
 
 **AI metadata enrichment and album organization for Immich.**
 
-immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket or album placement, and lets you approve every change before it is written back.
+immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket/album placement, and lets you approve every change before it is written back.
 
 ## Key highlights
 
-- Review-first workflow: nothing is written back automatically
-- Built for Immich: sync your library, classify assets, and organize albums
-- Flexible providers: OpenAI, OpenRouter, and self-hosted Ollama
-- Safe image handling: private Immich URLs are not sent to external providers
-- Simple deployment: one Docker image, one container, optional Redis only if you want it
-- Multi-user support: first-run setup, admin-managed users, per-user settings
+🧠 AI-driven — built to let AI do the heavy lifting instead of making you sort your library like it’s 2012.
+
+🗂️ Automatic album classification — helps sort assets into albums and sub-albums so your Immich library feels organized.
+
+🏷️ Metadata enrichment — generates useful descriptions and tags to make search, browsing, and rediscovery easier.
+
+🔒 Safe by design — private Immich URLs are not exposed to external providers.
+
+🏠 Local-friendly — works with self-hosted Ollama, so you can keep things close to home
 
 ## Table of contents
 
