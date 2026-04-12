@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getReviewCount } from "../services/api";
 import { useAuth } from "../contexts/useAuth";
+import { useJobCompletion } from "../hooks/useJobCompletion";
 import BrandLogo from "./BrandLogo";
 import {
   LayoutDashboard, Eye, FolderKanban, MessageSquare,
@@ -26,6 +27,7 @@ const DONATE_URL =
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
+  useJobCompletion();
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["review-count"],
     queryFn: () => getReviewCount("pending_review"),
