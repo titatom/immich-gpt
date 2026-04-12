@@ -17,7 +17,7 @@ data/
 # Frontend
 node_modules/
 frontend/dist/
-backend/static/assets/
+backend/static/
 
 # Logs
 logs/
