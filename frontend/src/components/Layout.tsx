@@ -84,7 +84,7 @@ export default function Layout() {
               href={REPOSITORY_URL}
               target="_blank"
               rel="noreferrer"
-              className={styles.licenseLink}
+              className={styles.sourceLink}
             >
               Source code
             </a>
