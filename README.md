@@ -11,9 +11,13 @@ immich-gpt is a self-hosted web app that connects to your Immich library, pulls 
 ## Key highlights
 
 🧠 AI-driven — built to let AI do the heavy lifting instead of making you sort your library like it’s 2012.
+
 🗂️ Automatic album classification — helps sort assets into albums and sub-albums so your Immich library feels organized.
+
 🏷️ Metadata enrichment — generates useful descriptions and tags to make search, browsing, and rediscovery easier.
+
 🔒 Safe by design — private Immich URLs are not exposed to external providers.
+
 🏠 Local-friendly — works with self-hosted Ollama, so you can keep things close to home
 
 ## Table of contents
