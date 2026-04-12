@@ -1,7 +1,7 @@
 # immich-gpt
 
 <p align="center">
-  <img src="frontend/public/logo.svg" alt="immich-gpt logo" width="320" />
+  <img src="frontend/public/logo.png" alt="immich-gpt logo" width="320" />
 </p>
 
 **AI metadata enrichment and review-first organization for Immich.**
