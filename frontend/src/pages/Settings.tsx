@@ -10,9 +10,10 @@ import {
   getProviderModels,
   getBehaviourSettings,
   saveBehaviourSettings,
+  getHealth,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
-import { CheckCircle, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
+import { CheckCircle, AlertTriangle, Plus, Trash2, Pencil, Heart, Github, Scale } from "lucide-react";
 
 const inputStyle: React.CSSProperties = {
   background: "#1e293b",
@@ -561,6 +562,139 @@ function BehaviourSection() {
   );
 }
 
+const REPOSITORY_URL = "https://github.com/titatom/immich-gpt";
+const DONATE_URL =
+  "https://www.paypal.com/donate/?business=P9PZB949MYSD8&no_recurring=0&item_name=Thanks+for+helping+me+continuing+to+develop+this+app+%21&currency_code=CAD";
+
+function AboutSection() {
+  const { data: health } = useQuery({ queryKey: ["health"], queryFn: getHealth });
+
+  const linkStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "8px 16px",
+    borderRadius: 8,
+    border: "1px solid #334155",
+    background: "transparent",
+    color: "#94a3b8",
+    fontSize: 13,
+    fontWeight: 500,
+    textDecoration: "none",
+    transition: "all 0.15s ease",
+    cursor: "pointer",
+  };
+
+  return (
+    <Section title="About">
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Version row */}
+        <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Version</div>
+            <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 600, fontFamily: "monospace" }}>
+              {health?.version ?? "—"}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>License</div>
+            <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 600 }}>AGPL-3.0</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.05em" }}>Author</div>
+            <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 600 }}>titatom</div>
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid #334155" }} />
+
+        {/* Links */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a
+            href={REPOSITORY_URL}
+            target="_blank"
+            rel="noreferrer"
+            style={linkStyle}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.color = "#f1f5f9";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "#64748b";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "#334155";
+            }}
+          >
+            <Github size={14} />
+            Source Code
+          </a>
+          <a
+            href={`${REPOSITORY_URL}/blob/main/LICENSE`}
+            target="_blank"
+            rel="noreferrer"
+            style={linkStyle}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.color = "#f1f5f9";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "#64748b";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "#334155";
+            }}
+          >
+            <Scale size={14} />
+            License
+          </a>
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              ...linkStyle,
+              background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.12))",
+              border: "1px solid rgba(245,158,11,0.35)",
+              color: "#fbbf24",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background =
+                "linear-gradient(135deg, rgba(245,158,11,0.28), rgba(239,68,68,0.22))";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(245,158,11,0.6)";
+              (e.currentTarget as HTMLAnchorElement).style.color = "#fcd34d";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background =
+                "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.12))";
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(245,158,11,0.35)";
+              (e.currentTarget as HTMLAnchorElement).style.color = "#fbbf24";
+            }}
+          >
+            <Heart size={14} style={{ fill: "currentColor" }} />
+            Donate
+          </a>
+        </div>
+
+        <div style={{ borderTop: "1px solid #334155" }} />
+
+        {/* Environment variables */}
+        <div>
+          <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Environment Variables
+          </div>
+          <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.8, fontFamily: "monospace", background: "#0f172a", borderRadius: 8, padding: "12px 16px" }}>
+            <div>IMMICH_URL=http://immich.local:2283</div>
+            <div>IMMICH_API_KEY=your-api-key</div>
+            <div>OPENAI_API_KEY=sk-...</div>
+            <div>OPENAI_MODEL=gpt-4o</div>
+            <div>REDIS_URL=redis://redis:6379/0</div>
+          </div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 8 }}>
+            Set these in your <code style={{ background: "#0f172a", padding: "1px 4px", borderRadius: 3 }}>.env</code> file or Docker environment.
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 export default function Settings() {
   return (
     <div style={{ padding: "32px 40px", maxWidth: 700 }}>
@@ -574,23 +708,7 @@ export default function Settings() {
       <ImmichSection />
       <BehaviourSection />
       <ProvidersSection />
-
-      {/* Environment info */}
-      <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", margin: "0 0 12px" }}>
-          Environment Variables
-        </h3>
-        <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.8, fontFamily: "monospace" }}>
-          <div>IMMICH_URL=http://immich.local:2283</div>
-          <div>IMMICH_API_KEY=your-api-key</div>
-          <div>OPENAI_API_KEY=sk-...</div>
-          <div>OPENAI_MODEL=gpt-4o</div>
-          <div>REDIS_URL=redis://redis:6379/0</div>
-        </div>
-        <div style={{ fontSize: 12, color: "#475569", marginTop: 12 }}>
-          Set these in your <code style={{ background: "#0f172a", padding: "1px 4px", borderRadius: 3 }}>.env</code> file or Docker environment.
-        </div>
-      </div>
+      <AboutSection />
     </div>
   );
 }
