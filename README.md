@@ -1,63 +1,140 @@
 # immich-gpt
 
 <p align="center">
-  <img src="frontend/public/logo.png" alt="immich-gpt logo" width="320" />
+  <img src="frontend/public/logo.svg" alt="immich-gpt logo" width="320" />
 </p>
 
-**AI metadata enrichment and album organization for Immich.**
+**AI metadata enrichment and review-first organization for Immich.**
 
-immich-gpt is a self-hosted app that connects to your Immich library, uses AI to suggest descriptions, tags, and album placement, and lets you review every result before anything is written back.
+immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket placement, and lets you approve every change before it is written back.
 
-## Why use it
+## Key highlights
 
-- Make large photo libraries easier to search
-- Add useful descriptions and tags with AI assistance
-- Organize assets into albums or sub-albums with bucket rules
-- Keep a human review step before write-back
-- Use OpenAI, OpenRouter, or local Ollama models
+- Review-first workflow: nothing is written back automatically
+- Built for Immich: sync your library, classify assets, and organize albums
+- Flexible providers: OpenAI, OpenRouter, and self-hosted Ollama
+- Safe image handling: private Immich URLs are not sent to external providers
+- Simple deployment: one Docker image, one container, optional Redis only if you want it
+- Multi-user support: first-run setup, admin-managed users, per-user settings
 
-## What it helps with
+## Table of contents
+
+- [What immich-gpt does](#what-immich-gpt-does)
+- [Documentation map](#documentation-map)
+- [Quick start](#quick-start)
+- [Typical workflow](#typical-workflow)
+- [Features](#features)
+- [Deployment options](#deployment-options)
+- [Configuration overview](#configuration-overview)
+- [API and health endpoints](#api-and-health-endpoints)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## What immich-gpt does
+
+immich-gpt helps you enrich and organize large photo libraries without giving up control.
 
 ### Better metadata
 
-immich-gpt analyzes each synced asset and suggests:
+For each synced asset, immich-gpt can suggest:
 
-- a bucket/category
-- a description
+- a bucket or category
+- a natural-language description
 - search-friendly tags
-- an album or sub-album name when relevant
+- an album or sub-album name when your bucket rules allow it
 
-### Smarter album organization
+### Smarter organization
 
 Buckets let you control what approval means for each kind of asset:
 
-- **Virtual** keeps the result inside immich-gpt only
-- **Immich Album** sends approved assets to a specific existing album
-- **Parent Group** lets AI suggest sub-albums under a broader bucket
-- **Immich Trash** supports review-first clean-up workflows
+- **Virtual**: keep the classification inside immich-gpt only
+- **Immich Album**: map approved assets into a specific Immich album
+- **Parent Group**: let AI suggest sub-albums under a broader bucket
+- **Immich Trash**: build a review-first cleanup workflow
 
 ### Review before write-back
 
-Nothing is written back automatically. In the review queue you can:
+The review queue lets you:
 
 - approve as-is
-- edit the bucket, description, tags, or album
+- edit the bucket, description, tags, or album suggestion
 - reject the suggestion
-- re-run AI analysis on an asset
+- re-run AI analysis when you want another pass
 
-## How to use it
+## Documentation map
 
-### 1. Connect Immich and your AI provider
+Start here, then jump to the guide that matches your job.
 
-Go through the setup flow, then open **Settings** and configure:
+| Guide | What it covers |
+|------|-----------------|
+| [`docs/getting-started.md`](docs/getting-started.md) | First install, first login, and a safe first workflow |
+| [`DOCKER.md`](DOCKER.md) | Docker Compose, `docker run`, Unraid, Redis workers, upgrades |
+| [`docs/reverse-proxy.md`](docs/reverse-proxy.md) | Nginx, Caddy, Traefik, HTTPS, and SSE buffering |
+| [`docs/configuration.md`](docs/configuration.md) | Environment variables, provider settings, cookies, workers, CORS |
+| [`docs/architecture.md`](docs/architecture.md) | System design, data flow, jobs, storage, and write-back |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Startup, login, Immich connectivity, SSE, providers, password reset |
+| [`docs/development.md`](docs/development.md) | Local development, tests, frontend build, and Alembic |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute changes to the project |
 
-- your Immich URL and API key
-- an AI provider such as OpenAI, OpenRouter, or Ollama
-- whether AI may create new tags or new album names
+## Quick start
+
+The fastest path is Docker Compose.
+
+1. Copy the sample environment file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set at minimum:
+
+   - `IMMICH_URL`
+   - `IMMICH_API_KEY`
+   - `DATA_DIR`
+
+   `SECRET_KEY` can be left blank in Docker deployments. The container will generate one on first boot and persist it under `/data/.secret_key`.
+
+3. Start the app:
+
+   ```bash
+   docker compose up -d
+   ```
+
+4. Open `http://localhost:8000`.
+
+5. Complete the first-run setup wizard to create the initial admin account.
+
+6. Open **Settings** and configure:
+
+   - your Immich connection
+   - your preferred AI provider
+   - whether new tags and new album names may be created
+
+7. Go to **Dashboard** and run **Sync + AI**.
+
+8. Open **Review** and approve, edit, or reject each suggestion.
+
+If you are serving the app behind HTTPS, set `SESSION_COOKIE_SECURE=true`. If you are running on a plain HTTP LAN, leave it `false`.
+
+For full install details, read [`docs/getting-started.md`](docs/getting-started.md) and [`DOCKER.md`](DOCKER.md).
+
+## Typical workflow
+
+### 1. Connect Immich and your provider
+
+In **Settings**, save your Immich URL and API key, then add an AI provider:
+
+- **OpenAI**
+- **OpenRouter**
+- **Ollama**
+
+Immich settings saved in the UI are stored in the database and override `IMMICH_URL` and `IMMICH_API_KEY` environment values for that user.
 
 ### 2. Create a few buckets
 
-Buckets are the categories the AI uses to organize your library. A simple starting point is:
+A simple starter set is:
 
 - **Family** -> Parent Group
 - **Travel** -> Parent Group
@@ -65,11 +142,11 @@ Buckets are the categories the AI uses to organize your library. A simple starti
 - **Favourites Archive** -> Immich Album
 - **Trash** -> Immich Trash
 
-Each bucket can have its own prompt, priority, and confidence threshold.
+Each bucket can define its own prompt guidance, priority, and confidence threshold.
 
-### 3. Sync and run AI
+### 3. Pick a sync scope
 
-From the dashboard, choose a scope:
+From **Dashboard**, choose:
 
 - **All Photos & Videos**
 - **Favourites Only**
@@ -85,225 +162,186 @@ For a first run, **Sync + AI** is usually the easiest option.
 
 ### 4. Review and approve
 
-Open **Review** to check the suggestions. For each asset you can:
+In **Review**, you can:
 
 - change the bucket
 - rewrite the description
 - add or remove tags
-- accept or change the album/sub-album
+- accept or replace the album suggestion
 - approve or reject the result
 
-### 5. Roll it out gradually
+### 5. Roll out gradually
 
-A good first rollout is:
+A safe rollout looks like this:
 
 1. start with a few clear buckets
-2. run on favourites or specific albums
-3. review results closely
-4. adjust prompts and priorities
-5. expand to more of your library
-
-## Architecture
-
-```
-┌─────────────┐    ┌──────────────────────┐    ┌────────────┐
-│   Browser   │───▶│   FastAPI (Python)   │───▶│   Immich   │
-│  React SPA  │    │                      │    │   Server   │
-└─────────────┘    │  ImmichClient        │    └────────────┘
-                   │  ImagePrepService    │
-                   │  OpenAIProvider      │───▶ OpenAI API
-                   │  OllamaProvider      │     (base64 data URL,
-                   │  OpenRouterProvider  │      never raw URL)
-                   │  PromptAssembly      │
-                   │  ClassificationOrch  │
-                   │  ReviewDecisionSvc   │
-                   │  JobProgressService  │
-                   └──────────────────────┘
-                          │
-                   ┌──────┘
-                   ▼
-              SQLite DB
-           (persistent vol)
-```
-
-Background jobs run in-process via a `ThreadPoolExecutor` by default — no
-extra services needed.  If you already run Redis on your home lab, set
-`REDIS_URL` and jobs will be dispatched through RQ instead.
-
-## Quick Start
-
-1. Copy the example env file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` with your Immich URL, API key, and (optionally) an OpenAI key.
-
-3. Run with Docker Compose:
-   ```bash
-   docker compose up -d
-   ```
-
-   If your Docker install is too old for `docker compose build` (for example older Unraid packages), use the published image with `docker compose up -d`, or build locally with `./build.sh` and then start Compose.
-
-4. Open http://localhost:8000 in your browser.
-
-5. Complete the **setup wizard** to create the first admin account.
-
-6. Go to **Dashboard** → **Sync Assets** to pull your Immich library.
-
-7. Click **Run AI Classification** to start processing.
-
-8. Go to **Review** to approve or edit each suggestion.
-
-## Default Buckets
-
-| Bucket | Purpose |
-|--------|---------|
-| Documents | Receipts, invoices, forms, scans, photos of paper |
-| Business | Work sites, tools, project documentation |
-| Personal | Family, travel, events, everyday life |
-| Trash | Blurry, accidental, no-value shots |
-
-Documents always beats Business when the asset is clearly a receipt, invoice, contract, or photo of paper.
-
-Trash is **non-destructive** — nothing is ever deleted automatically.
+2. run on favourites or specific albums first
+3. review the early results closely
+4. refine prompts and bucket rules
+5. expand to more of the library
 
 ## Features
 
-### AI-First Pipeline
-- One AI call per asset (image + metadata combined)
-- Structured JSON output with strict schema validation
-- Malformed responses surfaced as errors, never silently dropped
+### AI-first pipeline
 
-### Image Handling
-- Thumbnails fetched server-side from Immich
-- Converted to base64 data URLs before sending to AI provider
-- Private Immich URLs **never** passed to external providers
+- one AI call per asset with image plus metadata context
+- structured JSON responses with schema validation
+- bad provider responses are surfaced as errors instead of silently ignored
 
-### AI Providers
-- **OpenAI** — GPT-4o (default), GPT-4o-mini, or any vision model
-- **Ollama** — local models (llava, llava-phi3, moondream, etc.)
-- **OpenRouter** — any model available on openrouter.ai
-- All configured per-user in the UI; API keys never leave your server
+### Image handling
 
-### Prompt System
-- Global classification, description, and tags prompts
-- Per-bucket classification prompts
-- All prompts stored in DB, editable in UI, versioned
+- thumbnails are fetched server-side from Immich
+- images are converted to base64 data URLs before being sent to providers
+- private Immich URLs are never passed directly to external AI services
 
-### Review Workflow
-- Thumbnail shown for every item
-- Approve/edit description, tags, bucket
-- Override bucket with dropdown
-- Bulk approve/reject
-- Clicking thumbnail opens large preview
+### Prompt system
 
-### Jobs & Progress
-- Real-time progress bar (processed/total, %, step)
-- Live log panel per job
-- Job states: queued → syncing → preparing_image → classifying_ai → completed
-- Pause, resume, and cancel support
+- global prompts for classification, descriptions, and tags
+- per-bucket prompts for tighter control
+- prompts are stored in the database and editable in the UI
 
-### Write-back
-- Explicit: only after user approval
-- Logged to AuditLog table
-- Failures surfaced clearly (not silently swallowed)
-- External library write limitations detected and warned
+### Review workflow
 
-## Tech Stack
+- thumbnails for each item
+- edit-before-approve controls
+- bulk approve and reject actions
+- large preview on thumbnail click
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.12 + FastAPI |
-| Database | SQLite (persistent volume) |
-| Background jobs | ThreadPoolExecutor (built-in); optional Redis + RQ |
-| Frontend | React 18 + TypeScript + Vite |
-| AI | OpenAI, Ollama, OpenRouter |
-| Container | Docker + Docker Compose |
+### Jobs and progress
 
-## Environment Variables
+- live progress tracking
+- job logs in the UI
+- job states such as `queued`, `syncing_assets`, `preparing_image`, `classifying_ai`, `writing_results`, and `completed`
+- pause, resume, and cancel support
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `IMMICH_URL` | — | Your Immich server URL (can also be set in the UI) |
-| `IMMICH_API_KEY` | — | Immich API key (can also be set in the UI) |
-| `OPENAI_API_KEY` | — | OpenAI API key (optional — configure provider in the UI) |
-| `OPENAI_MODEL` | `gpt-4o` | OpenAI model to use |
-| `APP_PORT` | `8000` | Host port to expose |
-| `REDIS_URL` | *(empty)* | Optional Redis URL — leave blank for built-in thread pool |
-| `WORKER_CONCURRENCY` | `2` | Thread-pool workers (ignored when REDIS_URL is set) |
-| `DATABASE_URL` | `sqlite:////data/immich_gpt.db` | SQLite database path |
-| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
-| `SESSION_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
+### Write-back safeguards
 
-## API Reference
+- explicit approval before write-back
+- audit logging for important actions
+- failures are visible instead of swallowed
+- external library limitations are detected and warned
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET/POST | `/api/settings/immich` | Immich connection settings |
-| GET/POST | `/api/settings/providers` | AI provider config |
-| GET/POST/PATCH/DELETE | `/api/buckets` | Bucket CRUD |
-| GET/POST/PATCH/DELETE | `/api/prompts` | Prompt template CRUD |
-| GET | `/api/assets` | List synced assets |
-| GET | `/api/assets/count` | Asset count |
-| POST | `/api/jobs/sync` | Start asset sync job |
-| POST | `/api/jobs/classify` | Start classification job |
-| GET | `/api/jobs/{id}` | Job status + logs |
-| GET | `/api/jobs/{id}/stream` | SSE stream for real-time job updates |
-| GET | `/api/review/queue` | Review queue |
-| GET | `/api/review/queue/count` | Pending count |
-| POST | `/api/review/item/{id}/approve` | Approve with edits |
-| POST | `/api/review/item/{id}/reject` | Reject suggestion |
-| POST | `/api/review/bulk` | Bulk approve/reject |
-| GET | `/api/thumbnails/{asset_id}` | Proxied thumbnail |
-| GET | `/api/albums` | Immich albums (for bucket mapping) |
+## Deployment options
 
-## Running Tests
+| Option | Best for |
+|--------|----------|
+| Docker Compose | Most users and home labs |
+| Unraid Community Apps | Unraid users who want a template-driven install |
+| `docker run` | Small manual deployments |
+| Redis + RQ worker | Advanced setups that already run Redis |
+| Local development | Contributors working on backend or frontend changes |
+
+immich-gpt runs as a single container by default. Background jobs use an in-process `ThreadPoolExecutor`, so Redis is optional rather than required.
+
+## Configuration overview
+
+The project supports both environment-based defaults and per-user settings in the UI.
+
+### Most important settings
+
+| Setting | Purpose |
+|--------|---------|
+| `IMMICH_URL` | Base URL of your Immich instance |
+| `IMMICH_API_KEY` | Immich API key |
+| `SECRET_KEY` | Session-signing secret; auto-generated in Docker if blank |
+| `SESSION_COOKIE_SECURE` | Must be `true` behind HTTPS, `false` for plain HTTP |
+| `OPENAI_API_KEY` | Optional default OpenAI key |
+| `OPENAI_MODEL` | Default OpenAI model |
+| `REDIS_URL` | Optional Redis for RQ worker mode |
+| `WORKER_CONCURRENCY` | Thread count for built-in background jobs |
+| `LOG_LEVEL` | Logging verbosity |
+
+UI settings take precedence for:
+
+- Immich connection details
+- provider definitions
+- behaviour toggles such as allowing new tags and new albums
+
+The full configuration reference lives in [`docs/configuration.md`](docs/configuration.md).
+
+## API and health endpoints
+
+Useful built-in endpoints:
+
+| Endpoint | Purpose |
+|---------|---------|
+| `/health` | Basic health check |
+| `/api/health` | Health check under the API namespace |
+| `/docs` | Interactive OpenAPI docs |
+| `/redoc` | Alternative API reference UI |
+
+Core API areas include:
+
+- `/api/auth`
+- `/api/settings`
+- `/api/buckets`
+- `/api/prompts`
+- `/api/assets`
+- `/api/jobs`
+- `/api/review`
+- `/api/albums`
+- `/api/thumbnails`
+
+## Architecture
+
+```text
+┌─────────────┐    ┌──────────────────────┐    ┌────────────┐
+│   Browser   │───▶│   FastAPI (Python)   │───▶│   Immich   │
+│  React SPA  │    │                      │    │   Server   │
+└─────────────┘    │  auth + settings     │    └────────────┘
+                   │  sync + job control  │
+                   │  prompt assembly     │
+                   │  review + write-back │───▶ AI provider
+                   └──────────────────────┘     (OpenAI /
+                          │                     OpenRouter /
+                          ▼                     Ollama)
+                     SQLite DB
+                (persistent volume)
+```
+
+FastAPI serves the API and, in production, the built React frontend from `backend/static`. SQLite stores users, settings, prompts, synced assets, suggestions, jobs, and audit logs. Optional Redis can be added when you want RQ workers.
+
+For a deeper architecture walkthrough, see [`docs/architecture.md`](docs/architecture.md).
+
+## Development
+
+### Backend
 
 ```bash
 cd backend
-pip install -r requirements.txt
 python3 -m pytest tests/ -v
 ```
 
-238 backend tests covering auth, admin, settings, assets, buckets, prompts, jobs,
-review, thumbnails, audit logs, AI providers, migrations, user isolation, and more.
+### Frontend
 
 ```bash
 cd frontend
 npm test
+npm run lint
+npx tsc --noEmit
 ```
 
-48 frontend tests (Vitest + React Testing Library).
+### Frontend production build
 
-## Unraid Deployment
+```bash
+cd frontend
+npx vite build
+```
 
-1. Use the published `ghcr.io/titatom/immich-gpt:latest` image in Unraid, or build locally with `./build.sh` if you need a source build on an older Docker stack.
-2. Map `/data` to a persistent path on your array (e.g. `/mnt/user/appdata/immich-gpt`).
-3. Optionally map `/logs` for persistent log files.
-4. Set environment variables in Unraid's Docker template.
-5. Ensure the container can reach your Immich instance on the local network.
-6. On first visit, complete the web setup wizard to create the admin account.
+That build writes static assets into `backend/static` so FastAPI can serve the SPA in production.
 
-## Reverse Proxy / HTTPS
-
-See [`docs/reverse-proxy.md`](docs/reverse-proxy.md) for Nginx and Caddy configuration examples, including the SSE stream endpoint and `SESSION_COOKIE_SECURE` guidance.
-
-## License
-
-This project is licensed under the GNU Affero General Public License v3.0.
-See [`LICENSE`](LICENSE) for the full text.
-
-If you modify immich-gpt and let users interact with that modified version
-over a network, AGPL-3.0 requires you to make the corresponding source code
-of that version available to those users.
+See [`docs/development.md`](docs/development.md) for local run commands, migrations, and contributor workflow details.
 
 ## Roadmap
 
 - [ ] Asset detail view
 - [ ] Video thumbnail support
-- [ ] Duplicate/junk heuristic pre-filter
-- [ ] Immich face/people metadata
-- [ ] SMTP / email delivery for password resets
+- [ ] Duplicate and junk heuristic pre-filter
+- [ ] Immich face and people metadata
+- [ ] SMTP or email delivery for password resets
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0. See [`LICENSE`](LICENSE) for the full text.
+
+If you modify immich-gpt and let users interact with that modified version over a network, AGPL-3.0 requires you to make the corresponding source code of that version available to those users.
