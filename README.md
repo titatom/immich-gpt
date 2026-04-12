@@ -4,9 +4,9 @@
   <img src="frontend/public/logo.png" alt="immich-gpt logo" width="320" />
 </p>
 
-**AI metadata enrichment and review-first organization for Immich.**
+**AI metadata enrichment and album organization for Immich.**
 
-immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket placement, and lets you approve every change before it is written back.
+immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket or album placement, and lets you approve every change before it is written back.
 
 ## Key highlights
 
@@ -43,7 +43,7 @@ For each synced asset, immich-gpt can suggest:
 - a bucket or category
 - a natural-language description
 - search-friendly tags
-- an album or sub-album name when your bucket rules allow it
+- an album or sub-album 
 
 ### Smarter organization
 
