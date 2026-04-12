@@ -151,6 +151,14 @@ if _static_dir_exists:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str, request: Request):
+        # Serve real static files (e.g. logo.png, favicon) that Vite places at
+        # the build root before falling back to the SPA index.html.
+        static_root = os.path.realpath(static_dir)
+        if full_path:
+            candidate = os.path.realpath(os.path.join(static_dir, full_path))
+            # Guard against path-traversal; only serve files inside static_root
+            if candidate.startswith(static_root + os.sep) and os.path.isfile(candidate):
+                return FileResponse(candidate)
         index_file = os.path.join(static_dir, "index.html")
         if os.path.exists(index_file):
             return FileResponse(index_file)
