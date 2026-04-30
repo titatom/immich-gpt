@@ -191,6 +191,11 @@ export const getAssetDetail = (id: string): Promise<AssetDetail> =>
 export const reclassifyAssets = (asset_ids: string[], force = true) =>
   api.post("/assets/reclassify", { asset_ids, force }).then((r) => r.data as { job_id: string; status: string; asset_count: number });
 
+export const assignAssetsToBucket = (asset_ids: string[], bucket_id: string) =>
+  api.post("/assets/assign-bucket", { asset_ids, bucket_id }).then(
+    (r) => r.data as { assigned: number; bucket_id: string; bucket_name: string },
+  );
+
 // --- Jobs ---
 export const getJobs = (params?: { job_type?: string; status?: string; limit?: number }): Promise<JobRun[]> =>
   api.get("/jobs", { params }).then((r) => r.data);

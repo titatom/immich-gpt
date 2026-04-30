@@ -133,6 +133,26 @@ def test_start_sync_job_creates_db_record(client, db):
     assert job.job_type == "asset_sync"
 
 
+def test_start_sync_job_accepts_bucket(client, db):
+    from app.models.bucket import Bucket
+
+    bucket = db.query(Bucket).filter(Bucket.name == "Personal").first()
+    with patch("app.routers.jobs._enqueue") as mock_enqueue:
+        r = client.post("/api/jobs/sync", json={"scope": "all", "bucket_id": bucket.id})
+    assert r.status_code == 200
+    job = db.query(JobRun).filter(JobRun.id == r.json()["job_id"]).first()
+    assert job.params_json["bucket_id"] == bucket.id
+    args = mock_enqueue.call_args.args
+    assert args[-1] == bucket.id
+
+
+def test_start_sync_job_rejects_unknown_bucket(client):
+    with patch("app.routers.jobs._enqueue") as mock_enqueue:
+        r = client.post("/api/jobs/sync", json={"scope": "all", "bucket_id": "missing"})
+    assert r.status_code == 404
+    mock_enqueue.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # POST /api/jobs/classify
 # ---------------------------------------------------------------------------

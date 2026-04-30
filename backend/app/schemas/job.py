@@ -40,3 +40,4 @@ class SyncJobRequest(BaseModel):
 
     scope: Literal["all", "favorites", "albums"] = "all"
     album_ids: Optional[List[str]] = None
+    bucket_id: Optional[str] = None

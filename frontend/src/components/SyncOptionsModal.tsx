@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X, RefreshCw, Star, FolderOpen, ChevronDown, ChevronUp, Loader } from "lucide-react";
-import { getAlbums } from "../services/api";
-import type { SyncScope, ImmichAlbum } from "../types";
+import { getAlbums, getBuckets } from "../services/api";
+import type { SyncScope, ImmichAlbum, Bucket } from "../types";
 
 interface Props {
   onClose: () => void;
-  onConfirm: (scope: SyncScope, albumIds?: string[]) => void;
+  onConfirm: (scope: SyncScope, albumIds?: string[], bucketId?: string) => void;
   isLoading?: boolean;
 }
 
@@ -29,12 +29,18 @@ const SELECTED_CARD_STYLE: React.CSSProperties = {
 export default function SyncOptionsModal({ onClose, onConfirm, isLoading = false }: Props) {
   const [scope, setScope] = useState<SyncScope>("all");
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
+  const [selectedBucketId, setSelectedBucketId] = useState("");
   const [albumSearchQuery, setAlbumSearchQuery] = useState("");
   const [albumsExpanded, setAlbumsExpanded] = useState(true);
 
   const { data: albums = [], isLoading: albumsLoading } = useQuery<ImmichAlbum[]>({
     queryKey: ["albums"],
     queryFn: getAlbums,
+  });
+
+  const { data: buckets = [] } = useQuery<Bucket[]>({
+    queryKey: ["buckets"],
+    queryFn: getBuckets,
   });
 
   const filteredAlbums = albums.filter((a) =>
@@ -55,9 +61,9 @@ export default function SyncOptionsModal({ onClose, onConfirm, isLoading = false
 
   const handleConfirm = () => {
     if (scope === "albums") {
-      onConfirm(scope, Array.from(selectedAlbumIds));
+      onConfirm(scope, Array.from(selectedAlbumIds), selectedBucketId || undefined);
     } else {
-      onConfirm(scope);
+      onConfirm(scope, undefined, selectedBucketId || undefined);
     }
   };
 
@@ -405,6 +411,29 @@ export default function SyncOptionsModal({ onClose, onConfirm, isLoading = false
               )}
             </div>
           )}
+
+          <div style={{ marginTop: 20 }}>
+            <label style={{ display: "block", fontSize: 12, color: "#94a3b8", fontWeight: 600, marginBottom: 8 }}>
+              Assign synced assets to bucket
+            </label>
+            <select
+              value={selectedBucketId}
+              onChange={(e) => setSelectedBucketId(e.target.value)}
+              style={{
+                width: "100%", boxSizing: "border-box", background: "#1e293b",
+                border: "1px solid #334155", color: "#e2e8f0", borderRadius: 8,
+                padding: "8px 12px", fontSize: 13,
+              }}
+            >
+              <option value="">Do not assign a bucket</option>
+              {buckets.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+              When selected, every asset pulled by this sync is marked as approved in that bucket.
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

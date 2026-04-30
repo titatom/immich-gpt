@@ -8,7 +8,7 @@ import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
 import SyncOptionsModal from "../components/SyncOptionsModal";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp, Pause, RotateCcw, Trash2 } from "lucide-react";
-import type { SyncScope } from "../types";
+import type { SyncJobRequest, SyncScope } from "../types";
 import styles from "./Jobs.module.css";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
@@ -28,7 +28,7 @@ export default function Jobs() {
   });
 
   const syncMut = useMutation({
-    mutationFn: (params: { scope: SyncScope; album_ids?: string[] }) => startSyncJob(params),
+    mutationFn: (params: SyncJobRequest) => startSyncJob(params),
     onSuccess: (d) => { setShowSyncModal(false); qc.invalidateQueries({ queryKey: ["jobs"] }); setExpandedJobId(d.job_id); },
   });
 
@@ -132,7 +132,7 @@ export default function Jobs() {
       {showSyncModal && (
         <SyncOptionsModal
           onClose={() => setShowSyncModal(false)}
-          onConfirm={(scope, albumIds) => syncMut.mutate({ scope, album_ids: albumIds })}
+          onConfirm={(scope, albumIds, bucketId) => syncMut.mutate({ scope, album_ids: albumIds, bucket_id: bucketId })}
           isLoading={syncMut.isPending}
         />
       )}

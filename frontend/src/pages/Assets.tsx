@@ -3,13 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   getAssets, getAssetCount, getAllAssetIds, getAssetDetail, getThumbnailUrl,
-  getBuckets, reclassifyAssets, UNSCANNED_BUCKET_FILTER,
+  assignAssetsToBucket, getBuckets, reclassifyAssets, UNSCANNED_BUCKET_FILTER,
 } from "../services/api";
 import type { Asset, AssetDetail, Bucket } from "../types";
 import {
   Search, Image as ImageIcon, ArrowUp, ArrowDown, ArrowUpDown,
   X, Star, Archive, ExternalLink, Camera, MapPin, Tag, Calendar,
-  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw,
+  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, FolderOpen,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -456,6 +456,8 @@ export default function Assets() {
   const [selectAllPages, setSelectAllPages] = React.useState(false);
   const [loadingAllIds, setLoadingAllIds] = React.useState(false);
   const [reclassifyMessage, setReclassifyMessage] = React.useState<string | null>(null);
+  const [assignBucketId, setAssignBucketId] = React.useState("");
+  const [assignBucketMessage, setAssignBucketMessage] = React.useState<string | null>(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -530,6 +532,23 @@ export default function Assets() {
     },
   });
 
+  const assignBucketMut = useMutation({
+    mutationFn: (params: { assetIds: string[]; bucketId: string }) =>
+      assignAssetsToBucket(params.assetIds, params.bucketId),
+    onSuccess: (data) => {
+      setAssignBucketMessage(
+        `Assigned ${data.assigned} asset${data.assigned !== 1 ? "s" : ""} to ${data.bucket_name}.`
+      );
+      setSelectedIds(new Set());
+      setSelectAllPages(false);
+      setAssignBucketId("");
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["asset-count"] });
+      qc.invalidateQueries({ queryKey: ["bucket-stats"] });
+      setTimeout(() => setAssignBucketMessage(null), 5000);
+    },
+  });
+
   // Client-side search filter only (server handles bucket/type)
   const filtered = search
     ? assets.filter((a) =>
@@ -591,6 +610,37 @@ export default function Assets() {
         {someSelected && (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#94a3b8" }}>{selectedIds.size} selected</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#94a3b8" }}>
+              Bucket
+              <select
+                aria-label="Bucket"
+                value={assignBucketId}
+                onChange={(e) => setAssignBucketId(e.target.value)}
+                style={{
+                  background: "#1e293b", border: "1px solid #334155", color: "#94a3b8",
+                  borderRadius: 8, padding: "8px 12px", fontSize: 13, minWidth: 180,
+                }}
+              >
+                <option value="">Choose bucket...</option>
+                {buckets.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={() => assignBucketMut.mutate({ assetIds: Array.from(selectedIds), bucketId: assignBucketId })}
+              disabled={!assignBucketId || assignBucketMut.isPending}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "8px 16px", borderRadius: 8, border: "none",
+                background: "#0ea5e9", color: "white", fontSize: 13, fontWeight: 600,
+                cursor: (!assignBucketId || assignBucketMut.isPending) ? "not-allowed" : "pointer",
+                opacity: (!assignBucketId || assignBucketMut.isPending) ? 0.6 : 1,
+              }}
+            >
+              <FolderPlus size={13} />
+              {assignBucketMut.isPending ? "Assigning…" : "Assign bucket"}
+            </button>
             <button
               onClick={() => reclassifyMut.mutate(Array.from(selectedIds))}
               disabled={reclassifyMut.isPending}
@@ -626,6 +676,15 @@ export default function Assets() {
           <button onClick={() => navigate("/jobs")} style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>
             View Jobs
           </button>
+        </div>
+      )}
+      {assignBucketMessage && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8,
+          background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)",
+          fontSize: 13, color: "#86efac",
+        }}>
+          {assignBucketMessage}
         </div>
       )}
 

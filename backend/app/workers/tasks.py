@@ -37,6 +37,7 @@ def run_asset_sync(
     scope: str = "all",
     album_ids: Optional[List[str]] = None,
     user_id: Optional[str] = None,
+    bucket_id: Optional[str] = None,
 ) -> dict:
     db = SessionLocal()
     try:
@@ -55,11 +56,16 @@ def run_asset_sync(
             "favorites": "favourited assets",
             "albums": f"{len(album_ids or [])} album(s)",
         }.get(scope, scope)
+        bucket_label = ""
+        if bucket_id:
+            from ..models.bucket import Bucket
+            bucket = db.query(Bucket).filter(Bucket.id == bucket_id).first()
+            bucket_label = f" into bucket '{bucket.name}'" if bucket else " into selected bucket"
 
         job_svc.update_progress(
             job_id, status="syncing_assets",
-            current_step=f"Syncing {scope_label} from Immich",
-            log_line=f"Asset sync started (scope: {scope_label})",
+            current_step=f"Syncing {scope_label} from Immich{bucket_label}",
+            log_line=f"Asset sync started (scope: {scope_label}{bucket_label})",
         )
 
         def progress_cb(msg: str):
@@ -74,11 +80,24 @@ def run_asset_sync(
         sync_svc = AssetSyncService(db, immich, user_id=user_id)
 
         if scope == "favorites":
-            result = sync_svc.sync_favorites(job_progress_callback=progress_cb, should_stop=should_stop)
+            result = sync_svc.sync_favorites(
+                job_progress_callback=progress_cb,
+                should_stop=should_stop,
+                bucket_id=bucket_id,
+            )
         elif scope == "albums" and album_ids:
-            result = sync_svc.sync_albums(album_ids, job_progress_callback=progress_cb, should_stop=should_stop)
+            result = sync_svc.sync_albums(
+                album_ids,
+                job_progress_callback=progress_cb,
+                should_stop=should_stop,
+                bucket_id=bucket_id,
+            )
         else:
-            result = sync_svc.sync_all(job_progress_callback=progress_cb, should_stop=should_stop)
+            result = sync_svc.sync_all(
+                job_progress_callback=progress_cb,
+                should_stop=should_stop,
+                bucket_id=bucket_id,
+            )
 
         j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
         if j and j.status not in ("paused", "cancelled"):

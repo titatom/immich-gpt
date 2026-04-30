@@ -148,6 +148,7 @@ export type SyncScope = "all" | "favorites" | "albums";
 export interface SyncJobRequest {
   scope: SyncScope;
   album_ids?: string[];
+  bucket_id?: string;
 }
 
 export interface ImmichAlbum {
