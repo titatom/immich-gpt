@@ -8,6 +8,7 @@ from datetime import datetime
 from ..database import get_db
 from ..dependencies import require_active_user
 from ..models.asset import Asset
+from ..services.bucket_assignment import BucketAssignmentService
 from ..models.suggested_classification import SuggestedClassification
 from ..models.suggested_metadata import SuggestedMetadata
 from ..schemas.asset import AssetOut
@@ -269,6 +270,27 @@ def get_asset_detail(
 class ReclassifyRequest(BaseModel):
     asset_ids: List[str]
     force: bool = True
+
+
+class AssignBucketRequest(BaseModel):
+    asset_ids: List[str]
+    bucket_id: str
+
+
+@router.post("/assign-bucket", response_model=dict)
+def assign_bucket(
+    body: AssignBucketRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    svc = BucketAssignmentService(db, current_user.id)
+    bucket = svc.get_bucket(body.bucket_id)
+    if not bucket:
+        raise HTTPException(status_code=404, detail="Bucket not found")
+
+    assigned = svc.assign_assets(body.asset_ids, bucket)
+    db.commit()
+    return {"assigned": assigned, "bucket_id": bucket.id, "bucket_name": bucket.name}
 
 
 @router.post("/reclassify", response_model=dict)

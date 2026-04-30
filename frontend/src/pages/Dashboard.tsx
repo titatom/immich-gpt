@@ -37,7 +37,7 @@ const SCOPE_OPTIONS: { value: SyncScope; label: string; desc: string; icon: Reac
 type WorkflowMode = "sync" | "sync_ai" | "ai";
 
 function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disabled }: {
-  onSync: (scope: SyncScope, albumIds: string[] | undefined, runAI: boolean) => void;
+  onSync: (scope: SyncScope, albumIds: string[] | undefined, runAI: boolean, bucketId?: string) => void;
   onClassify: () => void;
   isSyncLoading: boolean;
   isClassifyLoading: boolean;
@@ -48,11 +48,17 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
   const [albumSearch, setAlbumSearch] = useState("");
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>("sync_ai");
+  const [selectedBucketId, setSelectedBucketId] = useState("");
 
   const { data: albums = [] } = useQuery<ImmichAlbum[]>({
     queryKey: ["albums"],
     queryFn: getAlbums,
     enabled: scope === "albums",
+  });
+
+  const { data: buckets = [] } = useQuery<Bucket[]>({
+    queryKey: ["buckets"],
+    queryFn: getBuckets,
   });
 
   const filtered = albums.filter((a) => a.albumName.toLowerCase().includes(albumSearch.toLowerCase()));
@@ -96,6 +102,7 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
         scope,
         scope === "albums" ? Array.from(selectedAlbumIds) : undefined,
         workflowMode === "sync_ai",
+        selectedBucketId || undefined,
       );
     }
   }
@@ -190,6 +197,26 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
               )}
             </div>
           )}
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+              Assign synced assets to bucket
+            </label>
+            <select
+              value={selectedBucketId}
+              onChange={(e) => setSelectedBucketId(e.target.value)}
+              className={styles.albumSearchInput}
+              style={{ width: "100%" }}
+            >
+              <option value="">Do not assign a bucket</option>
+              {buckets.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <div className={styles.scopeDesc} style={{ marginTop: 6, marginBottom: 0 }}>
+              Every asset pulled by this sync is marked as approved in the selected bucket.
+            </div>
+          </div>
         </>
       )}
 
@@ -266,7 +293,7 @@ export default function Dashboard() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: (params: { scope: SyncScope; album_ids?: string[] }) => startSyncJob(params),
+    mutationFn: (params: { scope: SyncScope; album_ids?: string[]; bucket_id?: string }) => startSyncJob(params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["asset-count"] });
@@ -320,9 +347,9 @@ export default function Dashboard() {
       </div>
 
       <SyncPanel
-        onSync={(scope, albumIds, runAI) => {
+        onSync={(scope, albumIds, runAI, bucketId) => {
           runAIAfterSyncRef.current = runAI;
-          syncMutation.mutate({ scope, album_ids: albumIds });
+          syncMutation.mutate({ scope, album_ids: albumIds, bucket_id: bucketId });
         }}
         onClassify={() => classifyMutation.mutate()}
         isSyncLoading={syncMutation.isPending}

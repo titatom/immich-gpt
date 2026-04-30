@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, List, Callable
 from sqlalchemy.orm import Session
 
 from ..models.asset import Asset
+from ..services.bucket_assignment import BucketAssignmentService
 from ..services.immich_client import ImmichClient
 from datetime import timezone
 
@@ -38,6 +39,7 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
         should_stop: Optional[Callable[[], bool]] = None,
+        bucket_id: Optional[str] = None,
     ) -> Dict[str, int]:
         """Sync all assets from Immich."""
         return self._sync_paged(
@@ -45,6 +47,7 @@ class AssetSyncService:
             job_progress_callback=job_progress_callback,
             page_size=page_size,
             should_stop=should_stop,
+            bucket_id=bucket_id,
         )
 
     def sync_favorites(
@@ -52,6 +55,7 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
         should_stop: Optional[Callable[[], bool]] = None,
+        bucket_id: Optional[str] = None,
     ) -> Dict[str, int]:
         """Sync only favorited assets from Immich."""
         return self._sync_paged(
@@ -61,6 +65,7 @@ class AssetSyncService:
             job_progress_callback=job_progress_callback,
             page_size=page_size,
             should_stop=should_stop,
+            bucket_id=bucket_id,
         )
 
     def sync_album(
@@ -69,6 +74,7 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
         should_stop: Optional[Callable[[], bool]] = None,
+        bucket_id: Optional[str] = None,
     ) -> Dict[str, int]:
         """Sync assets from a specific album."""
         return self._sync_paged(
@@ -78,6 +84,7 @@ class AssetSyncService:
             job_progress_callback=job_progress_callback,
             page_size=page_size,
             should_stop=should_stop,
+            bucket_id=bucket_id,
         )
 
     def sync_albums(
@@ -86,6 +93,7 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
         should_stop: Optional[Callable[[], bool]] = None,
+        bucket_id: Optional[str] = None,
     ) -> Dict[str, int]:
         """Sync assets from multiple albums."""
         total_created = total_updated = total_errors = 0
@@ -101,6 +109,7 @@ class AssetSyncService:
                 job_progress_callback=job_progress_callback,
                 page_size=page_size,
                 should_stop=should_stop,
+                bucket_id=bucket_id,
             )
             total_created += result["created"]
             total_updated += result["updated"]
@@ -116,11 +125,19 @@ class AssetSyncService:
         job_progress_callback=None,
         page_size: int = 100,
         should_stop: Optional[Callable[[], bool]] = None,
+        bucket_id: Optional[str] = None,
     ) -> Dict[str, int]:
         created = updated = errors = 0
         page = 1
         synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
         pending = 0  # rows flushed but not yet committed
+        bucket = None
+        bucket_assignment = None
+        if bucket_id:
+            bucket_assignment = BucketAssignmentService(self.db, self.user_id)
+            bucket = bucket_assignment.get_bucket(bucket_id)
+            if not bucket:
+                raise ValueError(f"Bucket {bucket_id} not found")
 
         while True:
             # Cooperative stop check (pause/cancel)
@@ -143,9 +160,16 @@ class AssetSyncService:
 
             for raw in raw_assets:
                 try:
-                    c, u = self._upsert_asset(raw, synced_at)
+                    c, u, asset_id = self._upsert_asset(raw, synced_at)
                     created += c
                     updated += u
+                    if asset_id and bucket and bucket_assignment:
+                        bucket_assignment.add_assignment(
+                            asset_id,
+                            bucket,
+                            explanation="Assigned during asset sync.",
+                            provider_name="sync",
+                        )
                     pending += 1
                 except Exception:
                     errors += 1
@@ -167,7 +191,7 @@ class AssetSyncService:
     def _upsert_asset(self, raw: Dict[str, Any], synced_at: datetime):
         immich_id = raw.get("id")
         if not immich_id:
-            return 0, 0
+            return 0, 0, None
 
         q = self.db.query(Asset).filter(Asset.immich_id == immich_id)
         if self.user_id:
@@ -204,8 +228,8 @@ class AssetSyncService:
         if existing:
             for k, v in data.items():
                 setattr(existing, k, v)
-            return 0, 1
+            return 0, 1, existing.id
         else:
             asset = Asset(id=str(uuid.uuid4()), user_id=self.user_id, **data)
             self.db.add(asset)
-            return 1, 0
+            return 1, 0, asset.id
