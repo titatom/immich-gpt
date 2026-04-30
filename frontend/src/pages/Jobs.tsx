@@ -8,7 +8,7 @@ import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
 import SyncOptionsModal from "../components/SyncOptionsModal";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp, Pause, RotateCcw, Trash2 } from "lucide-react";
-import type { SyncJobRequest, SyncScope } from "../types";
+import type { SyncJobRequest } from "../types";
 import styles from "./Jobs.module.css";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);

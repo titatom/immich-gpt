@@ -9,7 +9,7 @@ import type { Asset, AssetDetail, Bucket } from "../types";
 import {
   Search, Image as ImageIcon, ArrowUp, ArrowDown, ArrowUpDown,
   X, Star, Archive, ExternalLink, Camera, MapPin, Tag, Calendar,
-  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, FolderOpen,
+  CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, FolderPlus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
