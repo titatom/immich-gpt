@@ -20,6 +20,7 @@ class ReviewDecision(Base):
     approved_location_json = Column(JSON, nullable=True)
     approved_subalbum = Column(String, nullable=True)
     subalbum_approved = Column(Boolean, default=False)
+    location_approved = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     writeback_triggered = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())

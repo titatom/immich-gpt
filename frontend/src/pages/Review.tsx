@@ -55,20 +55,6 @@ interface LocationEditState {
   uncertainty_reason?: string | null;
 }
 
-function updateLocationField(
-  location: LocationEditState,
-  key: keyof LocationEditState,
-  value: string,
-): LocationEditState {
-  if (key === "latitude" || key === "longitude") {
-    return { ...location, [key]: value === "" ? null : Number(value) };
-  }
-  if (key === "radius_meters") {
-    return { ...location, radius_meters: Number(value) || 1 };
-  }
-  return { ...location, [key]: value || null };
-}
-
 interface ReviewCardProps {
   item: ReviewItem;
   buckets: Bucket[];
