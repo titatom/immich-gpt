@@ -123,6 +123,25 @@ function ReviewCard({
     onEditChange(item.asset_id, { bucketId: newBucketId, subalbum: newSubalbum });
   }
 
+  const locationInputStyle: React.CSSProperties = {
+    background: "#0f172a",
+    border: "1px solid #334155",
+    borderRadius: 6,
+    color: "#f1f5f9",
+    fontSize: 12,
+    padding: "6px 10px",
+    width: "100%",
+    boxSizing: "border-box",
+  };
+  const locationFieldStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#94a3b8",
+  };
+
   return (
     <div style={{
       background: "#1e293b", border: "1px solid #334155",
@@ -253,44 +272,56 @@ function ReviewCard({
                 <MapPin size={12} /> Apply suggested location
               </label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <input
-                  value={editState.location.place_name ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, place_name: e.target.value || null } })}
-                  placeholder="Place name"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
-                <input
-                  value={editState.location.city ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, city: e.target.value || null } })}
-                  placeholder="City"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
-                <input
-                  value={editState.location.region ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, region: e.target.value || null } })}
-                  placeholder="Region"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
-                <input
-                  value={editState.location.country ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, country: e.target.value || null } })}
-                  placeholder="Country"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
-                <input
-                  type="number"
-                  value={editState.location.latitude ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, latitude: e.target.value === "" ? null : Number(e.target.value) } })}
-                  placeholder="Latitude"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
-                <input
-                  type="number"
-                  value={editState.location.longitude ?? ""}
-                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, longitude: e.target.value === "" ? null : Number(e.target.value) } })}
-                  placeholder="Longitude"
-                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
-                />
+                <label style={locationFieldStyle}>
+                  Place name
+                  <input
+                    value={editState.location.place_name ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, place_name: e.target.value || null } })}
+                    style={locationInputStyle}
+                  />
+                </label>
+                <label style={locationFieldStyle}>
+                  City
+                  <input
+                    value={editState.location.city ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, city: e.target.value || null } })}
+                    style={locationInputStyle}
+                  />
+                </label>
+                <label style={locationFieldStyle}>
+                  Region
+                  <input
+                    value={editState.location.region ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, region: e.target.value || null } })}
+                    style={locationInputStyle}
+                  />
+                </label>
+                <label style={locationFieldStyle}>
+                  Country
+                  <input
+                    value={editState.location.country ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, country: e.target.value || null } })}
+                    style={locationInputStyle}
+                  />
+                </label>
+                <label style={locationFieldStyle}>
+                  Latitude
+                  <input
+                    type="number"
+                    value={editState.location.latitude ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, latitude: e.target.value === "" ? null : Number(e.target.value) } })}
+                    style={locationInputStyle}
+                  />
+                </label>
+                <label style={locationFieldStyle}>
+                  Longitude
+                  <input
+                    type="number"
+                    value={editState.location.longitude ?? ""}
+                    onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, longitude: e.target.value === "" ? null : Number(e.target.value) } })}
+                    style={locationInputStyle}
+                  />
+                </label>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "#94a3b8" }}>
                 <span>Confidence {Math.round(editState.location.confidence * 100)}%</span>
