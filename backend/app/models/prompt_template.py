@@ -9,7 +9,8 @@ class PromptTemplate(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, nullable=False, index=True)
     # type: "global_classification", "bucket_classification",
-    #        "description_generation", "tags_generation", "review_guidance"
+    #        "description_generation", "tags_generation",
+    #        "geolocation_generation", "review_guidance"
     prompt_type = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
     content = Column(Text, nullable=False)

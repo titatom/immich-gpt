@@ -10,10 +10,15 @@ class SuggestedMetadata(Base):
     asset_id = Column(String, nullable=False, index=True)
     description_suggestion = Column(Text, nullable=True)
     tags_json = Column(JSON, nullable=True)
+    location_suggestion_json = Column(JSON, nullable=True)
     approved_description = Column(Text, nullable=True)
     approved_tags_json = Column(JSON, nullable=True)
+    approved_location_json = Column(JSON, nullable=True)
     # writeback_status: "pending", "written", "failed", "skipped"
     writeback_status = Column(String, default="pending")
+    # location_writeback_status: "pending", "written", "failed", "skipped"
+    location_writeback_status = Column(String, default="pending")
+    location_writeback_error = Column(Text, nullable=True)
     writeback_error = Column(Text, nullable=True)
     provider_name = Column(String, nullable=True)
     prompt_run_id = Column(String, nullable=True)

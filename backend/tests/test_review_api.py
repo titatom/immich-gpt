@@ -42,6 +42,18 @@ def make_review_data(db, n=3):
             asset_id=asset.id,
             description_suggestion=f"Description for photo {i}",
             tags_json=["tag1", "tag2"],
+            location_suggestion_json={
+                "place_name": "Central Park",
+                "city": "New York",
+                "region": "New York",
+                "country": "USA",
+                "latitude": 40.785091,
+                "longitude": -73.968285,
+                "radius_meters": 500,
+                "confidence": 0.86,
+                "evidence": "Visible landmark and park setting.",
+                "uncertainty_reason": "Exact camera position is approximate.",
+            } if i == 0 else None,
             provider_name="openai",
         )
         db.add(meta)
@@ -72,6 +84,16 @@ def test_review_item_has_required_fields(client, db):
     assert "description_suggestion" in item
     assert "tags_suggestion" in item
     assert "classification_status" in item
+    assert "location_suggestion" in item
+
+
+def test_review_item_returns_location_suggestion(client, db):
+    make_review_data(db, n=1)
+    resp = client.get("/api/review/queue")
+    assert resp.status_code == 200
+    item = resp.json()[0]
+    assert item["location_suggestion"]["city"] == "New York"
+    assert item["location_suggestion"]["radius_meters"] == 500
 
 
 def test_review_item_has_thumbnail_info(client, db):

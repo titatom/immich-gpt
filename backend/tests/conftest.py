@@ -91,6 +91,8 @@ def db():
          "Generate a concise, useful description."),
         ("tags_generation", "Tags Generation",
          "Generate 3 to 8 practical tags."),
+        ("geolocation_generation", "Geolocation Generation",
+         "Suggest location only when evidence supports it."),
     ]
     for pt, name, content in prompts:
         session.add(PromptTemplate(

@@ -67,6 +67,35 @@ def test_metadata_included_in_user_message(db):
     assert "New York" in user_content
 
 
+def test_location_prompt_only_enabled_without_geo_data(db):
+    from tests.conftest import TEST_USER_ID
+    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
+    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+
+    missing_geo = svc.assemble_classification_messages({"original_filename": "tokyo.jpg"}, buckets)
+    assert "Suggest location only when evidence supports it" in missing_geo[0]["content"]
+
+    with_geo = svc.assemble_classification_messages({
+        "original_filename": "tokyo.jpg",
+        "raw_metadata": {"exifInfo": {"latitude": 35.0, "longitude": 139.0}},
+    }, buckets)
+    assert "Return location_suggestion as null" in with_geo[0]["content"]
+
+
+def test_suggestion_settings_disable_fields(db):
+    from tests.conftest import TEST_USER_ID
+    from app.models.app_setting import AppSetting
+    db.add(AppSetting(id=str(uuid.uuid4()), user_id=TEST_USER_ID, key="suggest_tags", value="false"))
+    db.add(AppSetting(id=str(uuid.uuid4()), user_id=TEST_USER_ID, key="suggest_subalbums", value="false"))
+    db.commit()
+
+    svc = PromptAssemblyService(db, user_id=TEST_USER_ID)
+    buckets = db.query(Bucket).filter(Bucket.user_id == TEST_USER_ID).all()
+    system = svc.assemble_classification_messages({}, buckets)[0]["content"]
+    assert "Return tags as an empty array" in system
+    assert "Set subalbum_suggestion to null" in system
+
+
 def test_output_schema_contains_bucket_names(db):
     from tests.conftest import TEST_USER_ID
     svc = PromptAssemblyService(db, user_id=TEST_USER_ID)

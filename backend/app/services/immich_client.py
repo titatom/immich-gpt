@@ -193,6 +193,20 @@ class ImmichClient:
                 )
             return r.json()
 
+    def update_asset_location(self, asset_id: str, latitude: float, longitude: float) -> Dict[str, Any]:
+        """Write GPS coordinates back to Immich."""
+        with self._client() as client:
+            r = client.put(
+                f"/api/assets/{asset_id}",
+                json={"latitude": latitude, "longitude": longitude},
+            )
+            if r.status_code not in (200, 201):
+                raise ImmichError(
+                    f"Failed to update location for {asset_id}: {r.text}",
+                    r.status_code,
+                )
+            return r.json()
+
     def get_existing_tags_only(self, tag_names: List[str]) -> List[Dict[str, Any]]:
         """
         Return only tags that already exist in Immich — never creates new ones.

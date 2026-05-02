@@ -14,6 +14,7 @@ VALID_RESPONSE = {
     "description_suggestion": "Family gathering in the living room.",
     "tags": ["family", "indoor", "casual"],
     "subalbum_suggestion": None,
+    "location_suggestion": None,
     "review_recommended": False,
 }
 
@@ -122,3 +123,89 @@ def test_tags_capped_at_20():
     provider = make_mock_provider(response)
     result = provider.classify_asset([{"role": "user", "content": "test"}])
     assert len(result.tags) <= 20
+
+
+def test_location_suggestion_parses():
+    response = {
+        **VALID_RESPONSE,
+        "location_suggestion": {
+            "place_name": "Golden Gate Bridge",
+            "city": "San Francisco",
+            "region": "California",
+            "country": "United States",
+            "latitude": 37.8199,
+            "longitude": -122.4783,
+            "radius_meters": 500,
+            "confidence": 0.9,
+            "evidence": "The bridge towers are visible.",
+            "uncertainty_reason": None,
+        },
+    }
+    provider = make_mock_provider(response)
+    result = provider.classify_asset([{"role": "user", "content": "test"}])
+    assert result.location_suggestion is not None
+    assert result.location_suggestion.radius_meters == 500
+
+
+def test_low_confidence_location_must_be_null():
+    response = {
+        **VALID_RESPONSE,
+        "location_suggestion": {
+            "place_name": None,
+            "city": None,
+            "region": None,
+            "country": "Japan",
+            "latitude": None,
+            "longitude": None,
+            "radius_meters": 250000,
+            "confidence": 0.2,
+            "evidence": "Weak visual clues.",
+            "uncertainty_reason": "Too generic.",
+        },
+    }
+    provider = make_mock_provider(response)
+    with pytest.raises(ValueError, match="below 0.35"):
+        provider.classify_asset([{"role": "user", "content": "test"}])
+
+
+def test_valid_location_suggestion_parses():
+    response = {
+        **VALID_RESPONSE,
+        "location_suggestion": {
+            "place_name": "Golden Gate Bridge",
+            "city": "San Francisco",
+            "region": "California",
+            "country": "United States",
+            "latitude": 37.8199,
+            "longitude": -122.4783,
+            "radius_meters": 750,
+            "confidence": 0.92,
+            "evidence": "The bridge towers and bay match the Golden Gate Bridge.",
+            "uncertainty_reason": None,
+        },
+    }
+    provider = make_mock_provider(response)
+    result = provider.classify_asset([{"role": "user", "content": "test"}])
+    assert result.location_suggestion is not None
+    assert result.location_suggestion.radius_meters == 750
+
+
+def test_low_confidence_location_must_be_null():
+    response = {
+        **VALID_RESPONSE,
+        "location_suggestion": {
+            "place_name": None,
+            "city": None,
+            "region": None,
+            "country": "Japan",
+            "latitude": None,
+            "longitude": None,
+            "radius_meters": 250000,
+            "confidence": 0.2,
+            "evidence": "Weak language clue.",
+            "uncertainty_reason": "Insufficient visual evidence.",
+        },
+    }
+    provider = make_mock_provider(response)
+    with pytest.raises(ValueError, match="confidence below 0.35"):
+        provider.classify_asset([{"role": "user", "content": "test"}])

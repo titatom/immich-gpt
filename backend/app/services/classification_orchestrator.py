@@ -274,6 +274,7 @@ class ClassificationOrchestrator:
             "camera_model": asset.camera_model,
             "description": asset.description,
             "tags": asset.tags_json or [],
+            "raw_metadata": asset.raw_metadata_json or {},
             "is_favorite": asset.is_favorite,
         }
 
@@ -323,6 +324,11 @@ class ClassificationOrchestrator:
             asset_id=asset.id,
             description_suggestion=result.description_suggestion,
             tags_json=result.tags,
+            location_suggestion_json=(
+                result.location_suggestion.model_dump()
+                if result.location_suggestion and not self.prompt_service._asset_has_location(self._asset_to_metadata_dict(asset))
+                else None
+            ),
             provider_name=self.provider.provider_name,
             prompt_run_id=prompt_run_id,
         )

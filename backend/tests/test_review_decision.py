@@ -104,6 +104,43 @@ def test_approve_writes_tags(db):
     assert result.tags_written is True
 
 
+def test_approve_writes_location_when_enabled(db):
+    from app.models.app_setting import AppSetting
+    from tests.conftest import TEST_USER_ID
+    asset, cls, meta = make_full_suggestion(db)
+    db.add(AppSetting(id=str(uuid.uuid4()), user_id=TEST_USER_ID, key="writeback_locations", value="true"))
+    db.commit()
+
+    mock_immich = MagicMock()
+    svc = ReviewDecisionService(db, immich_client=mock_immich, user_id=TEST_USER_ID)
+    result = svc.approve_asset(
+        asset_id=asset.id,
+        approved_bucket_id=cls.suggested_bucket_id,
+        approved_bucket_name="Personal",
+        approved_description=None,
+        approved_tags=None,
+        approved_subalbum=None,
+        subalbum_approved=False,
+        approved_location={
+            "place_name": "Eiffel Tower",
+            "city": "Paris",
+            "region": "Ile-de-France",
+            "country": "France",
+            "latitude": 48.8584,
+            "longitude": 2.2945,
+            "radius_meters": 100,
+            "confidence": 0.95,
+            "evidence": "Visible landmark.",
+            "uncertainty_reason": None,
+        },
+        location_approved=True,
+        trigger_writeback=True,
+    )
+
+    mock_immich.update_asset_location.assert_called_once_with(asset.immich_id, 48.8584, 2.2945)
+    assert result.location_written is True
+
+
 def test_approve_without_writeback_does_not_call_immich(db):
     asset, cls, meta = make_full_suggestion(db)
 

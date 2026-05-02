@@ -9,6 +9,7 @@ const PROMPT_TYPES = [
   { value: "bucket_classification", label: "Bucket Classification" },
   { value: "description_generation", label: "Description Generation" },
   { value: "tags_generation", label: "Tags Generation" },
+  { value: "geolocation_generation", label: "Geolocation Generation" },
   { value: "review_guidance", label: "Review Guidance" },
 ];
 
