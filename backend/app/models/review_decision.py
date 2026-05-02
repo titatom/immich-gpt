@@ -17,6 +17,7 @@ class ReviewDecision(Base):
     approved_bucket_name = Column(String, nullable=True)
     approved_description = Column(Text, nullable=True)
     approved_tags_json = Column(JSON, nullable=True)
+    approved_location_json = Column(JSON, nullable=True)
     approved_subalbum = Column(String, nullable=True)
     subalbum_approved = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)

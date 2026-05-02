@@ -20,6 +20,12 @@ DEFAULT_TAGS_PROMPT = (
     "Generate 3 to 8 practical, search-friendly tags. "
     "Prefer concrete terms over vague words."
 )
+DEFAULT_GEOLOCATION_PROMPT = (
+    "Suggest location only when evidence supports it. Never invent exact coordinates. "
+    "Use the largest radius that honestly represents uncertainty. If relying on nearby asset "
+    "context, say so in evidence. Return null for generic indoor scenes, close-ups, food, "
+    "pets, documents, or ambiguous landscapes."
+)
 
 DEFAULT_BUCKET_PROMPTS = {
     "Business": (
@@ -79,6 +85,13 @@ class PromptAssemblyService:
         """
         allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
         allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
+        suggest_descriptions = self._get_behaviour_setting("suggest_descriptions", True)
+        suggest_tags = self._get_behaviour_setting("suggest_tags", True)
+        suggest_subalbums = self._get_behaviour_setting("suggest_subalbums", True)
+        suggest_locations = (
+            self._get_behaviour_setting("suggest_locations", True)
+            and not self._asset_has_location(asset_metadata)
+        )
 
         global_prompt = (
             self._get_prompt("global_classification")
@@ -87,9 +100,13 @@ class PromptAssemblyService:
         description_prompt = (
             self._get_prompt("description_generation")
             or DEFAULT_DESCRIPTION_PROMPT
+            if suggest_descriptions
+            else "Description suggestions are disabled. Return description_suggestion as an empty string."
         )
 
-        if allow_new_tags:
+        if not suggest_tags:
+            tags_prompt = "Tag suggestions are disabled. Return tags as an empty array []."
+        elif allow_new_tags:
             tags_prompt = (
                 self._get_prompt("tags_generation")
                 or DEFAULT_TAGS_PROMPT
@@ -110,7 +127,9 @@ class PromptAssemblyService:
                     "so return an empty tags array []."
                 )
 
-        if allow_new_albums:
+        if not suggest_subalbums:
+            subalbum_note = "\n\nSubalbum suggestions are disabled. Set subalbum_suggestion to null."
+        elif allow_new_albums:
             subalbum_note = ""
         else:
             if available_albums:
@@ -129,7 +148,18 @@ class PromptAssemblyService:
 
         bucket_defs = self._build_bucket_definitions(buckets)
         metadata_summary = self._build_metadata_summary(asset_metadata)
-        output_schema = self._build_output_schema_instructions(buckets, allow_new_tags) + subalbum_note
+        geolocation_prompt = (
+            self._get_prompt("geolocation_generation")
+            or DEFAULT_GEOLOCATION_PROMPT
+            if suggest_locations
+            else "Location suggestions are disabled or this asset already has location data. Return location_suggestion as null."
+        )
+        output_schema = self._build_output_schema_instructions(
+            buckets,
+            allow_new_tags=allow_new_tags,
+            suggest_tags=suggest_tags,
+            suggest_locations=suggest_locations,
+        ) + subalbum_note
 
         system_content = (
             f"You are an expert photo and document classifier and metadata enricher.\n\n"
@@ -137,6 +167,7 @@ class PromptAssemblyService:
             f"## Available Buckets\n{bucket_defs}\n\n"
             f"## Description Task\n{description_prompt}\n\n"
             f"## Tags Task\n{tags_prompt}\n\n"
+            f"## Location Task\n{geolocation_prompt}\n\n"
             f"## Output Requirements\n{output_schema}"
         )
 
@@ -195,13 +226,45 @@ class PromptAssemblyService:
             parts.append(f"Current tags: {', '.join(metadata['tags'])}")
         return "\n".join(parts) if parts else "No metadata available."
 
-    def _build_output_schema_instructions(self, buckets: List[Bucket], allow_new_tags: bool = True) -> str:
+    def _asset_has_location(self, metadata: Dict[str, Any]) -> bool:
+        if metadata.get("city") or metadata.get("country"):
+            return True
+        raw = metadata.get("raw_metadata") or {}
+        exif = raw.get("exifInfo") if isinstance(raw, dict) else None
+        if not isinstance(exif, dict):
+            exif = {}
+        location_values = [
+            exif.get("latitude"),
+            exif.get("longitude"),
+            exif.get("city"),
+            exif.get("state"),
+            exif.get("country"),
+            raw.get("city") if isinstance(raw, dict) else None,
+            raw.get("country") if isinstance(raw, dict) else None,
+        ]
+        return any(value not in (None, "", 0, 0.0) for value in location_values)
+
+    def _build_output_schema_instructions(
+        self,
+        buckets: List[Bucket],
+        allow_new_tags: bool = True,
+        suggest_tags: bool = True,
+        suggest_locations: bool = True,
+    ) -> str:
         bucket_names = [b.name for b in buckets if b.enabled]
         names_str = ", ".join(f'"{n}"' for n in bucket_names)
-        tags_desc = (
-            "array of 3-8 strings"
-            if allow_new_tags
-            else "array of 0-8 strings chosen strictly from the provided tag list (may be empty [])"
+        if not suggest_tags:
+            tags_desc = "empty array []"
+        elif allow_new_tags:
+            tags_desc = "array of 3-8 strings"
+        else:
+            tags_desc = "array of 0-8 strings chosen strictly from the provided tag list (may be empty [])"
+        location_desc = (
+            "object or null. Object fields: place_name, city, region, country, latitude, longitude, "
+            "radius_meters, confidence, evidence, uncertainty_reason. Use null when confidence would be below 0.35. "
+            "Coordinates may be null for broad guesses, but radius_meters is always required when an object is returned."
+            if suggest_locations
+            else "null"
         )
         return (
             f"Return ONLY a JSON object with these exact fields:\n"
@@ -211,6 +274,7 @@ class PromptAssemblyService:
             f"- description_suggestion: string, concise and useful\n"
             f"- tags: {tags_desc}\n"
             f"- subalbum_suggestion: string or null\n"
+            f"- location_suggestion: {location_desc}\n"
             f"- review_recommended: boolean\n\n"
             f"No other fields. No markdown. Valid JSON only."
         )

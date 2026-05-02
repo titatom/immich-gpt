@@ -17,7 +17,7 @@ import type { ReviewItem, Bucket } from "../types";
 import Thumbnail from "../components/Thumbnail";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 import TagList from "../components/TagList";
-import { CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface ApproveData {
@@ -27,6 +27,8 @@ interface ApproveData {
   approved_tags?: string[];
   approved_subalbum?: string;
   subalbum_approved?: boolean;
+  approved_location?: LocationEditState;
+  location_approved?: boolean;
   trigger_writeback?: boolean;
 }
 
@@ -36,6 +38,35 @@ interface EditState {
   tags: string[];
   bucketId: string;
   subalbum: string;
+  location?: LocationEditState;
+  locationApproved: boolean;
+}
+
+interface LocationEditState {
+  place_name?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  radius_meters: number;
+  confidence: number;
+  evidence: string;
+  uncertainty_reason?: string | null;
+}
+
+function updateLocationField(
+  location: LocationEditState,
+  key: keyof LocationEditState,
+  value: string,
+): LocationEditState {
+  if (key === "latitude" || key === "longitude") {
+    return { ...location, [key]: value === "" ? null : Number(value) };
+  }
+  if (key === "radius_meters") {
+    return { ...location, radius_meters: Number(value) || 1 };
+  }
+  return { ...location, [key]: value || null };
 }
 
 interface ReviewCardProps {
@@ -86,6 +117,8 @@ function ReviewCard({
       approved_tags: editState.tags,
       approved_subalbum: editState.subalbum || undefined,
       subalbum_approved: !!editState.subalbum,
+      approved_location: editState.locationApproved ? editState.location : undefined,
+      location_approved: editState.locationApproved,
       trigger_writeback: true,
     });
   };
@@ -223,6 +256,67 @@ function ReviewCard({
             </div>
           )}
 
+          {item.location_suggestion && editState.location && (
+            <div style={{ background: "rgba(56,189,248,0.06)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 8, padding: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7dd3fc", marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={editState.locationApproved}
+                  onChange={(e) => onEditChange(item.asset_id, { locationApproved: e.target.checked })}
+                />
+                <MapPin size={12} /> Apply suggested location
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <input
+                  value={editState.location.place_name ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, place_name: e.target.value || null } })}
+                  placeholder="Place name"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+                <input
+                  value={editState.location.city ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, city: e.target.value || null } })}
+                  placeholder="City"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+                <input
+                  value={editState.location.region ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, region: e.target.value || null } })}
+                  placeholder="Region"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+                <input
+                  value={editState.location.country ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, country: e.target.value || null } })}
+                  placeholder="Country"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+                <input
+                  type="number"
+                  value={editState.location.latitude ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, latitude: e.target.value === "" ? null : Number(e.target.value) } })}
+                  placeholder="Latitude"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+                <input
+                  type="number"
+                  value={editState.location.longitude ?? ""}
+                  onChange={(e) => onEditChange(item.asset_id, { location: { ...editState.location!, longitude: e.target.value === "" ? null : Number(e.target.value) } })}
+                  placeholder="Longitude"
+                  style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 12, padding: "6px 10px" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "#94a3b8" }}>
+                <span>Confidence {Math.round(editState.location.confidence * 100)}%</span>
+                <span>Radius {editState.location.radius_meters.toLocaleString()}m</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
+                Evidence: {editState.location.evidence}
+                {editState.location.uncertainty_reason ? ` Uncertainty: ${editState.location.uncertainty_reason}` : ""}
+              </div>
+            </div>
+          )}
+
           {/* Metadata toggle */}
           <button
             onClick={() => setShowMeta((v) => !v)}
@@ -337,6 +431,8 @@ function buildDefaultEditState(
     tags: item.tags_suggestion ?? item.current_tags ?? [],
     bucketId,
     subalbum,
+    location: item.location_suggestion ?? undefined,
+    locationApproved: !!item.location_suggestion,
   };
 }
 

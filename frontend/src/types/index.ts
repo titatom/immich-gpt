@@ -67,10 +67,25 @@ export interface AssetMetadataSuggestion {
   id: string;
   description_suggestion?: string;
   tags?: string[];
+  location_suggestion?: LocationSuggestion | null;
   approved_description?: string;
   approved_tags?: string[];
+  approved_location?: LocationSuggestion | null;
   writeback_status?: string;
   provider_name?: string;
+}
+
+export interface LocationSuggestion {
+  place_name?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  radius_meters: number;
+  confidence: number;
+  evidence: string;
+  uncertainty_reason?: string | null;
 }
 
 export interface AssetDetail extends Asset {
@@ -102,6 +117,7 @@ export interface ReviewItem {
   metadata_id?: string;
   description_suggestion?: string;
   tags_suggestion?: string[];
+  location_suggestion?: LocationSuggestion | null;
   provider_name?: string;
   prompt_run_id?: string;
 }

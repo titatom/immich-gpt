@@ -4,7 +4,27 @@ All provider-specific logic is isolated here.
 """
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+class LocationSuggestion(BaseModel):
+    place_name: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    radius_meters: int = Field(gt=0)
+    confidence: float = Field(ge=0.35, le=1.0)
+    evidence: str
+    uncertainty_reason: Optional[str] = None
+
+    @field_validator("evidence")
+    @classmethod
+    def evidence_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("location evidence must not be blank")
+        return value
 
 
 class AIClassificationResult(BaseModel):
@@ -14,6 +34,7 @@ class AIClassificationResult(BaseModel):
     description_suggestion: str
     tags: List[str]
     subalbum_suggestion: Optional[str] = None
+    location_suggestion: Optional[LocationSuggestion] = None
     review_recommended: bool = True
 
 
@@ -30,6 +51,32 @@ AI_OUTPUT_SCHEMA = {
         "description_suggestion": {"type": "string"},
         "tags": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 20},
         "subalbum_suggestion": {"type": ["string", "null"]},
+        "location_suggestion": {
+            "anyOf": [
+                {"type": "null"},
+                {
+                    "type": "object",
+                    "required": [
+                        "place_name", "city", "region", "country",
+                        "latitude", "longitude", "radius_meters",
+                        "confidence", "evidence", "uncertainty_reason"
+                    ],
+                    "properties": {
+                        "place_name": {"type": ["string", "null"]},
+                        "city": {"type": ["string", "null"]},
+                        "region": {"type": ["string", "null"]},
+                        "country": {"type": ["string", "null"]},
+                        "latitude": {"type": ["number", "null"], "minimum": -90.0, "maximum": 90.0},
+                        "longitude": {"type": ["number", "null"], "minimum": -180.0, "maximum": 180.0},
+                        "radius_meters": {"type": "integer", "minimum": 1},
+                        "confidence": {"type": "number", "minimum": 0.35, "maximum": 1.0},
+                        "evidence": {"type": "string"},
+                        "uncertainty_reason": {"type": ["string", "null"]},
+                    },
+                    "additionalProperties": False,
+                },
+            ]
+        },
         "review_recommended": {"type": "boolean"},
     },
     "additionalProperties": False,
@@ -74,6 +121,14 @@ def _validate_result(data: dict, raw: str) -> AIClassificationResult:
         raise ValueError("tags must be a list")
     tags = [str(t) for t in tags[:20]]
 
+    location_suggestion = data.get("location_suggestion")
+    if location_suggestion is not None:
+        if not isinstance(location_suggestion, dict):
+            raise ValueError("location_suggestion must be an object or null")
+        if float(location_suggestion.get("confidence", 0)) < 0.35:
+            raise ValueError("location_suggestion confidence below 0.35 must be returned as null")
+        location_suggestion = LocationSuggestion.model_validate(location_suggestion)
+
     return AIClassificationResult(
         bucket_name=str(data["bucket_name"]),
         confidence=confidence,
@@ -81,6 +136,7 @@ def _validate_result(data: dict, raw: str) -> AIClassificationResult:
         description_suggestion=str(data["description_suggestion"]),
         tags=tags,
         subalbum_suggestion=data.get("subalbum_suggestion"),
+        location_suggestion=location_suggestion,
         review_recommended=bool(data.get("review_recommended", True)),
     )
 

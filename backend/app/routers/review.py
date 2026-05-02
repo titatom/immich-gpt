@@ -61,6 +61,7 @@ def _build_review_item(
         metadata_id=metadata.id if metadata else None,
         description_suggestion=metadata.description_suggestion if metadata else None,
         tags_suggestion=metadata.tags_json if metadata else None,
+        location_suggestion=metadata.location_suggestion_json if metadata else None,
         provider_name=classification.provider_name if classification else None,
         prompt_run_id=classification.prompt_run_id if classification else None,
     )
@@ -210,6 +211,8 @@ def approve_asset(
             approved_tags=body.approved_tags,
             approved_subalbum=body.approved_subalbum,
             subalbum_approved=body.subalbum_approved,
+            approved_location=body.approved_location.model_dump() if body.approved_location else None,
+            location_approved=body.location_approved,
             trigger_writeback=body.trigger_writeback,
         )
         return result.to_dict()
@@ -306,6 +309,8 @@ def bulk_review(
                     approved_tags=meta.tags_json if meta else None,
                     approved_subalbum=cls.subalbum_suggestion if cls else None,
                     subalbum_approved=False,
+                    approved_location=meta.location_suggestion_json if meta else None,
+                    location_approved=bool(meta and meta.location_suggestion_json),
                     trigger_writeback=body.trigger_writeback,
                 )
                 results.append({"asset_id": asset_id, "status": "approved", **result.to_dict()})

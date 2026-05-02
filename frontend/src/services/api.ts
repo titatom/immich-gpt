@@ -104,6 +104,11 @@ export const saveImmichSettings = (url: string, apiKey: string): Promise<ImmichS
 export interface BehaviourSettings {
   allow_new_tags: boolean;
   allow_new_albums: boolean;
+  suggest_descriptions: boolean;
+  suggest_tags: boolean;
+  suggest_subalbums: boolean;
+  suggest_locations: boolean;
+  writeback_locations: boolean;
 }
 export const getBehaviourSettings = (): Promise<BehaviourSettings> =>
   api.get("/settings/behaviour").then((r) => r.data);
@@ -253,6 +258,8 @@ export const approveAsset = (
     approved_tags?: string[];
     approved_subalbum?: string;
     subalbum_approved?: boolean;
+    approved_location?: ReviewItem["location_suggestion"];
+    location_approved?: boolean;
     trigger_writeback?: boolean;
   }
 ) => api.post(`/review/item/${assetId}/approve`, data).then((r) => r.data);

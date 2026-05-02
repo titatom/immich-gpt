@@ -440,12 +440,22 @@ function BehaviourSection() {
 
   const [allowNewTags, setAllowNewTags] = React.useState<boolean | undefined>(undefined);
   const [allowNewAlbums, setAllowNewAlbums] = React.useState<boolean | undefined>(undefined);
+  const [suggestDescriptions, setSuggestDescriptions] = React.useState<boolean | undefined>(undefined);
+  const [suggestTags, setSuggestTags] = React.useState<boolean | undefined>(undefined);
+  const [suggestSubalbums, setSuggestSubalbums] = React.useState<boolean | undefined>(undefined);
+  const [suggestLocations, setSuggestLocations] = React.useState<boolean | undefined>(undefined);
+  const [writebackLocations, setWritebackLocations] = React.useState<boolean | undefined>(undefined);
   const [saved, setSaved] = React.useState(false);
 
   React.useEffect(() => {
     if (behaviour) {
       setAllowNewTags(behaviour.allow_new_tags);
       setAllowNewAlbums(behaviour.allow_new_albums);
+      setSuggestDescriptions(behaviour.suggest_descriptions);
+      setSuggestTags(behaviour.suggest_tags);
+      setSuggestSubalbums(behaviour.suggest_subalbums);
+      setSuggestLocations(behaviour.suggest_locations);
+      setWritebackLocations(behaviour.writeback_locations);
     }
   }, [behaviour]);
 
@@ -453,6 +463,11 @@ function BehaviourSection() {
     mutationFn: () => saveBehaviourSettings({
       allow_new_tags: allowNewTags ?? true,
       allow_new_albums: allowNewAlbums ?? true,
+      suggest_descriptions: suggestDescriptions ?? true,
+      suggest_tags: suggestTags ?? true,
+      suggest_subalbums: suggestSubalbums ?? true,
+      suggest_locations: suggestLocations ?? true,
+      writeback_locations: writebackLocations ?? false,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["behaviour-settings"] });
@@ -463,10 +478,61 @@ function BehaviourSection() {
 
   const effectiveTags = allowNewTags ?? behaviour?.allow_new_tags ?? true;
   const effectiveAlbums = allowNewAlbums ?? behaviour?.allow_new_albums ?? true;
+  const effectiveSuggestDescriptions = suggestDescriptions ?? behaviour?.suggest_descriptions ?? true;
+  const effectiveSuggestTags = suggestTags ?? behaviour?.suggest_tags ?? true;
+  const effectiveSuggestSubalbums = suggestSubalbums ?? behaviour?.suggest_subalbums ?? true;
+  const effectiveSuggestLocations = suggestLocations ?? behaviour?.suggest_locations ?? true;
+  const effectiveWritebackLocations = writebackLocations ?? behaviour?.writeback_locations ?? false;
 
   return (
     <Section title="AI Behaviour">
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Suggestion Types</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {[
+              ["Descriptions", effectiveSuggestDescriptions, setSuggestDescriptions],
+              ["Tags", effectiveSuggestTags, setSuggestTags],
+              ["Subalbums", effectiveSuggestSubalbums, setSuggestSubalbums],
+              ["Locations", effectiveSuggestLocations, setSuggestLocations],
+            ].map(([label, checked, setter]) => (
+              <label key={label as string} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={checked as boolean}
+                  onChange={(e) => (setter as React.Dispatch<React.SetStateAction<boolean | undefined>>)(e.target.checked)}
+                />
+                <span style={{ fontSize: 13, color: "#94a3b8" }}>Suggest {String(label).toLowerCase()}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
+            Location suggestions are only requested for assets with no existing city, country, or GPS data.
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid #334155" }} />
+
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Location Write-back</div>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={effectiveWritebackLocations}
+              onChange={(e) => setWritebackLocations(e.target.checked)}
+              style={{ marginTop: 2 }}
+            />
+            <div>
+              <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Write approved coordinates to Immich</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                Approved broad location suggestions without coordinates stay stored in immich-gpt and are not written to Immich.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div style={{ borderTop: "1px solid #334155" }} />
+
         {/* Tags behaviour */}
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Tag Creation</div>

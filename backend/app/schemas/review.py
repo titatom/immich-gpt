@@ -3,6 +3,19 @@ from typing import Optional, List
 from datetime import datetime
 
 
+class LocationSuggestion(BaseModel):
+    place_name: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    radius_meters: int
+    confidence: float
+    evidence: str
+    uncertainty_reason: Optional[str] = None
+
+
 class ReviewItemOut(BaseModel):
     asset_id: str
     immich_id: str
@@ -29,6 +42,7 @@ class ReviewItemOut(BaseModel):
     metadata_id: Optional[str]
     description_suggestion: Optional[str]
     tags_suggestion: Optional[List[str]]
+    location_suggestion: Optional[LocationSuggestion]
     provider_name: Optional[str]
     prompt_run_id: Optional[str]
 
@@ -40,6 +54,8 @@ class ReviewApproveRequest(BaseModel):
     approved_tags: Optional[List[str]] = None
     approved_subalbum: Optional[str] = None
     subalbum_approved: bool = False
+    approved_location: Optional[LocationSuggestion] = None
+    location_approved: bool = False
     trigger_writeback: bool = True
 
 
@@ -54,4 +70,5 @@ class WritebackResult(BaseModel):
     description_written: bool
     tags_written: bool
     album_assigned: bool
+    location_written: bool
     errors: List[str]

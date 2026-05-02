@@ -22,6 +22,7 @@ class WritebackResult:
         self.description_written = False
         self.tags_written = False
         self.album_assigned = False
+        self.location_written = False
         self.errors: List[str] = []
 
     def to_dict(self) -> Dict[str, Any]:
@@ -30,6 +31,7 @@ class WritebackResult:
             "description_written": self.description_written,
             "tags_written": self.tags_written,
             "album_assigned": self.album_assigned,
+            "location_written": self.location_written,
             "errors": self.errors,
         }
 
@@ -54,6 +56,8 @@ class ReviewDecisionService:
         approved_tags: Optional[List[str]],
         approved_subalbum: Optional[str],
         subalbum_approved: bool,
+        approved_location: Optional[Dict[str, Any]] = None,
+        location_approved: bool = False,
         trigger_writeback: bool = True,
     ) -> WritebackResult:
         asset = self.db.query(Asset).filter(Asset.id == asset_id).first()
@@ -84,6 +88,7 @@ class ReviewDecisionService:
         if metadata_suggestion:
             metadata_suggestion.approved_description = approved_description
             metadata_suggestion.approved_tags_json = approved_tags
+            metadata_suggestion.approved_location_json = approved_location if location_approved else None
 
         # Create decision record
         decision = ReviewDecision(
@@ -98,6 +103,8 @@ class ReviewDecisionService:
             approved_tags_json=approved_tags,
             approved_subalbum=approved_subalbum,
             subalbum_approved=subalbum_approved,
+            approved_location_json=approved_location if location_approved else None,
+            location_approved=location_approved,
             writeback_triggered=trigger_writeback,
         )
         self.db.add(decision)
@@ -114,6 +121,7 @@ class ReviewDecisionService:
                 description=approved_description,
                 tags=approved_tags,
                 subalbum=approved_subalbum if subalbum_approved else None,
+                location=approved_location if location_approved else None,
                 metadata_suggestion=metadata_suggestion,
                 result=result,
             )
@@ -149,18 +157,20 @@ class ReviewDecisionService:
         description: Optional[str],
         tags: Optional[List[str]],
         subalbum: Optional[str],
+        location: Optional[Dict[str, Any]],
         metadata_suggestion: Optional[SuggestedMetadata],
         result: WritebackResult,
     ) -> None:
         is_external = asset.is_external_library
         if is_external:
             result.errors.append(
-                "Asset is from an external library. Description/tag writes may be restricted."
+                "Asset is from an external library. Description/tag/location writes may be restricted."
             )
 
-        # Read behaviour settings to decide whether to create new entities.
+        # Read behaviour settings to decide whether to create new entities and write approved location.
         allow_new_tags = self._get_behaviour_setting("allow_new_tags", True)
         allow_new_albums = self._get_behaviour_setting("allow_new_albums", True)
+        writeback_locations = self._get_behaviour_setting("writeback_locations", False)
 
         # Write description
         if description and description.strip():
@@ -202,6 +212,48 @@ class ReviewDecisionService:
                 msg = f"Failed to write tags: {e}"
                 result.errors.append(msg)
                 self._audit(asset.id, "writeback_tags", "failed", error=msg)
+
+        # Write location
+        if location and not writeback_locations:
+            msg = "Location write-back is disabled in settings."
+            result.errors.append(msg)
+            if metadata_suggestion:
+                metadata_suggestion.location_writeback_status = "skipped"
+                metadata_suggestion.location_writeback_error = msg
+        elif location and location.get("latitude") is not None and location.get("longitude") is not None:
+            try:
+                self.immich.update_asset_location(
+                    asset.immich_id,
+                    float(location["latitude"]),
+                    float(location["longitude"]),
+                )
+                result.location_written = True
+                if metadata_suggestion:
+                    metadata_suggestion.location_writeback_status = "written"
+                    metadata_suggestion.location_writeback_error = None
+                self._audit(
+                    asset.id,
+                    "writeback_location",
+                    "success",
+                    {
+                        "latitude": location["latitude"],
+                        "longitude": location["longitude"],
+                        "radius_meters": location.get("radius_meters"),
+                    },
+                )
+            except (ImmichError, TypeError, ValueError) as e:
+                msg = f"Failed to write location: {e}"
+                result.errors.append(msg)
+                self._audit(asset.id, "writeback_location", "failed", error=msg)
+                if metadata_suggestion:
+                    metadata_suggestion.location_writeback_status = "failed"
+                    metadata_suggestion.location_writeback_error = msg
+        elif location:
+            msg = "Approved location has no coordinates; write-back skipped."
+            result.errors.append(msg)
+            if metadata_suggestion:
+                metadata_suggestion.location_writeback_status = "skipped"
+                metadata_suggestion.location_writeback_error = msg
 
         # Album assignment
         # Priority: subalbum name → bucket immich_album_id → create album from bucket name

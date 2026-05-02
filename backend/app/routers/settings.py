@@ -20,6 +20,11 @@ _KEY_IMMICH_URL = "immich_url"
 _KEY_IMMICH_API_KEY = "immich_api_key"
 _KEY_ALLOW_NEW_TAGS = "allow_new_tags"
 _KEY_ALLOW_NEW_ALBUMS = "allow_new_albums"
+_KEY_SUGGEST_DESCRIPTIONS = "suggest_descriptions"
+_KEY_SUGGEST_TAGS = "suggest_tags"
+_KEY_SUGGEST_SUBALBUMS = "suggest_subalbums"
+_KEY_SUGGEST_LOCATIONS = "suggest_locations"
+_KEY_WRITEBACK_LOCATIONS = "writeback_locations"
 
 
 def _get_setting(db: Session, user_id: str, key: str) -> Optional[str]:
@@ -243,6 +248,11 @@ def list_provider_models(
 class BehaviourSettings(BaseModel):
     allow_new_tags: bool = True
     allow_new_albums: bool = True
+    suggest_descriptions: bool = True
+    suggest_tags: bool = True
+    suggest_subalbums: bool = True
+    suggest_locations: bool = True
+    writeback_locations: bool = False
 
 
 @router.get("/behaviour", response_model=BehaviourSettings)
@@ -259,6 +269,11 @@ def get_behaviour_settings(
     return BehaviourSettings(
         allow_new_tags=_get(_KEY_ALLOW_NEW_TAGS, True),
         allow_new_albums=_get(_KEY_ALLOW_NEW_ALBUMS, True),
+        suggest_descriptions=_get(_KEY_SUGGEST_DESCRIPTIONS, True),
+        suggest_tags=_get(_KEY_SUGGEST_TAGS, True),
+        suggest_subalbums=_get(_KEY_SUGGEST_SUBALBUMS, True),
+        suggest_locations=_get(_KEY_SUGGEST_LOCATIONS, True),
+        writeback_locations=_get(_KEY_WRITEBACK_LOCATIONS, False),
     )
 
 
@@ -270,6 +285,11 @@ def save_behaviour_settings(
 ):
     _set_setting(db, current_user.id, _KEY_ALLOW_NEW_TAGS, "true" if body.allow_new_tags else "false")
     _set_setting(db, current_user.id, _KEY_ALLOW_NEW_ALBUMS, "true" if body.allow_new_albums else "false")
+    _set_setting(db, current_user.id, _KEY_SUGGEST_DESCRIPTIONS, "true" if body.suggest_descriptions else "false")
+    _set_setting(db, current_user.id, _KEY_SUGGEST_TAGS, "true" if body.suggest_tags else "false")
+    _set_setting(db, current_user.id, _KEY_SUGGEST_SUBALBUMS, "true" if body.suggest_subalbums else "false")
+    _set_setting(db, current_user.id, _KEY_SUGGEST_LOCATIONS, "true" if body.suggest_locations else "false")
+    _set_setting(db, current_user.id, _KEY_WRITEBACK_LOCATIONS, "true" if body.writeback_locations else "false")
     return body
 
 

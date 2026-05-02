@@ -5,7 +5,7 @@ import uuid
 import pytest
 from unittest.mock import MagicMock, patch
 from app.services.classification_orchestrator import ClassificationOrchestrator
-from app.services.ai_provider import AIClassificationResult
+from app.services.ai_provider import AIClassificationResult, LocationSuggestion
 from app.models.asset import Asset
 from app.models.bucket import Bucket
 from app.models.job_run import JobRun
@@ -98,6 +98,76 @@ def test_saves_suggested_metadata(db):
     assert sm is not None
     assert sm.description_suggestion == "A family gathering photo"
     assert "family" in sm.tags_json
+
+
+def test_saves_location_suggestion_only_when_asset_has_no_geo(db):
+    from tests.conftest import TEST_USER_ID
+    asset = make_asset(db)
+    job = make_job(db)
+    provider = make_mock_provider()
+    provider.classify_asset.return_value = AIClassificationResult(
+        bucket_name="Personal",
+        confidence=0.9,
+        explanation="Travel photo",
+        description_suggestion="A landmark view",
+        tags=["travel"],
+        location_suggestion=LocationSuggestion(
+            place_name="Eiffel Tower",
+            city="Paris",
+            region="Ile-de-France",
+            country="France",
+            latitude=48.8584,
+            longitude=2.2945,
+            radius_meters=100,
+            confidence=0.9,
+            evidence="The landmark is visible.",
+            uncertainty_reason=None,
+        ),
+    )
+
+    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator.image_service = make_mock_image_service()
+    orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
+
+    from app.models.suggested_metadata import SuggestedMetadata
+    sm = db.query(SuggestedMetadata).filter(SuggestedMetadata.asset_id == asset.id).first()
+    assert sm.location_suggestion_json["city"] == "Paris"
+
+
+def test_does_not_save_location_suggestion_when_asset_has_geo(db):
+    from tests.conftest import TEST_USER_ID
+    asset = make_asset(db)
+    asset.city = "Chicago"
+    db.commit()
+    job = make_job(db)
+    provider = make_mock_provider()
+    provider.classify_asset.return_value = AIClassificationResult(
+        bucket_name="Personal",
+        confidence=0.9,
+        explanation="Travel photo",
+        description_suggestion="A city view",
+        tags=["travel"],
+        location_suggestion=LocationSuggestion(
+            place_name=None,
+            city="Paris",
+            region=None,
+            country="France",
+            latitude=48.8584,
+            longitude=2.2945,
+            radius_meters=100,
+            confidence=0.9,
+            evidence="The landmark is visible.",
+            uncertainty_reason=None,
+        ),
+    )
+
+    orchestrator = ClassificationOrchestrator(db, provider, user_id=TEST_USER_ID)
+    orchestrator.image_service = make_mock_image_service()
+    orchestrator.run_classification_job(job.id, asset_ids=[asset.id])
+
+    from app.models.suggested_metadata import SuggestedMetadata
+    sm = db.query(SuggestedMetadata).filter(SuggestedMetadata.asset_id == asset.id).first()
+    assert sm.location_suggestion_json is None
 
 
 def test_job_completes_successfully(db):
