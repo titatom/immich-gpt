@@ -58,6 +58,30 @@ vi.mock("../services/api", async (importOriginal) => {
     saveImmichSettings: noop,
     getThumbnailUrl: (id: string, size = "thumbnail") =>
       `/api/thumbnails/${id}?size=${size}`,
+    // Routing tree
+    getRoutingTree: vi.fn().mockResolvedValue({ nodes: [] }),
+    listRoutingNodes: vi.fn().mockResolvedValue([]),
+    createRoutingNode: noop,
+    updateRoutingNode: noop,
+    deleteRoutingNode: noop,
+    duplicateRoutingNode: noop,
+    moveRoutingNode: noop,
+    listRoutingExamples: vi.fn().mockResolvedValue([]),
+    addRoutingExample: noop,
+    deleteRoutingExample: noop,
+    getRoutingPromptPreview: vi.fn().mockResolvedValue({ bucket_id: "x", path: "X", compiled_prompt: "" }),
+    startRoutingClassify: vi.fn().mockResolvedValue({ job_id: "job-1", plan_id: "plan-1", status: "queued" }),
+    listRoutingPlans: vi.fn().mockResolvedValue([]),
+    getRoutingPlan: noop,
+    getRoutingPlanSummary: vi.fn().mockResolvedValue({
+      plan_id: "x", total: 0,
+      groups: { auto_applied: [], ready_to_approve: [], needs_review: [], trash_candidates: [], rejected: [], failed: [] },
+    }),
+    getRoutingPlanItems: vi.fn().mockResolvedValue([]),
+    approveRoutingPlanItems: noop,
+    rejectRoutingPlanItems: noop,
+    moveRoutingPlanItems: noop,
+    applyRoutingPlan: noop,
   };
 });
 
@@ -168,6 +192,26 @@ describe("App routing", () => {
       </Wrapper>
     );
     await waitFor(() => expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1));
+  });
+
+  it("renders routing tree page on /routing route", async () => {
+    render(
+      <Wrapper path="/routing">
+        <App />
+      </Wrapper>
+    );
+    await waitFor(() => expect(screen.getAllByText(/Routing tree/i).length).toBeGreaterThanOrEqual(1));
+  });
+
+  it("renders routing plans page on /routing/plans route", async () => {
+    render(
+      <Wrapper path="/routing/plans">
+        <App />
+      </Wrapper>
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText(/Routing plans/i).length).toBeGreaterThanOrEqual(1)
+    );
   });
 
   it("renders assets page on /assets route", async () => {

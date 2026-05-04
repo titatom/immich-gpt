@@ -12,6 +12,11 @@ import type {
   ImmichAlbum,
   AuditLog,
   BucketStat,
+  RoutingNode,
+  RoutingExample,
+  RoutingPlan,
+  RoutingPlanItem,
+  RoutingPlanSummary,
 } from "../types";
 
 const api = axios.create({
@@ -302,6 +307,85 @@ export const getAuditLogCount = (params?: {
 // --- Bucket stats ---
 export const getBucketStats = (): Promise<BucketStat[]> =>
   api.get("/buckets/stats").then((r) => r.data);
+
+// --- Routing tree ---
+export const getRoutingTree = (): Promise<{ nodes: RoutingNode[] }> =>
+  api.get("/routing/tree").then((r) => r.data);
+
+export const listRoutingNodes = (): Promise<RoutingNode[]> =>
+  api.get("/routing/nodes").then((r) => r.data);
+
+export const createRoutingNode = (data: Partial<RoutingNode>): Promise<RoutingNode> =>
+  api.post("/routing/nodes", data).then((r) => r.data);
+
+export const updateRoutingNode = (id: string, data: Partial<RoutingNode>): Promise<RoutingNode> =>
+  api.patch(`/routing/nodes/${id}`, data).then((r) => r.data);
+
+export const deleteRoutingNode = (id: string, cascade = false) =>
+  api.delete(`/routing/nodes/${id}`, { params: { cascade } }).then((r) => r.data);
+
+export const moveRoutingNode = (id: string, new_parent_id: string | null): Promise<RoutingNode> =>
+  api.post(`/routing/nodes/${id}/move`, { new_parent_id }).then((r) => r.data);
+
+export const duplicateRoutingNode = (id: string): Promise<RoutingNode> =>
+  api.post(`/routing/nodes/${id}/duplicate`).then((r) => r.data);
+
+export const listRoutingExamples = (nodeId: string): Promise<RoutingExample[]> =>
+  api.get(`/routing/nodes/${nodeId}/examples`).then((r) => r.data);
+
+export const addRoutingExample = (
+  nodeId: string,
+  data: { asset_id?: string; example_type: "positive" | "negative"; note?: string; source?: string }
+): Promise<RoutingExample> =>
+  api.post(`/routing/nodes/${nodeId}/examples`, data).then((r) => r.data);
+
+export const deleteRoutingExample = (exampleId: string) =>
+  api.delete(`/routing/examples/${exampleId}`).then((r) => r.data);
+
+export const getRoutingPromptPreview = (nodeId: string): Promise<{ bucket_id: string; path: string; compiled_prompt: string }> =>
+  api.get(`/routing/nodes/${nodeId}/prompt-preview`).then((r) => r.data);
+
+export const startRoutingClassify = (data?: {
+  asset_ids?: string[];
+  limit?: number;
+  force?: boolean;
+}) =>
+  api.post("/routing/classify", data ?? {}).then(
+    (r) => r.data as { job_id: string; plan_id: string; status: string }
+  );
+
+export const listRoutingPlans = (params?: { status?: string }): Promise<RoutingPlan[]> =>
+  api.get("/routing/plans", { params }).then((r) => r.data);
+
+export const getRoutingPlan = (planId: string): Promise<RoutingPlan> =>
+  api.get(`/routing/plans/${planId}`).then((r) => r.data);
+
+export const getRoutingPlanSummary = (planId: string): Promise<RoutingPlanSummary> =>
+  api.get(`/routing/plans/${planId}/summary`).then((r) => r.data);
+
+export const getRoutingPlanItems = (
+  planId: string,
+  params?: { status?: string; bucket_id?: string }
+): Promise<RoutingPlanItem[]> =>
+  api.get(`/routing/plans/${planId}/items`, { params }).then((r) => r.data);
+
+export const approveRoutingPlanItems = (
+  planId: string,
+  data: { item_ids?: string[]; bucket_id?: string }
+) => api.post(`/routing/plans/${planId}/approve`, data).then((r) => r.data);
+
+export const rejectRoutingPlanItems = (
+  planId: string,
+  data: { item_ids?: string[]; bucket_id?: string }
+) => api.post(`/routing/plans/${planId}/reject`, data).then((r) => r.data);
+
+export const moveRoutingPlanItems = (
+  planId: string,
+  data: { item_ids: string[]; target_bucket_id: string }
+) => api.post(`/routing/plans/${planId}/items/move`, data).then((r) => r.data);
+
+export const applyRoutingPlan = (planId: string) =>
+  api.post(`/routing/plans/${planId}/apply`).then((r) => r.data);
 
 // --- Thumbnail URL helper ---
 export const getThumbnailUrl = (assetId: string, size = "thumbnail") =>

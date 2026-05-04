@@ -8,6 +8,7 @@ import BrandLogo from "./BrandLogo";
 import {
   LayoutDashboard, Eye, FolderKanban, MessageSquare,
   Settings, Activity, Images, ClipboardList, Users, LogOut, Heart,
+  Network, GitBranch,
 } from "lucide-react";
 import styles from "./Layout.module.css";
 
@@ -16,6 +17,8 @@ const navItems = [
   { path: "/review", label: "Review", icon: Eye, badge: true },
   { path: "/assets", label: "Assets", icon: Images },
   { path: "/buckets", label: "Buckets", icon: FolderKanban },
+  { path: "/routing", label: "Routing", icon: Network },
+  { path: "/routing/plans", label: "Routing plans", icon: GitBranch },
   { path: "/prompts", label: "Prompts", icon: MessageSquare },
   { path: "/jobs", label: "Jobs", icon: Activity },
   { path: "/logs", label: "Logs", icon: ClipboardList },
