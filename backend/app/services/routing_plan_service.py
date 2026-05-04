@@ -210,7 +210,10 @@ class RoutingPlanService:
             raise ValueError(f"Target bucket {target_bucket_id} not found")
         items = self._items_by_ids(item_ids)
         count = 0
+        from .routing_learning import RoutingLearningService
+        learner = RoutingLearningService(self.db, self.user_id)
         for item in items:
+            from_bucket = item.primary_bucket_id
             item.primary_bucket_id = target.id
             item.primary_bucket_path = target.path or target.name
             if target.destination_type == "immich_trash":
@@ -218,6 +221,11 @@ class RoutingPlanService:
             elif item.disposition == "trash_candidate":
                 item.disposition = "review"
             count += 1
+            try:
+                learner.record_correction(item.asset_id, from_bucket, target.id)
+            except Exception:
+                # Learning is best-effort; never block the move.
+                pass
         self.db.commit()
         return count
 
