@@ -11,6 +11,8 @@ from .job_run import JobRun
 from .audit_log import AuditLog
 from .provider_config import ProviderConfig
 from .app_setting import AppSetting
+from .routing_example import RoutingExample
+from .routing_plan import RoutingPlan, RoutingPlanItem
 
 __all__ = [
     "User",
@@ -27,4 +29,7 @@ __all__ = [
     "AuditLog",
     "ProviderConfig",
     "AppSetting",
+    "RoutingExample",
+    "RoutingPlan",
+    "RoutingPlanItem",
 ]

@@ -51,6 +51,7 @@ def init_db():
         asset, bucket, prompt_template, prompt_run,
         suggested_classification, suggested_metadata,
         review_decision, job_run, audit_log, provider_config, app_setting,
+        routing_example, routing_plan,
     )
 
     try:

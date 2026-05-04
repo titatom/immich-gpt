@@ -20,6 +20,8 @@ import app.models.job_run  # noqa
 import app.models.audit_log  # noqa
 import app.models.provider_config  # noqa
 import app.models.app_setting  # noqa
+import app.models.routing_example  # noqa
+import app.models.routing_plan  # noqa
 
 from app.database import Base, get_db
 from app.main import app
@@ -79,9 +81,12 @@ def db():
             id=str(uuid.uuid4()),
             user_id=TEST_USER_ID,
             name=b["name"],
+            path=b["name"],
+            is_leaf=True,
             enabled=True,
             priority=b["priority"],
             mapping_mode="virtual",
+            destination_type="virtual",
         ))
 
     prompts = [

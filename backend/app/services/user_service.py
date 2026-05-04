@@ -164,6 +164,8 @@ def delete_user(db: Session, user_id: str) -> bool:
 # Default seeding for new users
 # ---------------------------------------------------------------------------
 
+# Default routing tree.  These are NOT special-cased in code anywhere
+# — they are seeded leaves with normal generic settings.
 DEFAULT_BUCKETS = [
     {
         "name": "Business",
@@ -173,6 +175,7 @@ DEFAULT_BUCKETS = [
             "Business includes construction, handyman, renovation sites, tools, materials, "
             "estimates, invoices, work progress, finished work, and project documentation."
         ),
+        "destination_type": "virtual",
     },
     {
         "name": "Documents",
@@ -180,9 +183,13 @@ DEFAULT_BUCKETS = [
         "priority": 5,
         "classification_prompt": (
             "Documents include receipts, invoices, forms, scans, contracts, screenshots of "
-            "emails, notes, whiteboards, and photos of paper. Documents beat Business when "
-            "the asset is clearly a receipt, invoice, contract, scan, or photo of paper."
+            "emails, notes, whiteboards, and photos of paper."
         ),
+        "destination_type": "virtual",
+        "privacy_rules": {
+            "documents_visible": "allow",
+            "address_visible": "review",
+        },
     },
     {
         "name": "Personal",
@@ -192,6 +199,7 @@ DEFAULT_BUCKETS = [
             "Personal includes family photos, selfies, social events, travel, food, pets, "
             "hobbies, and everyday life moments."
         ),
+        "destination_type": "virtual",
     },
     {
         "name": "Trash",
@@ -202,6 +210,8 @@ DEFAULT_BUCKETS = [
             "completely dark or overexposed images with no value. "
             "When in doubt, do NOT classify as Trash — prefer another bucket."
         ),
+        "destination_type": "virtual",
+        "auto_apply_enabled": False,
     },
 ]
 
@@ -251,11 +261,16 @@ def _seed_user_defaults(db: Session, user_id: str) -> None:
             id=str(uuid.uuid4()),
             user_id=user_id,
             name=b["name"],
+            path=b["name"],
+            is_leaf=True,
             description=b["description"],
             enabled=True,
             priority=b["priority"],
             mapping_mode="virtual",
+            destination_type=b.get("destination_type", "virtual"),
             classification_prompt=b["classification_prompt"],
+            privacy_rules_json=b.get("privacy_rules"),
+            auto_apply_enabled=b.get("auto_apply_enabled", False),
         ))
 
     for p in DEFAULT_PROMPTS:
