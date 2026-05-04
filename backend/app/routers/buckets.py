@@ -57,14 +57,24 @@ def create_bucket(
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Bucket '{body.name}' already exists")
+    destination_type = (
+        "immich_trash" if body.mapping_mode == "immich_trash"
+        else "immich_album" if body.mapping_mode == "immich_album"
+        else "review_only" if body.mapping_mode == "review_only"
+        else "virtual"
+    )
     b = Bucket(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
         name=body.name,
+        path=body.name,
+        is_leaf=True,
+        parent_id=None,
         description=body.description,
         enabled=body.enabled,
         priority=body.priority,
         mapping_mode=body.mapping_mode,
+        destination_type=destination_type,
         immich_album_id=body.immich_album_id,
         classification_prompt=body.classification_prompt,
         examples_json=body.examples,
@@ -154,7 +164,8 @@ def update_bucket(
     if not b:
         raise HTTPException(status_code=404, detail="Bucket not found")
     if body.name is not None:
-        b.name = body.name
+        from ..services.routing_tree import RoutingTreeService
+        RoutingTreeService(db, current_user.id).rename_node(b, body.name)
     if body.description is not None:
         b.description = body.description
     if body.enabled is not None:
@@ -163,6 +174,14 @@ def update_bucket(
         b.priority = body.priority
     if body.mapping_mode is not None:
         b.mapping_mode = body.mapping_mode
+        if body.mapping_mode == "immich_trash":
+            b.destination_type = "immich_trash"
+        elif body.mapping_mode == "immich_album":
+            b.destination_type = "immich_album"
+        elif body.mapping_mode == "review_only":
+            b.destination_type = "review_only"
+        elif body.mapping_mode == "virtual":
+            b.destination_type = "virtual"
     if body.immich_album_id is not None:
         b.immich_album_id = body.immich_album_id
     if body.classification_prompt is not None:

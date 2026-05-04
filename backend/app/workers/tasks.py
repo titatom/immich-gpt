@@ -8,6 +8,7 @@ from ..services.job_progress import JobProgressService
 from ..services.asset_sync import AssetSyncService
 from ..services.immich_client import ImmichClient
 from ..services.classification_orchestrator import ClassificationOrchestrator
+from ..services.routing_classification import RoutingClassificationOrchestrator
 from ..services.ai_provider import build_provider
 from ..models.provider_config import ProviderConfig
 from typing import Optional, List
@@ -168,6 +169,67 @@ def run_classification(
         immich = _get_user_immich_client(db, user_id)
         orchestrator = ClassificationOrchestrator(db, provider, immich_client=immich, user_id=user_id)
         orchestrator.run_classification_job(job_id, asset_ids=asset_ids, limit=limit, force=force)
+        return {"status": "done"}
+
+    except Exception as e:
+        db.rollback()
+        try:
+            JobProgressService(db).fail_job(job_id, str(e))
+        except Exception:
+            pass
+        raise
+    finally:
+        db.close()
+
+
+def run_routing_classification(
+    job_id: str,
+    plan_id: Optional[str] = None,
+    asset_ids: Optional[List[str]] = None,
+    limit: Optional[int] = None,
+    force: bool = False,
+    user_id: Optional[str] = None,
+) -> dict:
+    """Background task: classify assets against the user's routing tree."""
+    db = SessionLocal()
+    try:
+        q = db.query(ProviderConfig)
+        if user_id:
+            q = q.filter(ProviderConfig.user_id == user_id)
+        provider_cfg = q.filter(
+            ProviderConfig.is_default == True,
+            ProviderConfig.enabled == True,
+        ).first()
+        if not provider_cfg:
+            provider_cfg = q.filter(ProviderConfig.enabled == True).first()
+        if not provider_cfg:
+            from ..config import settings
+            if settings.OPENAI_API_KEY:
+                provider = build_provider("openai", {
+                    "api_key": settings.OPENAI_API_KEY,
+                    "model_name": settings.OPENAI_MODEL,
+                })
+            else:
+                raise ValueError(
+                    "No AI provider configured. Set OPENAI_API_KEY or configure a provider."
+                )
+        else:
+            cfg_dict = {
+                "api_key": provider_cfg.api_key_encrypted or "",
+                "model_name": provider_cfg.model_name,
+                "base_url": provider_cfg.base_url,
+            }
+            if provider_cfg.extra_config_json:
+                cfg_dict.update(provider_cfg.extra_config_json)
+            provider = build_provider(provider_cfg.provider_name, cfg_dict)
+
+        immich = _get_user_immich_client(db, user_id)
+        orch = RoutingClassificationOrchestrator(
+            db, provider, user_id=user_id, immich_client=immich,
+        )
+        orch.run_classification_job(
+            job_id, asset_ids=asset_ids, limit=limit, force=force, plan_id=plan_id,
+        )
         return {"status": "done"}
 
     except Exception as e:

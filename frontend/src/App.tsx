@@ -7,6 +7,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Review from "./pages/Review";
 import Buckets from "./pages/Buckets";
+import Routing from "./pages/Routing";
+import RoutingPlans from "./pages/RoutingPlans";
 import Prompts from "./pages/Prompts";
 import Jobs from "./pages/Jobs";
 import Settings from "./pages/Settings";
@@ -44,6 +46,8 @@ export default function App() {
           <Route path="review" element={<Guarded><Review /></Guarded>} />
           <Route path="assets" element={<Guarded><Assets /></Guarded>} />
           <Route path="buckets" element={<Guarded><Buckets /></Guarded>} />
+          <Route path="routing" element={<Guarded><Routing /></Guarded>} />
+          <Route path="routing/plans" element={<Guarded><RoutingPlans /></Guarded>} />
           <Route path="prompts" element={<Guarded><Prompts /></Guarded>} />
           <Route path="jobs" element={<Guarded><Jobs /></Guarded>} />
           <Route path="logs" element={<Guarded><Logs /></Guarded>} />

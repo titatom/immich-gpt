@@ -15,7 +15,7 @@ from .database import init_db
 from .limiter import limiter
 from .routers import (
     settings, buckets, prompts, assets, jobs, review,
-    thumbnails, albums, audit_logs,
+    thumbnails, albums, audit_logs, routing,
 )
 from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
@@ -132,6 +132,7 @@ app.include_router(review.router)
 app.include_router(thumbnails.router)
 app.include_router(albums.router)
 app.include_router(audit_logs.router)
+app.include_router(routing.router)
 
 
 @app.get("/api/health")
