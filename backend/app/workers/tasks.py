@@ -71,25 +71,25 @@ def run_asset_sync(
             j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
             return j is not None and j.status in ("paused", "cancelled")
 
-        immich = _get_user_immich_client(db, user_id)
-        sync_svc = AssetSyncService(db, immich, user_id=user_id)
+        with _get_user_immich_client(db, user_id) as immich:
+            sync_svc = AssetSyncService(db, immich, user_id=user_id)
 
-        if scope == "favorites":
-            result = sync_svc.sync_favorites(
-                job_progress_callback=progress_cb,
-                should_stop=should_stop,
-            )
-        elif scope == "albums" and album_ids:
-            result = sync_svc.sync_albums(
-                album_ids,
-                job_progress_callback=progress_cb,
-                should_stop=should_stop,
-            )
-        else:
-            result = sync_svc.sync_all(
-                job_progress_callback=progress_cb,
-                should_stop=should_stop,
-            )
+            if scope == "favorites":
+                result = sync_svc.sync_favorites(
+                    job_progress_callback=progress_cb,
+                    should_stop=should_stop,
+                )
+            elif scope == "albums" and album_ids:
+                result = sync_svc.sync_albums(
+                    album_ids,
+                    job_progress_callback=progress_cb,
+                    should_stop=should_stop,
+                )
+            else:
+                result = sync_svc.sync_all(
+                    job_progress_callback=progress_cb,
+                    should_stop=should_stop,
+                )
 
         j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
         if j and j.status not in ("paused", "cancelled"):
@@ -157,13 +157,13 @@ def run_routing_classification(
                 cfg_dict.update(provider_cfg.extra_config_json)
             provider = build_provider(provider_cfg.provider_name, cfg_dict)
 
-        immich = _get_user_immich_client(db, user_id)
-        orch = RoutingClassificationOrchestrator(
-            db, provider, user_id=user_id, immich_client=immich,
-        )
-        orch.run_classification_job(
-            job_id, asset_ids=asset_ids, limit=limit, force=force, plan_id=plan_id,
-        )
+        with _get_user_immich_client(db, user_id) as immich:
+            orch = RoutingClassificationOrchestrator(
+                db, provider, user_id=user_id, immich_client=immich,
+            )
+            orch.run_classification_job(
+                job_id, asset_ids=asset_ids, limit=limit, force=force, plan_id=plan_id,
+            )
         return {"status": "done"}
 
     except Exception as e:

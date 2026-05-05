@@ -71,9 +71,57 @@ def test_api_key_sent_in_header():
     """Verify credentials are sent in headers, not in URL."""
     client = ImmichClient("http://immich.local", "my-secret-key")
     http_client = client._client()
-    assert http_client.headers.get("x-api-key") == "my-secret-key"
-    # Key should not be in the base URL
-    assert "my-secret-key" not in str(http_client.base_url)
+    try:
+        assert http_client.headers.get("x-api-key") == "my-secret-key"
+        # Key should not be in the base URL
+        assert "my-secret-key" not in str(http_client.base_url)
+    finally:
+        http_client.close()
+
+
+def test_context_manager_reuses_single_http_client():
+    client = ImmichClient("http://immich.local", "key")
+    mock_http = MagicMock()
+    mock_http.get.side_effect = [
+        make_mock_response(200, {"total": 1}),
+        make_mock_response(200, [{"id": "album-1"}]),
+    ]
+
+    with patch.object(client, "_client", return_value=mock_http) as make_client:
+        with client:
+            assert client.get_asset_count() == 1
+            assert client.list_albums() == [{"id": "album-1"}]
+
+    make_client.assert_called_once()
+    mock_http.close.assert_called_once()
+
+
+def test_list_album_assets_caches_full_album_payload():
+    client = ImmichClient("http://immich.local", "key")
+    mock_http = MagicMock()
+    mock_http.__enter__ = lambda self: self
+    mock_http.__exit__ = MagicMock(return_value=False)
+    mock_http.get.return_value = make_mock_response(
+        200,
+        {
+            "assets": [
+                {"id": "asset-1"},
+                {"id": "asset-2"},
+                {"id": "asset-3"},
+            ]
+        },
+    )
+
+    with patch.object(client, "_client", return_value=mock_http):
+        first = client.list_album_assets("album-1", page=1, page_size=2)
+        second = client.list_album_assets("album-1", page=2, page_size=2)
+
+    assert first == [{"id": "asset-1"}, {"id": "asset-2"}]
+    assert second == [{"id": "asset-3"}]
+    mock_http.get.assert_called_once_with(
+        "/api/albums/album-1",
+        params={"withoutAssets": False},
+    )
 
 
 def test_is_external_library_asset_detection():
