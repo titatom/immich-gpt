@@ -8,8 +8,16 @@ import pytest
 from app.models.audit_log import AuditLog
 
 
-def _make_log(db, action="writeback_description", status="success",
-              asset_id=None, job_run_id=None) -> AuditLog:
+def _make_log(
+    db,
+    action="writeback_description",
+    status="success",
+    asset_id=None,
+    job_run_id=None,
+    level=None,
+    source=None,
+    error_message=None,
+) -> AuditLog:
     from tests.conftest import TEST_USER_ID
     log = AuditLog(
         id=str(uuid.uuid4()),
@@ -18,6 +26,9 @@ def _make_log(db, action="writeback_description", status="success",
         job_run_id=job_run_id,
         action=action,
         status=status,
+        level=level,
+        source=source,
+        error_message=error_message,
     )
     db.add(log)
     db.commit()
@@ -81,6 +92,21 @@ def test_audit_log_count(client, db):
     r = client.get("/api/audit-logs/count?status=success")
     assert r.status_code == 200
     assert r.json()["count"] == 2
+
+
+def test_audit_log_count_matches_list_filters(client, db):
+    _make_log(db, action="writeback_tags", source="writeback", error_message="tag failed")
+    _make_log(db, action="writeback_description", source="writeback")
+    _make_log(db, action="writeback_tags", source="routing")
+
+    params = "action=writeback_tags&source=writeback&q=tag"
+    listed = client.get(f"/api/audit-logs?{params}")
+    counted = client.get(f"/api/audit-logs/count?{params}")
+
+    assert listed.status_code == 200
+    assert counted.status_code == 200
+    assert len(listed.json()) == 1
+    assert counted.json()["count"] == 1
 
 
 def test_get_audit_log(client, db):

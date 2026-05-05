@@ -55,6 +55,12 @@ function ImmichSection() {
   const [apiKey, setApiKey] = React.useState("");
   const [saveResult, setSaveResult] = React.useState<TestResult | null>(null);
 
+  React.useEffect(() => {
+    if (settings?.immich_url) {
+      setUrl(settings.immich_url);
+    }
+  }, [settings?.immich_url]);
+
   const saveMut = useMutation({
     mutationFn: () => saveImmichSettings(url, apiKey),
     onSuccess: (data) => {

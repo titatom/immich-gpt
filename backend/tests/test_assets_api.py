@@ -36,6 +36,15 @@ def _make_asset(db, immich_id=None, asset_type="IMAGE") -> Asset:
     return a
 
 
+def _make_named_asset(db, filename: str, created_at: datetime) -> Asset:
+    asset = _make_asset(db)
+    asset.original_filename = filename
+    asset.file_created_at = created_at
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
 # ---------------------------------------------------------------------------
 # GET /api/assets
 # ---------------------------------------------------------------------------
@@ -76,6 +85,15 @@ def test_list_assets_filter_by_type(client, db):
     data = r.json()
     assert len(data) == 1
     assert data[0]["asset_type"] == "IMAGE"
+
+
+def test_list_assets_server_side_sort_filename(client, db):
+    _make_named_asset(db, "bravo.jpg", datetime(2024, 1, 1))
+    _make_named_asset(db, "alpha.jpg", datetime(2024, 1, 2))
+
+    r = client.get("/api/assets?sort=filename&dir=asc")
+    assert r.status_code == 200
+    assert [a["original_filename"] for a in r.json()] == ["alpha.jpg", "bravo.jpg"]
 
 
 def test_list_assets_response_shape(client, db):

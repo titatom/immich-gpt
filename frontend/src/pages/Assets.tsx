@@ -15,26 +15,6 @@ const PAGE_SIZE = 50;
 type SortKey = "date" | "filename" | "location" | "tags" | "type";
 type SortDir = "asc" | "desc";
 
-function sortAssets(assets: Asset[], key: SortKey, dir: SortDir): Asset[] {
-  const factor = dir === "asc" ? 1 : -1;
-  return [...assets].sort((a, b) => {
-    let va: string;
-    let vb: string;
-    switch (key) {
-      case "date":     va = a.file_created_at ?? a.created_at ?? ""; vb = b.file_created_at ?? b.created_at ?? ""; break;
-      case "filename": va = a.original_filename ?? ""; vb = b.original_filename ?? ""; break;
-      case "location": va = [a.city, a.country].filter(Boolean).join(", "); vb = [b.city, b.country].filter(Boolean).join(", "); break;
-      case "tags":     va = (a.tags ?? []).join(", "); vb = (b.tags ?? []).join(", "); break;
-      case "type":     va = a.asset_type ?? ""; vb = b.asset_type ?? ""; break;
-      default:         va = ""; vb = "";
-    }
-    if (!va && vb) return 1;
-    if (va && !vb) return -1;
-    if (!va && !vb) return 0;
-    return factor * va.localeCompare(vb);
-  });
-}
-
 function SortHeader({ label, sortKey, current, dir, onChange }: {
   label: string; sortKey: SortKey; current: SortKey; dir: SortDir; onChange: (k: SortKey) => void;
 }) {
@@ -272,6 +252,13 @@ export default function Assets() {
     page_size: PAGE_SIZE,
     asset_type: assetType || undefined,
     q: search || undefined,
+    sort: sortKey,
+    dir: sortDir,
+  };
+
+  const countQueryParams = {
+    asset_type: assetType || undefined,
+    q: search || undefined,
   };
 
   const { data: assets = [], isLoading } = useQuery<Asset[]>({
@@ -280,14 +267,13 @@ export default function Assets() {
   });
 
   const { data: countData } = useQuery<{ count: number }>({
-    queryKey: ["asset-count", queryParams],
-    queryFn: () => getAssetCount(queryParams),
+    queryKey: ["asset-count", countQueryParams],
+    queryFn: () => getAssetCount(countQueryParams),
   });
 
   const total = countData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const sorted = sortAssets(assets, sortKey, sortDir);
-  const selected = sorted.find((a) => a.id === selectedAssetId);
+  const selected = assets.find((a) => a.id === selectedAssetId);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -333,13 +319,13 @@ export default function Assets() {
 
       {isLoading ? (
         <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Loading assets…</div>
-      ) : sorted.length === 0 ? (
+      ) : assets.length === 0 ? (
         <div style={{ padding: 60, textAlign: "center", color: "#64748b", fontSize: 13 }}>
           No assets match the current filter. Sync your Immich library from the dashboard.
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-          {sorted.map((asset) => (
+          {assets.map((asset) => (
             <AssetCard
               key={asset.id}
               asset={asset}

@@ -14,14 +14,14 @@ vi.mock("../services/api", () => ({
 
 import { getAuditLogs, getAuditLogCount, getJobs } from "../services/api";
 
-function renderPage() {
+function renderPage(path = "/logs") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/logs"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Logs />
       </MemoryRouter>
     </QueryClientProvider>
@@ -76,5 +76,21 @@ describe("Logs page", () => {
     await waitFor(() => expect(screen.getByText("[12:00:00] Starting classification")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Show matching activity" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open jobs page" })).toBeInTheDocument();
+  });
+
+  it("uses the same filters for list and count queries", async () => {
+    renderPage("/logs?action=writeback_tags&source=writeback&q=tag&status=success&level=info&job_run_id=job-1");
+
+    await waitFor(() => expect(getAuditLogCount).toHaveBeenCalled());
+    expect(getAuditLogCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "writeback_tags",
+        source: "writeback",
+        q: "tag",
+        status: "success",
+        level: "info",
+        job_run_id: "job-1",
+      })
+    );
   });
 });

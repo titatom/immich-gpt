@@ -329,8 +329,8 @@ export default function Logs() {
   });
 
   const { data: countData } = useQuery({
-    queryKey: ["audit-log-count", statusFilter, levelFilter, jobId],
-    queryFn: () => getAuditLogCount({ status: statusFilter || undefined, level: levelFilter || undefined, job_run_id: jobId || undefined }),
+    queryKey: ["audit-log-count", params],
+    queryFn: () => getAuditLogCount(params),
   });
 
   const { data: recentJobs = [], isLoading: jobsLoading } = useQuery({
