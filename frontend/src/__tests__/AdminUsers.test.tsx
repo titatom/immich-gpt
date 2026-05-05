@@ -5,12 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import AdminUsers from "../pages/AdminUsers";
 
-interface ClipboardNavigator extends Navigator {
-  clipboard: {
-    writeText: ReturnType<typeof vi.fn>;
-  };
-}
-
 vi.mock("../services/api", () => ({
   adminListUsers: vi.fn(),
   adminCreateUser: vi.fn(),
@@ -50,10 +44,9 @@ describe("AdminUsers", () => {
       token: "sensitive-reset-token",
     });
 
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
   });
 
@@ -63,7 +56,7 @@ describe("AdminUsers", () => {
     await userEvent.click(await screen.findByTitle("Reset password"));
 
     await waitFor(() => {
-      expect((navigator as ClipboardNavigator).clipboard.writeText).toHaveBeenCalledWith("sensitive-reset-token");
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("sensitive-reset-token");
     });
     expect(screen.getByText(/copied to your clipboard/i)).toBeInTheDocument();
     expect(screen.queryByText("sensitive-reset-token")).not.toBeInTheDocument();

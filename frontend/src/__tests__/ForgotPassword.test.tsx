@@ -30,7 +30,7 @@ describe("ForgotPassword page", () => {
 
     render(<ForgotPassword />);
 
-    await userEvent.type(screen.getByLabelText("Email"), "admin@example.com");
+    await userEvent.type(screen.getByRole("textbox"), "admin@example.com");
     await userEvent.click(screen.getByRole("button", { name: /generate reset token/i }));
 
     await waitFor(() => {

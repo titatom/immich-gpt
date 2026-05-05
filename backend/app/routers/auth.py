@@ -172,10 +172,6 @@ def forgot_password(
     return {
         "message": "Reset token generated",
         "token": raw_token,
-        "note": (
-            "Copy this token once and deliver it through a secure channel. "
-            "It expires in 1 hour."
-        ),
     }
 
 
