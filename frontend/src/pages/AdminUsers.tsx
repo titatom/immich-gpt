@@ -7,6 +7,7 @@ import {
   adminResetPassword,
   adminDeleteUser,
 } from "../services/api";
+import { copySecretToClipboard } from "../utils/clipboard";
 import { UserPlus, RefreshCw, Trash2, ShieldCheck, UserX, User, Key } from "lucide-react";
 
 interface AdminUser {
@@ -24,7 +25,7 @@ export default function AdminUsers() {
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ email: "", username: "", password: "", role: "user", force_password_change: true });
   const [createError, setCreateError] = useState("");
-  const [resetResult, setResetResult] = useState<{ userId: string; token?: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{ userId: string; copied: boolean } | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -55,7 +56,10 @@ export default function AdminUsers() {
 
   const resetMutation = useMutation({
     mutationFn: (userId: string) => adminResetPassword(userId),
-    onSuccess: (data, userId) => setResetResult({ userId, token: data.token }),
+    onSuccess: async (data, userId) => {
+      const copied = data.token ? await copySecretToClipboard(data.token) : false;
+      setResetResult({ userId, copied });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -192,7 +196,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {resetResult?.token && (
+      {resetResult && (
         <div style={{
           background: "rgba(34,197,94,0.1)",
           border: "1px solid rgba(34,197,94,0.3)",
@@ -200,8 +204,14 @@ export default function AdminUsers() {
           padding: "12px 16px",
           marginBottom: 20,
         }}>
-          <div style={{ color: "#4ade80", fontSize: 13, marginBottom: 6 }}>Reset token (valid 1 hour — share securely):</div>
-          <code style={{ color: "#38bdf8", fontSize: 12, wordBreak: "break-all" }}>{resetResult.token}</code>
+          <div style={{ color: "#4ade80", fontSize: 13, marginBottom: 6 }}>
+            Reset token generated for user {resetResult.userId}.
+          </div>
+          <div style={{ color: "#94a3b8", fontSize: 12 }}>
+            {resetResult.copied
+              ? "The one-time token was copied to your clipboard. It is not displayed here to reduce accidental exposure."
+              : "The token could not be copied by this browser. Generate a new reset token from a secure browser session."}
+          </div>
           <button
             onClick={() => setResetResult(null)}
             style={{ display: "block", marginTop: 8, color: "#94a3b8", fontSize: 12, background: "none", border: "none", cursor: "pointer" }}

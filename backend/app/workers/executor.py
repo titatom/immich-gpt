@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from ..config import settings
+from ..utils.logging import redact_url
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def enqueue(fn, *args) -> None:
         except Exception:
             logger.warning(
                 "Redis enqueue failed (REDIS_URL=%s); falling back to in-process executor.",
-                settings.REDIS_URL,
+                redact_url(settings.REDIS_URL),
                 exc_info=True,
             )
     submit(fn, *args)

@@ -12,6 +12,7 @@ from ..models.job_run import JobRun
 from ..schemas.job import JobRunOut, JobStartResponse, SyncJobRequest
 from ..services.job_progress import JobProgressService
 from ..config import settings
+from ..utils.logging import redact_url
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _enqueue(fn, *args):
         except Exception:
             logger.warning(
                 "Redis enqueue failed (REDIS_URL=%s); falling back to in-process executor.",
-                settings.REDIS_URL,
+                redact_url(settings.REDIS_URL),
                 exc_info=True,
             )
     from ..workers.executor import submit

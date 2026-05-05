@@ -30,6 +30,7 @@ import threading
 from typing import List, Optional
 
 from ..config import settings
+from ..utils.logging import redact_url
 
 
 logger = logging.getLogger(__name__)
@@ -168,7 +169,7 @@ def start_inline_workers(concurrency: Optional[int] = None) -> int:
         _started = True
         logger.info(
             "Started %d inline RQ worker thread(s) for REDIS_URL=%s",
-            n, settings.REDIS_URL,
+            n, redact_url(settings.REDIS_URL),
         )
         return n
 

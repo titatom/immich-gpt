@@ -70,10 +70,17 @@ def get_thumbnail_by_immich_id(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    """Proxy thumbnail directly by Immich asset ID using the current user's credentials."""
+    """Proxy a synced thumbnail by Immich asset ID for the current user."""
+    asset = db.query(Asset).filter(
+        Asset.immich_id == immich_id,
+        Asset.user_id == current_user.id,
+    ).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     client = _get_user_immich_client(db, current_user.id)
     try:
-        image_bytes = client.get_thumbnail(immich_id, size=size)
+        image_bytes = client.get_thumbnail(asset.immich_id, size=size)
         return Response(
             content=image_bytes,
             media_type="image/jpeg",
