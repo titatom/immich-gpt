@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..dependencies import require_active_user
 from ..services.immich_client import ImmichClient, ImmichError
+from ..services.secret_store import decrypt_secret
 from ..config import settings as app_settings
 
 router = APIRouter(prefix="/api/albums", tags=["albums"])
@@ -18,7 +19,9 @@ def _get_user_immich_client(db: Session, user_id: str) -> ImmichClient:
         AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
     ).first()
     url = (url_row.value if url_row and url_row.value else None) or app_settings.IMMICH_URL
-    api_key = (key_row.value if key_row and key_row.value else None) or app_settings.IMMICH_API_KEY
+    api_key = (
+        decrypt_secret(key_row.value) if key_row and key_row.value else None
+    ) or app_settings.IMMICH_API_KEY
     return ImmichClient(url, api_key)
 
 

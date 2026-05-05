@@ -66,6 +66,7 @@ def get_immich_client(
     falling back to env vars for unauthenticated contexts (e.g. tests).
     """
     from .models.app_setting import AppSetting
+    from .services.secret_store import decrypt_secret
 
     user_id = None
     if request is not None:
@@ -83,5 +84,5 @@ def get_immich_client(
     url_row = q.filter(AppSetting.key == "immich_url").first()
     key_row = q.filter(AppSetting.key == "immich_api_key").first()
     url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
-    api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
+    api_key = decrypt_secret(key_row.value if key_row else None) or settings.IMMICH_API_KEY
     return ImmichClient(url, api_key)

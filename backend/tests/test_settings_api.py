@@ -9,7 +9,9 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from app.models.app_setting import AppSetting
 from app.models.provider_config import ProviderConfig
+from app.services.secret_store import decrypt_secret
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +50,6 @@ def test_get_immich_settings_not_configured(client):
 
 
 def test_get_immich_settings_connected(client, db):
-    from app.models.app_setting import AppSetting
     from tests.conftest import TEST_USER_ID
     db.add(AppSetting(id="1", user_id=TEST_USER_ID, key="immich_url", value="http://immich.local"))
     db.add(AppSetting(id="2", user_id=TEST_USER_ID, key="immich_api_key", value="key"))
@@ -69,7 +70,6 @@ def test_get_immich_settings_connected(client, db):
 
 def test_get_immich_settings_error(client, db):
     from app.services.immich_client import ImmichError
-    from app.models.app_setting import AppSetting
     from tests.conftest import TEST_USER_ID
     db.add(AppSetting(id="3", user_id=TEST_USER_ID, key="immich_url", value="http://immich.local"))
     db.add(AppSetting(id="4", user_id=TEST_USER_ID, key="immich_api_key", value="key"))
@@ -124,6 +124,30 @@ def test_test_immich_connection_failure(client):
     assert "bad credentials" in r.json()["detail"]
 
 
+def test_save_immich_settings_encrypts_api_key(client, db):
+    from tests.conftest import TEST_USER_ID
+
+    mock_client = MagicMock()
+    mock_client.check_connectivity.return_value = {"connected": True, "info": {}}
+    mock_client.get_asset_count.return_value = 5
+
+    with patch("app.routers.settings.ImmichClient", return_value=mock_client):
+        r = client.post(
+            "/api/settings/immich",
+            json={"immich_url": "http://immich.local", "immich_api_key": "plain-key"},
+        )
+
+    assert r.status_code == 200
+    row = db.query(AppSetting).filter(
+        AppSetting.user_id == TEST_USER_ID,
+        AppSetting.key == "immich_api_key",
+    ).first()
+    assert row is not None
+    assert row.value != "plain-key"
+    assert row.value.startswith("enc:v1:")
+    assert decrypt_secret(row.value) == "plain-key"
+
+
 # ---------------------------------------------------------------------------
 # GET /api/settings/providers
 # ---------------------------------------------------------------------------
@@ -160,6 +184,25 @@ def test_create_provider(client):
     assert data["provider_name"] == "openai"
     assert data["enabled"] is True
     assert data["has_api_key"] is True
+
+
+def test_create_provider_encrypts_api_key(client, db):
+    r = client.post(
+        "/api/settings/providers",
+        json={
+            "provider_name": "openai",
+            "enabled": True,
+            "api_key": "sk-plain",
+            "model_name": "gpt-4o",
+        },
+    )
+
+    assert r.status_code == 200
+    row = db.query(ProviderConfig).filter(ProviderConfig.provider_name == "openai").first()
+    assert row is not None
+    assert row.api_key_encrypted != "sk-plain"
+    assert row.api_key_encrypted.startswith("enc:v1:")
+    assert decrypt_secret(row.api_key_encrypted) == "sk-plain"
 
 
 def test_upsert_provider_updates_existing(client, db):
@@ -226,6 +269,23 @@ def test_test_provider_ok(client, db):
 
     assert r.status_code == 200
     assert r.json()["connected"] is True
+
+
+def test_test_provider_decrypts_stored_api_key(client, db):
+    _make_provider(db, "openai")
+    row = db.query(ProviderConfig).filter(ProviderConfig.provider_name == "openai").first()
+    row.api_key_encrypted = "enc:v1:gAAAAABplaceholder"
+    db.commit()
+
+    with patch("app.routers.settings.decrypt_secret", return_value="sk-decrypted") as decrypt:
+        with patch("app.services.ai_provider.build_provider") as build_provider:
+            build_provider.return_value.health_check.return_value = True
+            r = client.get("/api/settings/providers/openai/test")
+
+    assert r.status_code == 200
+    decrypt.assert_called()
+    build_provider.assert_called_once()
+    assert build_provider.call_args.args[1]["api_key"] == "sk-decrypted"
 
 
 def test_test_provider_failure(client, db):
