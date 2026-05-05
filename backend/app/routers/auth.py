@@ -160,8 +160,8 @@ def forgot_password(
     """
     Generate a password-reset token for the given email address.
 
-    Requires admin authentication. The token is returned in the response body
-    so the admin can share it with the user securely out-of-band.
+    Requires admin authentication. The raw token is returned once in the
+    response body so the admin UI can copy it without storing or re-reading it.
     A future iteration can add email/SMTP delivery instead.
     """
     user = get_user_by_email(db, body.email)
@@ -172,7 +172,6 @@ def forgot_password(
     return {
         "message": "Reset token generated",
         "token": raw_token,
-        "note": "Share this token with the user securely. It expires in 1 hour.",
     }
 
 

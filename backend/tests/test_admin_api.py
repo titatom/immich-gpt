@@ -181,6 +181,7 @@ class TestAdminResetPassword:
         r = admin_client.post(f"/api/admin/users/{user.id}/reset-password", json={})
         assert r.status_code == 200
         assert "token" in r.json()
+        assert "note" not in r.json()
 
     def test_reset_with_new_password_sets_force_change(self, admin_client, db):
         user = _make_extra_user(db, email="pw@test.com", username="pw")

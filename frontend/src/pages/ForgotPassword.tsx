@@ -1,21 +1,28 @@
 import React, { useState } from "react";
 import BrandLogo from "../components/BrandLogo";
 import { forgotPassword } from "../services/api";
+import { copySecretToClipboard } from "../utils/clipboard";
 import styles from "./Login.module.css";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [result, setResult] = useState<{ message: string; token?: string } | null>(null);
   const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState<"copied" | "manual" | "failed" | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setCopyStatus(null);
     setSubmitting(true);
     try {
       const data = await forgotPassword(email);
-      setResult(data);
+      setResult({ message: data.message });
+      if (data.token) {
+        const copied = await copySecretToClipboard(data.token);
+        setCopyStatus(copied ? "copied" : "manual");
+      }
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(detail || "Something went wrong. Please try again.");
@@ -43,17 +50,19 @@ export default function ForgotPassword() {
             }}>
               {result.message}
             </div>
-            {result.token && (
+            {copyStatus && (
               <div style={{
                 background: "var(--bg-raised)", border: "1px solid var(--border)",
                 borderRadius: 8, padding: "12px 16px", marginBottom: 16,
               }}>
                 <div style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginBottom: 6 }}>
-                  Reset token (valid 1 hour):
+                  Reset token generated
                 </div>
-                <code style={{ color: "var(--accent)", fontSize: "var(--text-base)", wordBreak: "break-all" }}>
-                  {result.token}
-                </code>
+                <div style={{ color: "var(--text-primary)", fontSize: "var(--text-base)" }}>
+                  {copyStatus === "copied"
+                    ? "The one-time token was copied to your clipboard. It is not displayed here."
+                    : "The one-time token could not be copied automatically, so use the admin user-management screen or server logs to issue a new token through a secure channel."}
+                </div>
               </div>
             )}
             <a href="/reset-password" style={{ color: "var(--accent)", fontSize: "var(--text-base)" }}>

@@ -162,7 +162,10 @@ def admin_reset_password(
     else:
         raw_token = create_reset_token(db, user_id)
         return {
-            "message": "Reset token generated. Share with the user securely.",
+            "message": (
+                "Reset token generated. Copy it from the browser prompt and "
+                "share it with the user securely."
+            ),
             "token": raw_token,
         }
 

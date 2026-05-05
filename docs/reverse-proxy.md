@@ -119,9 +119,11 @@ It requires the proxy to **not buffer** the response.  The Uvicorn server sets
 
 ### Client IP logging
 
-The container runs Uvicorn with `--proxy-headers` so real client IPs are
-correctly recorded in audit logs and used for rate-limiting — as long as the
-proxy forwards `X-Forwarded-For` or `X-Real-IP`.  All examples above do this.
+The shipped container does not trust forwarded-client-IP headers by default.
+If your reverse proxy is the only component that can reach the container, add
+Uvicorn's `--proxy-headers` and set `--forwarded-allow-ips` to that proxy's
+address or Docker network. Do not use `--forwarded-allow-ips "*"`, because
+direct clients could spoof `X-Forwarded-For` and bypass IP-based controls.
 
 ### SESSION_COOKIE_SECURE
 

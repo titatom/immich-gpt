@@ -5,7 +5,7 @@ These tests do not require a running Redis: they patch the Redis /
 SimpleWorker classes that ``app.workers.rq_inline_worker`` imports
 lazily so we can assert behaviour deterministically.
 """
-import importlib
+import logging
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -108,6 +108,32 @@ def test_idempotent_when_redis_url_set(monkeypatch):
     assert second == 2
     # No additional threads on the second call.
     assert len(spawned) == 2
+
+
+def test_startup_log_redacts_redis_credentials(monkeypatch, caplog):
+    """Inline worker startup logs must not leak Redis userinfo/passwords."""
+    from app.workers import rq_inline_worker
+
+    spawned: list = []
+
+    real_thread_init = threading.Thread.__init__
+
+    def fake_thread_init(self, *args, **kwargs):
+        kwargs["target"] = lambda *a, **kw: None
+        real_thread_init(self, *args, **kwargs)
+        spawned.append(self)
+
+    monkeypatch.setattr(threading.Thread, "__init__", fake_thread_init)
+
+    redis_url = "redis://default:super-secret@example.com:6379/0"
+    with caplog.at_level(logging.INFO, logger="app.workers.rq_inline_worker"):
+        with _patch_settings(redis_url=redis_url, concurrency=1):
+            rq_inline_worker.start_inline_workers()
+
+    messages = "\n".join(record.getMessage() for record in caplog.records)
+    assert "super-secret" not in messages
+    assert "default:super-secret" not in messages
+    assert "redis://example.com:6379/0" in messages
 
 
 # ---------------------------------------------------------------------------

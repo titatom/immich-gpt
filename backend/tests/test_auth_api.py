@@ -315,6 +315,7 @@ class TestPasswordReset:
         app.dependency_overrides.clear()
         assert r.status_code == 200
         assert "token" in r.json()
+        assert "note" not in r.json()
 
     def test_forgot_password_unknown_email_returns_404(self, db):
         """Admin gets a 404 for a user that does not exist (admin-only endpoint)."""

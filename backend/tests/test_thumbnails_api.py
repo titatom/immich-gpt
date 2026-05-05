@@ -17,10 +17,10 @@ from tests.conftest import TEST_USER_ID
 FAKE_IMAGE_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 100  # minimal JPEG-like bytes
 
 
-def _make_asset(db) -> Asset:
+def _make_asset(db, user_id: str = TEST_USER_ID) -> Asset:
     a = Asset(
         id=str(uuid.uuid4()),
-        user_id=TEST_USER_ID,
+        user_id=user_id,
         immich_id=str(uuid.uuid4()),
         original_filename="photo.jpg",
         asset_type="IMAGE",
@@ -100,23 +100,35 @@ def test_get_thumbnail_size_param_forwarded(client, db):
     mock_client.get_thumbnail.assert_called_once_with(asset.immich_id, size="preview")
 
 
-def test_get_thumbnail_by_immich_id_direct(client):
-    immich_id = str(uuid.uuid4())
+def test_get_thumbnail_by_immich_id_direct(client, db):
+    asset = _make_asset(db)
     mock_client = MagicMock()
     mock_client.get_thumbnail.return_value = FAKE_IMAGE_BYTES
 
     with patch("app.routers.thumbnails._get_user_immich_client", return_value=mock_client):
-        r = client.get(f"/api/thumbnails/immich/{immich_id}")
+        r = client.get(f"/api/thumbnails/immich/{asset.immich_id}")
 
     assert r.status_code == 200
-    mock_client.get_thumbnail.assert_called_once_with(immich_id, size="thumbnail")
+    mock_client.get_thumbnail.assert_called_once_with(asset.immich_id, size="thumbnail")
 
 
-def test_get_thumbnail_by_immich_id_direct_error(client):
+def test_get_thumbnail_by_immich_id_direct_requires_owned_asset(client, db):
+    other_asset = _make_asset(db, user_id="other-user-id")
+    mock_client = MagicMock()
+
+    with patch("app.routers.thumbnails._get_user_immich_client", return_value=mock_client):
+        r = client.get(f"/api/thumbnails/immich/{other_asset.immich_id}")
+
+    assert r.status_code == 404
+    mock_client.get_thumbnail.assert_not_called()
+
+
+def test_get_thumbnail_by_immich_id_direct_error(client, db):
+    asset = _make_asset(db)
     mock_client = MagicMock()
     mock_client.get_thumbnail.side_effect = ImmichError("not found", 404)
 
     with patch("app.routers.thumbnails._get_user_immich_client", return_value=mock_client):
-        r = client.get("/api/thumbnails/immich/bad-id")
+        r = client.get(f"/api/thumbnails/immich/{asset.immich_id}")
 
     assert r.status_code == 502
