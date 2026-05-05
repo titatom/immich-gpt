@@ -256,82 +256,8 @@ class RoutingClassificationOrchestrator:
     def _call_provider(
         self, messages: List[Dict[str, Any]], image_payload: Optional[dict],
     ) -> Dict[str, Any]:
-        """
-        Use the provider's underlying OpenAI client when available and parse
-        a JSON object directly. Falls back to invoking the legacy
-        ``classify_asset`` method if the provider is mocked for tests.
-        """
-        # Try a direct chat-completions call when supported.
-        client = getattr(self.provider, "_client", None)
-        model = getattr(self.provider, "model", None) or getattr(self.provider, "_model", None)
-        if client is not None and model is not None:
-            return self._direct_completion(client, model, messages, image_payload)
-
-        # Fallback: rely on the legacy classifier and read its raw response.
-        legacy = self.provider.classify_asset(messages, image_payload)
-        if hasattr(legacy, "model_dump"):
-            return self._coerce_legacy_to_routing(legacy.model_dump())
-        return self._coerce_legacy_to_routing(legacy if isinstance(legacy, dict) else {})
-
-    def _direct_completion(
-        self,
-        client,
-        model: str,
-        messages: List[Dict[str, Any]],
-        image_payload: Optional[dict],
-    ) -> Dict[str, Any]:
-        msgs = list(messages)
-        if image_payload and image_payload.get("data_url"):
-            for i in range(len(msgs) - 1, -1, -1):
-                if msgs[i].get("role") == "user":
-                    content = msgs[i]["content"]
-                    if isinstance(content, str):
-                        content = [{"type": "text", "text": content}]
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": image_payload["data_url"], "detail": "low"},
-                    })
-                    msgs[i] = {"role": "user", "content": content}
-                    break
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=msgs,  # type: ignore
-            response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=1024,
-        )
-        raw = response.choices[0].message.content or "{}"
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            stripped = raw.strip().strip("`").strip()
-            return json.loads(stripped)
-
-    def _coerce_legacy_to_routing(self, legacy: Dict[str, Any]) -> Dict[str, Any]:
-        """Translate a legacy AIClassificationResult dict into the new shape."""
-        bucket_name = legacy.get("bucket_name")
-        confidence = legacy.get("confidence")
-        review_recommended = bool(legacy.get("review_recommended", True))
-        loc = legacy.get("location_suggestion") or {}
-        metadata = {
-            "description": legacy.get("description_suggestion"),
-            "tags": list(legacy.get("tags") or []),
-            "location": loc if loc else None,
-            "caption": None,
-        }
-        return {
-            "disposition": "review" if review_recommended else "keep",
-            "primary_path": bucket_name,
-            "primary_confidence": confidence,
-            "secondary_paths": [],
-            "review_required": review_recommended,
-            "review_reasons": [],
-            "reason_codes": [],
-            "safety_flags": {},
-            "quality_flags": {},
-            "metadata": metadata,
-        }
+        """Ask the provider to return a routing JSON object."""
+        return self.provider.classify_routing(messages, image_payload)
 
     # ------------------------------------------------------------------
     # Auto-apply

@@ -1,96 +1,22 @@
 """
 AI Provider interface and implementations.
-All provider-specific logic is isolated here.
+
+The provider is intentionally schema-agnostic: it speaks JSON to the
+upstream model and returns a parsed `dict`. Validation against the
+routing schema is done in the orchestrator with `AIRoutingResult`.
 """
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, Field, field_validator
-
-
-class LocationSuggestion(BaseModel):
-    place_name: Optional[str] = None
-    city: Optional[str] = None
-    region: Optional[str] = None
-    country: Optional[str] = None
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    radius_meters: int = Field(gt=0)
-    confidence: float = Field(ge=0.35, le=1.0)
-    evidence: str
-    uncertainty_reason: Optional[str] = None
-
-    @field_validator("evidence")
-    @classmethod
-    def evidence_must_not_be_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("location evidence must not be blank")
-        return value
-
-
-class AIClassificationResult(BaseModel):
-    bucket_name: str
-    confidence: float = Field(ge=0.0, le=1.0)
-    explanation: str
-    description_suggestion: str
-    tags: List[str]
-    subalbum_suggestion: Optional[str] = None
-    location_suggestion: Optional[LocationSuggestion] = None
-    review_recommended: bool = True
-
-
-AI_OUTPUT_SCHEMA = {
-    "type": "object",
-    "required": [
-        "bucket_name", "confidence", "explanation",
-        "description_suggestion", "tags", "review_recommended"
-    ],
-    "properties": {
-        "bucket_name": {"type": "string"},
-        "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-        "explanation": {"type": "string"},
-        "description_suggestion": {"type": "string"},
-        "tags": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 20},
-        "subalbum_suggestion": {"type": ["string", "null"]},
-        "location_suggestion": {
-            "anyOf": [
-                {"type": "null"},
-                {
-                    "type": "object",
-                    "required": [
-                        "place_name", "city", "region", "country",
-                        "latitude", "longitude", "radius_meters",
-                        "confidence", "evidence", "uncertainty_reason"
-                    ],
-                    "properties": {
-                        "place_name": {"type": ["string", "null"]},
-                        "city": {"type": ["string", "null"]},
-                        "region": {"type": ["string", "null"]},
-                        "country": {"type": ["string", "null"]},
-                        "latitude": {"type": ["number", "null"], "minimum": -90.0, "maximum": 90.0},
-                        "longitude": {"type": ["number", "null"], "minimum": -180.0, "maximum": 180.0},
-                        "radius_meters": {"type": "integer", "minimum": 1},
-                        "confidence": {"type": "number", "minimum": 0.35, "maximum": 1.0},
-                        "evidence": {"type": "string"},
-                        "uncertainty_reason": {"type": ["string", "null"]},
-                    },
-                    "additionalProperties": False,
-                },
-            ]
-        },
-        "review_recommended": {"type": "boolean"},
-    },
-    "additionalProperties": False,
-}
 
 
 class AIProvider(ABC):
     @abstractmethod
-    def classify_asset(
+    def classify_routing(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
-    ) -> AIClassificationResult:
-        """Send classification request. Returns validated result."""
+    ) -> Dict[str, Any]:
+        """Send a JSON-mode chat request and return the parsed dict."""
 
     @abstractmethod
     def health_check(self) -> bool:
@@ -102,43 +28,50 @@ class AIProvider(ABC):
         pass
 
 
-def _validate_result(data: dict, raw: str) -> AIClassificationResult:
-    """Shared validation for any provider returning the standard JSON shape."""
-    required_fields = [
-        "bucket_name", "confidence", "explanation",
-        "description_suggestion", "tags", "review_recommended"
-    ]
-    for field in required_fields:
-        if field not in data:
-            raise ValueError(f"Missing required field '{field}' in AI response. Raw: {raw[:500]}")
+def _inject_image(
+    messages: List[Dict[str, Any]],
+    image_payload: Optional[dict],
+    detail: Optional[str] = "low",
+) -> List[Dict[str, Any]]:
+    """Append an image_url part to the last user message in-place (copy)."""
+    msgs = list(messages)
+    if not (image_payload and image_payload.get("data_url")):
+        return msgs
+    for i in range(len(msgs) - 1, -1, -1):
+        if msgs[i].get("role") == "user":
+            content = msgs[i]["content"]
+            if isinstance(content, str):
+                content = [{"type": "text", "text": content}]
+            image_url: Dict[str, Any] = {"url": image_payload["data_url"]}
+            if detail:
+                image_url["detail"] = detail
+            content.append({"type": "image_url", "image_url": image_url})
+            msgs[i] = {"role": "user", "content": content}
+            break
+    return msgs
 
-    confidence = float(data["confidence"])
-    if not (0.0 <= confidence <= 1.0):
-        raise ValueError(f"confidence must be 0.0-1.0, got {confidence}")
 
-    tags = data["tags"]
-    if not isinstance(tags, list):
-        raise ValueError("tags must be a list")
-    tags = [str(t) for t in tags[:20]]
+def _parse_json_content(raw: str) -> Dict[str, Any]:
+    """Best-effort JSON parse, stripping markdown code fences if present."""
+    import json
 
-    location_suggestion = data.get("location_suggestion")
-    if location_suggestion is not None:
-        if not isinstance(location_suggestion, dict):
-            raise ValueError("location_suggestion must be an object or null")
-        if float(location_suggestion.get("confidence", 0)) < 0.35:
-            raise ValueError("location_suggestion confidence below 0.35 must be returned as null")
-        location_suggestion = LocationSuggestion.model_validate(location_suggestion)
-
-    return AIClassificationResult(
-        bucket_name=str(data["bucket_name"]),
-        confidence=confidence,
-        explanation=str(data["explanation"]),
-        description_suggestion=str(data["description_suggestion"]),
-        tags=tags,
-        subalbum_suggestion=data.get("subalbum_suggestion"),
-        location_suggestion=location_suggestion,
-        review_recommended=bool(data.get("review_recommended", True)),
-    )
+    if not raw:
+        raise ValueError("Empty response from provider")
+    stripped = raw.strip()
+    if stripped.startswith("```"):
+        stripped = stripped[3:]
+        newline = stripped.find("\n")
+        if newline != -1:
+            lang_tag = stripped[:newline].strip().lower()
+            if lang_tag in ("json", ""):
+                stripped = stripped[newline + 1:]
+        stripped = stripped.strip()
+        if stripped.endswith("```"):
+            stripped = stripped[:-3].strip()
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON from provider: {e}\nRaw: {raw[:500]}")
 
 
 class OpenAIProvider(AIProvider):
@@ -166,30 +99,12 @@ class OpenAIProvider(AIProvider):
         except Exception:
             return False
 
-    def classify_asset(
+    def classify_routing(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
-    ) -> AIClassificationResult:
-        import json
-
-        messages = list(prompt_messages)
-        if image_payload and image_payload.get("data_url"):
-            last_user = None
-            for i in range(len(messages) - 1, -1, -1):
-                if messages[i].get("role") == "user":
-                    last_user = i
-                    break
-            if last_user is not None:
-                content = messages[last_user]["content"]
-                if isinstance(content, str):
-                    content = [{"type": "text", "text": content}]
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": image_payload["data_url"], "detail": "low"},
-                })
-                messages[last_user] = {"role": "user", "content": content}
-
+    ) -> Dict[str, Any]:
+        messages = _inject_image(prompt_messages, image_payload, detail="low")
         response = self._client.chat.completions.create(
             model=self.model,
             messages=messages,  # type: ignore
@@ -197,27 +112,12 @@ class OpenAIProvider(AIProvider):
             temperature=0.2,
             max_tokens=1024,
         )
-
         raw = response.choices[0].message.content or "{}"
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON from OpenAI: {e}\nRaw: {raw[:500]}")
-
-        return _validate_result(data, raw)
+        return _parse_json_content(raw)
 
 
 class OllamaProvider(AIProvider):
-    """
-    Ollama provider via the OpenAI-compatible /v1 endpoint.
-
-    Requires Ollama >= 0.1.24 (ships the /v1 API).
-    Recommended vision models: llava, llava-phi3, moondream, bakllava.
-    Text-only models (llama3, mistral, etc.) also work but receive no image.
-
-    base_url should be the Ollama root, e.g. http://localhost:11434
-    The provider appends /v1 automatically.
-    """
+    """Ollama via the OpenAI-compatible /v1 endpoint (>= 0.1.24)."""
 
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "llava"):
         self.base_url = base_url.rstrip("/")
@@ -236,67 +136,48 @@ class OllamaProvider(AIProvider):
             return False
 
     def _is_vision_model(self) -> bool:
-        """Heuristic: model names that support image input."""
-        vision_keywords = ("llava", "moondream", "bakllava", "minicpm", "qwen2-vl", "pixtral")
-        return any(kw in self.model.lower() for kw in vision_keywords)
+        keywords = ("llava", "moondream", "bakllava", "minicpm", "qwen2-vl", "pixtral")
+        return any(kw in self.model.lower() for kw in keywords)
 
-    def classify_asset(
+    def classify_routing(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
-    ) -> AIClassificationResult:
-        import json
+    ) -> Dict[str, Any]:
         import httpx
 
-        messages = list(prompt_messages)
+        messages = (
+            _inject_image(prompt_messages, image_payload, detail=None)
+            if self._is_vision_model()
+            else list(prompt_messages)
+        )
 
-        # Inject image into the last user message for vision-capable models.
-        # Ollama /v1 accepts the same OpenAI image_url format.
-        if image_payload and image_payload.get("data_url") and self._is_vision_model():
-            last_user = None
-            for i in range(len(messages) - 1, -1, -1):
-                if messages[i].get("role") == "user":
-                    last_user = i
-                    break
-            if last_user is not None:
-                content = messages[last_user]["content"]
-                if isinstance(content, str):
-                    content = [{"type": "text", "text": content}]
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": image_payload["data_url"]},
-                })
-                messages[last_user] = {"role": "user", "content": content}
-
-        # Append a reminder to return JSON when the model is not instruction-tuned
-        # to do so by default.
-        messages_with_hint = list(messages)
-        if messages_with_hint and messages_with_hint[-1].get("role") == "user":
-            last = messages_with_hint[-1]
-            text_content = (
+        # Append a JSON-only reminder for non-instruct models.
+        if messages and messages[-1].get("role") == "user":
+            last = messages[-1]
+            text = (
                 last["content"] if isinstance(last["content"], str)
                 else next((c["text"] for c in last["content"] if c.get("type") == "text"), "")
             )
-            if "json" not in text_content.lower():
+            if "json" not in text.lower():
                 hint = "\n\nRespond ONLY with valid JSON matching the required schema."
                 if isinstance(last["content"], str):
-                    messages_with_hint[-1] = {"role": "user", "content": last["content"] + hint}
+                    messages[-1] = {"role": "user", "content": last["content"] + hint}
                 else:
                     new_content = list(last["content"])
                     for i, part in enumerate(new_content):
                         if part.get("type") == "text":
                             new_content[i] = {"type": "text", "text": part["text"] + hint}
                             break
-                    messages_with_hint[-1] = {"role": "user", "content": new_content}
+                    messages[-1] = {"role": "user", "content": new_content}
 
         payload: Dict[str, Any] = {
             "model": self.model,
-            "messages": messages_with_hint,
+            "messages": messages,
             "stream": False,
             "options": {"temperature": 0.2},
-            "format": "json",  # Ollama native JSON mode (>= 0.1.24)
+            "format": "json",
         }
-
         try:
             with httpx.Client(timeout=120) as client:
                 r = client.post(f"{self.base_url}/v1/chat/completions", json=payload)
@@ -309,29 +190,7 @@ class OllamaProvider(AIProvider):
             raise ValueError(f"Ollama request timed out (model={self.model})")
 
         raw = resp.get("choices", [{}])[0].get("message", {}).get("content", "")
-        if not raw:
-            raise ValueError(f"Empty response from Ollama (model={self.model})")
-
-        # Strip markdown code fences some models add even in JSON mode
-        stripped = raw.strip()
-        if stripped.startswith("```"):
-            stripped = stripped[3:]  # remove opening ```
-            # Remove optional language tag (json, JSON, etc.) on the same line
-            newline = stripped.find("\n")
-            if newline != -1:
-                lang_tag = stripped[:newline].strip().lower()
-                if lang_tag in ("json", ""):
-                    stripped = stripped[newline + 1:]
-            stripped = stripped.strip()
-            if stripped.endswith("```"):
-                stripped = stripped[:-3].strip()
-
-        try:
-            data = json.loads(stripped)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON from Ollama: {e}\nRaw: {raw[:500]}")
-
-        return _validate_result(data, raw)
+        return _parse_json_content(raw)
 
 
 class OpenRouterProvider(AIProvider):
@@ -342,7 +201,6 @@ class OpenRouterProvider(AIProvider):
     def __init__(self, api_key: str, model: str = "openai/gpt-4o"):
         self._api_key = api_key
         self._model = model
-        # Extra headers recommended by OpenRouter for attribution and routing.
         self._extra_headers = {
             "HTTP-Referer": "https://github.com/titatom/immich-gpt",
             "X-Title": "immich-gpt",
@@ -359,7 +217,6 @@ class OpenRouterProvider(AIProvider):
         return "openrouter"
 
     def health_check(self) -> bool:
-        """Lightweight connectivity check against OpenRouter's auth endpoint."""
         try:
             import httpx
             r = httpx.get(
@@ -374,31 +231,12 @@ class OpenRouterProvider(AIProvider):
         except Exception:
             return False
 
-    def classify_asset(
+    def classify_routing(
         self,
         prompt_messages: List[Dict[str, Any]],
         image_payload: Optional[dict] = None,
-    ) -> AIClassificationResult:
-        import json
-
-        messages = list(prompt_messages)
-        if image_payload and image_payload.get("data_url"):
-            last_user = None
-            for i in range(len(messages) - 1, -1, -1):
-                if messages[i].get("role") == "user":
-                    last_user = i
-                    break
-            if last_user is not None:
-                content = messages[last_user]["content"]
-                if isinstance(content, str):
-                    content = [{"type": "text", "text": content}]
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": image_payload["data_url"], "detail": "low"},
-                })
-                messages[last_user] = {"role": "user", "content": content}
-
-        # Try with JSON mode first; fall back without it for models that don't support it.
+    ) -> Dict[str, Any]:
+        messages = _inject_image(prompt_messages, image_payload, detail="low")
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -408,8 +246,8 @@ class OpenRouterProvider(AIProvider):
                 max_tokens=1024,
             )
         except Exception as e:
-            err_str = str(e).lower()
-            if "response_format" in err_str or "json_object" in err_str or "unsupported" in err_str:
+            err = str(e).lower()
+            if "response_format" in err or "json_object" in err or "unsupported" in err:
                 response = self._client.chat.completions.create(
                     model=self._model,
                     messages=messages,  # type: ignore
@@ -418,29 +256,8 @@ class OpenRouterProvider(AIProvider):
                 )
             else:
                 raise
-
         raw = response.choices[0].message.content or "{}"
-
-        # Strip markdown fences some models include
-        stripped = raw.strip()
-        if stripped.startswith("```"):
-            stripped = stripped[3:]  # remove opening ```
-            # Remove optional language tag (json, JSON, etc.) on the same line
-            newline = stripped.find("\n")
-            if newline != -1:
-                lang_tag = stripped[:newline].strip().lower()
-                if lang_tag in ("json", ""):
-                    stripped = stripped[newline + 1:]
-            stripped = stripped.strip()
-            if stripped.endswith("```"):
-                stripped = stripped[:-3].strip()
-
-        try:
-            data = json.loads(stripped)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON from OpenRouter ({self._model}): {e}\nRaw: {raw[:500]}")
-
-        return _validate_result(data, raw)
+        return _parse_json_content(raw)
 
 
 def build_provider(provider_name: str, config: dict) -> AIProvider:

@@ -11,11 +11,7 @@ import app.models.user  # noqa
 import app.models.session  # noqa
 import app.models.asset  # noqa
 import app.models.bucket  # noqa
-import app.models.prompt_template  # noqa
 import app.models.prompt_run  # noqa
-import app.models.suggested_classification  # noqa
-import app.models.suggested_metadata  # noqa
-import app.models.review_decision  # noqa
 import app.models.job_run  # noqa
 import app.models.audit_log  # noqa
 import app.models.provider_config  # noqa
@@ -45,7 +41,6 @@ def db():
     session = TestSession()
 
     from app.models.bucket import Bucket
-    from app.models.prompt_template import PromptTemplate
 
     # Create test users
     test_user = User(
@@ -85,30 +80,9 @@ def db():
             is_leaf=True,
             enabled=True,
             priority=b["priority"],
-            mapping_mode="virtual",
             destination_type="virtual",
         ))
 
-    prompts = [
-        ("global_classification", "Global Classification",
-         "Classify this asset into the most appropriate Bucket."),
-        ("description_generation", "Description Generation",
-         "Generate a concise, useful description."),
-        ("tags_generation", "Tags Generation",
-         "Generate 3 to 8 practical tags."),
-        ("geolocation_generation", "Geolocation Generation",
-         "Suggest location only when evidence supports it."),
-    ]
-    for pt, name, content in prompts:
-        session.add(PromptTemplate(
-            id=str(uuid.uuid4()),
-            user_id=TEST_USER_ID,
-            prompt_type=pt,
-            name=name,
-            content=content,
-            enabled=True,
-            version=1,
-        ))
     session.commit()
 
     try:

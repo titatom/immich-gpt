@@ -126,25 +126,19 @@ class TestAdminCreateUser:
         assert "Personal" in bucket_names
 
     def test_create_admin_seeds_defaults(self, admin_client, db):
-        """Creating an admin user should also seed their default buckets and prompts."""
+        """Creating an admin user should also seed their default routing tree."""
         from app.models.bucket import Bucket
-        from app.models.prompt_template import PromptTemplate
         r = admin_client.post("/api/admin/users", json={
             "email": "adminseeded@test.com", "username": "adminseeded",
             "password": "goodpass1", "role": "admin", "force_password_change": False,
         })
         assert r.status_code == 200
         user_id = r.json()["id"]
-        buckets = db.query(Bucket).filter(Bucket.user_id == user_id).all()
-        assert len(buckets) >= 4
-        bucket_names = {b.name for b in buckets}
-        assert "Business" in bucket_names
-        assert "Personal" in bucket_names
-        prompts = db.query(PromptTemplate).filter(PromptTemplate.user_id == user_id).all()
-        assert len(prompts) >= 4
-        prompt_types = {p.prompt_type for p in prompts}
-        assert "global_classification" in prompt_types
-        assert "review_guidance" in prompt_types
+        leaves = db.query(Bucket).filter(Bucket.user_id == user_id).all()
+        assert len(leaves) >= 4
+        leaf_names = {b.name for b in leaves}
+        assert "Business" in leaf_names
+        assert "Personal" in leaf_names
 
 
 # ---------------------------------------------------------------------------

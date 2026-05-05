@@ -18,13 +18,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 _KEY_IMMICH_URL = "immich_url"
 _KEY_IMMICH_API_KEY = "immich_api_key"
-_KEY_ALLOW_NEW_TAGS = "allow_new_tags"
-_KEY_ALLOW_NEW_ALBUMS = "allow_new_albums"
-_KEY_SUGGEST_DESCRIPTIONS = "suggest_descriptions"
-_KEY_SUGGEST_TAGS = "suggest_tags"
-_KEY_SUGGEST_SUBALBUMS = "suggest_subalbums"
-_KEY_SUGGEST_LOCATIONS = "suggest_locations"
-_KEY_WRITEBACK_LOCATIONS = "writeback_locations"
+_KEY_LEARN_FROM_CORRECTIONS = "routing_learn_from_corrections"
 
 
 def _get_setting(db: Session, user_id: str, key: str) -> Optional[str]:
@@ -245,51 +239,30 @@ def list_provider_models(
         raise HTTPException(status_code=502, detail=str(e))
 
 
-class BehaviourSettings(BaseModel):
-    allow_new_tags: bool = True
-    allow_new_albums: bool = True
-    suggest_descriptions: bool = True
-    suggest_tags: bool = True
-    suggest_subalbums: bool = True
-    suggest_locations: bool = True
-    writeback_locations: bool = False
+class RoutingPreferences(BaseModel):
+    learn_from_corrections: bool = False
 
 
-@router.get("/behaviour", response_model=BehaviourSettings)
-def get_behaviour_settings(
+@router.get("/routing", response_model=RoutingPreferences)
+def get_routing_preferences(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    def _get(key: str, default: bool) -> bool:
-        val = _get_setting(db, current_user.id, key)
-        if val is None:
-            return default
-        return val.lower() not in ("false", "0", "no")
+    val = _get_setting(db, current_user.id, _KEY_LEARN_FROM_CORRECTIONS)
+    learn = False if val is None else val.lower() not in ("false", "0", "no")
+    return RoutingPreferences(learn_from_corrections=learn)
 
-    return BehaviourSettings(
-        allow_new_tags=_get(_KEY_ALLOW_NEW_TAGS, True),
-        allow_new_albums=_get(_KEY_ALLOW_NEW_ALBUMS, True),
-        suggest_descriptions=_get(_KEY_SUGGEST_DESCRIPTIONS, True),
-        suggest_tags=_get(_KEY_SUGGEST_TAGS, True),
-        suggest_subalbums=_get(_KEY_SUGGEST_SUBALBUMS, True),
-        suggest_locations=_get(_KEY_SUGGEST_LOCATIONS, True),
-        writeback_locations=_get(_KEY_WRITEBACK_LOCATIONS, False),
+
+@router.post("/routing", response_model=RoutingPreferences)
+def save_routing_preferences(
+    body: RoutingPreferences,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_active_user),
+):
+    _set_setting(
+        db, current_user.id, _KEY_LEARN_FROM_CORRECTIONS,
+        "true" if body.learn_from_corrections else "false",
     )
-
-
-@router.post("/behaviour", response_model=BehaviourSettings)
-def save_behaviour_settings(
-    body: BehaviourSettings,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    _set_setting(db, current_user.id, _KEY_ALLOW_NEW_TAGS, "true" if body.allow_new_tags else "false")
-    _set_setting(db, current_user.id, _KEY_ALLOW_NEW_ALBUMS, "true" if body.allow_new_albums else "false")
-    _set_setting(db, current_user.id, _KEY_SUGGEST_DESCRIPTIONS, "true" if body.suggest_descriptions else "false")
-    _set_setting(db, current_user.id, _KEY_SUGGEST_TAGS, "true" if body.suggest_tags else "false")
-    _set_setting(db, current_user.id, _KEY_SUGGEST_SUBALBUMS, "true" if body.suggest_subalbums else "false")
-    _set_setting(db, current_user.id, _KEY_SUGGEST_LOCATIONS, "true" if body.suggest_locations else "false")
-    _set_setting(db, current_user.id, _KEY_WRITEBACK_LOCATIONS, "true" if body.writeback_locations else "false")
     return body
 
 

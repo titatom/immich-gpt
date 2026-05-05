@@ -248,7 +248,7 @@ class TestForcePasswordChangeGate:
 
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                r = c.get("/api/buckets")
+                r = c.get("/api/routing/nodes")
 
         app.dependency_overrides.clear()
         assert r.status_code == 403
