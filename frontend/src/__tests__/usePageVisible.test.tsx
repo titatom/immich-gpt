@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import React from "react";
 import { usePageVisible } from "../hooks/usePageVisible";
 
@@ -18,7 +18,9 @@ describe("usePageVisible", () => {
     expect(screen.getByText("visible")).toBeInTheDocument();
 
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-    document.dispatchEvent(new Event("visibilitychange"));
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
     expect(screen.getByText("hidden")).toBeInTheDocument();
   });
 });

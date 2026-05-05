@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export default function usePageVisible(): boolean {
+export function usePageVisible(): boolean {
   const [visible, setVisible] = useState(() => document.visibilityState === "visible");
 
   useEffect(() => {

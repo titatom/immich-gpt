@@ -9,6 +9,7 @@ import { CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Search, Copy, Chec
 
 const PAGE_SIZE = 50;
 const ACTIVE_JOB_STATUSES = new Set(["queued", "starting", "syncing_assets", "preparing_image", "classifying_ai", "validating_result", "saving_suggestion", "writing_results"]);
+const isActiveJobStatus = (status: string) => ACTIVE_JOB_STATUSES.has(status) || status === "paused";
 const sectionStyle: React.CSSProperties = {
   background: "#0f172a",
   border: "1px solid #1e293b",

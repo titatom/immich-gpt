@@ -116,8 +116,8 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
-    await waitForElementToBeRemoved(() => screen.queryByText("Loading..."));
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    await waitForElementToBeRemoved(() => screen.queryByText("Loading…"));
   });
 
   it("renders all nav links in the sidebar", async () => {

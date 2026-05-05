@@ -7,7 +7,7 @@ import {
   listRoutingPlans, listRoutingNodes,
 } from "../services/api";
 import type {
-  SyncScope, ImmichAlbum, RoutingNode, RoutingPlan,
+  SyncScope, ImmichAlbum, RoutingNode, RoutingPlan, JobRun,
 } from "../types";
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
@@ -237,11 +237,11 @@ export default function Dashboard() {
     queryFn: () => getAssetCount(),
   });
 
-  const { data: jobs = [] } = useQuery({
+  const { data: jobs = [] } = useQuery<JobRun[]>({
     queryKey: ["jobs", { limit: 10 }],
     queryFn: () => getJobs({ limit: 10 }),
     refetchInterval: (query) => {
-      const currentJobs = (query.state.data ?? []) as typeof jobs;
+      const currentJobs = (query.state.data ?? []) as JobRun[];
       const hasActiveJob = currentJobs.some((job) => !TERMINAL_STATUSES.has(job.status) && job.status !== "paused");
       return pageVisible && hasActiveJob ? 3_000 : false;
     },
