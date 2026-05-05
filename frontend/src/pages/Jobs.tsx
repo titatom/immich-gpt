@@ -4,6 +4,7 @@ import {
   getJobs, cancelJob, pauseJob, resumeJob, deleteJob,
   startSyncJob, startRoutingClassify,
 } from "../services/api";
+import { usePageVisible } from "../hooks/usePageVisible";
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp, Pause, RotateCcw, Trash2 } from "lucide-react";
@@ -14,6 +15,7 @@ const ACTIVE   = new Set(["queued","starting","syncing_assets","preparing_image"
 
 export default function Jobs() {
   const qc = useQueryClient();
+  const isPageVisible = usePageVisible();
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -21,7 +23,12 @@ export default function Jobs() {
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ["jobs", typeFilter],
     queryFn: () => getJobs({ job_type: typeFilter || undefined, limit: 50 }),
-    refetchInterval: 3_000,
+    refetchInterval: (query) => {
+      const currentJobs = query.state.data ?? [];
+      return isPageVisible && currentJobs.some((job) => ACTIVE.has(job.status) || job.status === "paused")
+        ? 3_000
+        : false;
+    },
   });
 
   const syncMut = useMutation({

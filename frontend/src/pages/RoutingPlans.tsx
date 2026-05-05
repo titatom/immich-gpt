@@ -9,6 +9,7 @@ import {
   startRoutingClassify,
 } from "../services/api";
 import type { RoutingPlanSummary, RoutingPlanGroupItem } from "../types";
+import { usePageVisible } from "../hooks/usePageVisible";
 import { CheckCircle2, AlertTriangle, Trash2, XCircle, Clock, Play, type LucideIcon } from "lucide-react";
 
 const GROUP_DEFS: {
@@ -27,14 +28,15 @@ const GROUP_DEFS: {
 
 export default function RoutingPlans() {
   const qc = useQueryClient();
+  const pageVisible = usePageVisible();
   const { data: plans = [] } = useQuery({ queryKey: ["routing-plans"], queryFn: () => listRoutingPlans() });
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
-  const { data: summary } = useQuery<RoutingPlanSummary>({
+  const { data: summary, isLoading: summaryLoading, isError: summaryError } = useQuery<RoutingPlanSummary>({
     queryKey: ["routing-plan-summary", selectedPlanId],
     queryFn: () => getRoutingPlanSummary(selectedPlanId!),
     enabled: !!selectedPlanId,
-    refetchInterval: 5000,
+    refetchInterval: pageVisible ? 5000 : false,
   });
 
   const classifyMut = useMutation({
@@ -135,6 +137,24 @@ export default function RoutingPlans() {
               color: "#64748b",
             }}>
               Select a plan from the list, or run a new one.
+            </div>
+          )}
+          {selectedPlanId && summaryLoading && (
+            <div style={{
+              padding: 32, textAlign: "center",
+              background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12,
+              color: "#64748b",
+            }}>
+              Loading plan summary...
+            </div>
+          )}
+          {selectedPlanId && summaryError && (
+            <div style={{
+              padding: 32, textAlign: "center",
+              background: "#0f172a", border: "1px solid #7f1d1d", borderRadius: 12,
+              color: "#fca5a5",
+            }}>
+              Could not load this plan summary. Try selecting it again.
             </div>
           )}
           {selectedPlanId && summary && (

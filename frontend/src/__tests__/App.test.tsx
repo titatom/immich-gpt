@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, waitForElementToBeRemoved } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -110,6 +110,16 @@ describe("App routing", () => {
     await waitFor(() => expect(screen.getAllByText("Immich GPT").length).toBeGreaterThanOrEqual(1));
   });
 
+  it("shows a fallback while lazy route bundles load", async () => {
+    render(
+      <Wrapper path="/setup">
+        <App />
+      </Wrapper>
+    );
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    await waitForElementToBeRemoved(() => screen.queryByText("Loading…"));
+  });
+
   it("renders all nav links in the sidebar", async () => {
     render(
       <Wrapper>
@@ -117,16 +127,16 @@ describe("App routing", () => {
       </Wrapper>
     );
     await waitFor(() => expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1));
-    expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Routing").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Routing plans").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole("link", { name: /donate/i })).toHaveAttribute(
+    await waitFor(() => expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Routing").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Routing plans").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(screen.getByRole("link", { name: /donate/i })).toHaveAttribute(
       "href",
       expect.stringContaining("paypal.com"),
-    );
+    ));
   });
 
   it("renders the shared logo image", async () => {
