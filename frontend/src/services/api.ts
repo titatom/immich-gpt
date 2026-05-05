@@ -140,6 +140,8 @@ export const getAssets = (params?: {
   page_size?: number;
   asset_type?: string;
   q?: string;
+  sort?: string;
+  dir?: string;
 }) => api.get("/assets", { params }).then((r) => r.data as Asset[]);
 
 export const getAssetCount = (params?: {
@@ -198,8 +200,11 @@ export const getAuditLogs = (params?: {
 export const getAuditLogCount = (params?: {
   asset_id?: string;
   job_run_id?: string;
+  action?: string;
   status?: string;
   level?: string;
+  source?: string;
+  q?: string;
 }) =>
   api.get("/audit-logs/count", { params }).then((r) => r.data as { count: number });
 

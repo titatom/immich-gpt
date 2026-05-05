@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
@@ -40,7 +41,30 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    query = db.query(AuditLog).filter(AuditLog.user_id == current_user.id)
+    query = _apply_audit_filters(
+        db.query(AuditLog).filter(AuditLog.user_id == current_user.id),
+        asset_id=asset_id,
+        job_run_id=job_run_id,
+        action=action,
+        status=status,
+        level=level,
+        source=source,
+        q=q,
+    )
+    offset = (page - 1) * page_size
+    return query.order_by(AuditLog.created_at.desc()).offset(offset).limit(page_size).all()
+
+
+def _apply_audit_filters(
+    query,
+    asset_id: Optional[str] = None,
+    job_run_id: Optional[str] = None,
+    action: Optional[str] = None,
+    status: Optional[str] = None,
+    level: Optional[str] = None,
+    source: Optional[str] = None,
+    q: Optional[str] = None,
+):
     if asset_id:
         query = query.filter(AuditLog.asset_id == asset_id)
     if job_run_id:
@@ -56,33 +80,38 @@ def list_audit_logs(
     if q:
         like = f"%{q}%"
         query = query.filter(
-            AuditLog.action.ilike(like) |
-            AuditLog.error_message.ilike(like) |
-            AuditLog.asset_id.ilike(like) |
-            AuditLog.job_run_id.ilike(like)
+            or_(
+                AuditLog.action.ilike(like),
+                AuditLog.error_message.ilike(like),
+                AuditLog.asset_id.ilike(like),
+                AuditLog.job_run_id.ilike(like),
+            )
         )
-    offset = (page - 1) * page_size
-    return query.order_by(AuditLog.created_at.desc()).offset(offset).limit(page_size).all()
+    return query
 
 
 @router.get("/count")
 def count_audit_logs(
     asset_id: Optional[str] = None,
     job_run_id: Optional[str] = None,
+    action: Optional[str] = None,
     status: Optional[str] = None,
     level: Optional[str] = None,
+    source: Optional[str] = None,
+    q: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
-    query = db.query(AuditLog).filter(AuditLog.user_id == current_user.id)
-    if asset_id:
-        query = query.filter(AuditLog.asset_id == asset_id)
-    if job_run_id:
-        query = query.filter(AuditLog.job_run_id == job_run_id)
-    if status:
-        query = query.filter(AuditLog.status == status)
-    if level:
-        query = query.filter(AuditLog.level == level)
+    query = _apply_audit_filters(
+        db.query(AuditLog).filter(AuditLog.user_id == current_user.id),
+        asset_id=asset_id,
+        job_run_id=job_run_id,
+        action=action,
+        status=status,
+        level=level,
+        source=source,
+        q=q,
+    )
     return {"count": query.count()}
 
 

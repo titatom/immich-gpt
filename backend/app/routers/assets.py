@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import asc, desc, or_
 from typing import List, Optional
 
 from ..database import get_db
@@ -54,12 +54,24 @@ def _apply_asset_filters(query, asset_type: Optional[str], q: Optional[str]):
     return query
 
 
+def _asset_sort_expression(sort: str):
+    return {
+        "date": Asset.file_created_at,
+        "filename": Asset.original_filename,
+        "location": Asset.city,
+        "tags": Asset.tags_json,
+        "type": Asset.asset_type,
+    }.get(sort, Asset.file_created_at)
+
+
 @router.get("", response_model=List[AssetOut])
 def list_assets(
     page: int = 1,
     page_size: int = 50,
     asset_type: Optional[str] = None,
     q: Optional[str] = None,
+    sort: str = "date",
+    dir: str = "desc",
     db: Session = Depends(get_db),
     current_user=Depends(require_active_user),
 ):
@@ -67,8 +79,10 @@ def list_assets(
         _user_asset_query(db, current_user.id), asset_type, q,
     )
     offset = (page - 1) * page_size
+    sort_expr = _asset_sort_expression(sort)
+    order = asc(sort_expr) if dir == "asc" else desc(sort_expr)
     assets = (
-        query.order_by(Asset.file_created_at.desc())
+        query.order_by(order, Asset.id.asc())
         .offset(offset)
         .limit(page_size)
         .all()
