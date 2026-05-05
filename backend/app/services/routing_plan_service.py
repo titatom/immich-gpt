@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models.routing_plan import RoutingPlan, RoutingPlanItem
@@ -53,6 +54,20 @@ class RoutingPlanService:
         if status:
             q = q.filter(RoutingPlan.status == status)
         return q.order_by(RoutingPlan.created_at.desc()).all()
+
+    def item_counts_by_plan(self, plan_ids: List[str]) -> Dict[str, int]:
+        if not plan_ids:
+            return {}
+        rows = (
+            self.db.query(RoutingPlanItem.plan_id, func.count(RoutingPlanItem.id))
+            .filter(
+                RoutingPlanItem.user_id == self.user_id,
+                RoutingPlanItem.plan_id.in_(plan_ids),
+            )
+            .group_by(RoutingPlanItem.plan_id)
+            .all()
+        )
+        return {plan_id: count for plan_id, count in rows}
 
     def add_item(
         self,

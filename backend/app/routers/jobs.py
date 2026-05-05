@@ -174,11 +174,22 @@ def start_sync_job(
     svc = JobProgressService(db)
     job = svc.create_job(
         "asset_sync",
-        params={"scope": req.scope, "album_ids": req.album_ids},
+        params={
+            "scope": req.scope,
+            "album_ids": req.album_ids,
+            "run_routing_after": req.run_routing_after,
+        },
         user_id=current_user.id,
     )
 
-    _enqueue(run_asset_sync, job.id, req.scope, req.album_ids, current_user.id)
+    _enqueue(
+        run_asset_sync,
+        job.id,
+        req.scope,
+        req.album_ids,
+        current_user.id,
+        req.run_routing_after,
+    )
 
     return JobStartResponse(job_id=job.id, status="queued", message="Sync job started")
 
@@ -260,7 +271,13 @@ def _resume_job_task(job_id: str) -> None:
         user_id = j.user_id
         if j.job_type == "asset_sync":
             from ..workers.tasks import run_asset_sync
-            run_asset_sync(job_id, params.get("scope", "all"), params.get("album_ids"), user_id)
+            run_asset_sync(
+                job_id,
+                params.get("scope", "all"),
+                params.get("album_ids"),
+                user_id,
+                params.get("run_routing_after", False),
+            )
         elif j.job_type == "routing_classification":
             from ..workers.tasks import run_routing_classification
             run_routing_classification(

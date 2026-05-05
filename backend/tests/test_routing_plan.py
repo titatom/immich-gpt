@@ -1,13 +1,17 @@
 """RoutingPlanService and routing API tests."""
 import uuid
 import pytest
+from datetime import datetime
+from app.models.asset import Asset
 from app.services.routing_plan_service import RoutingPlanService
 from app.services.routing_tree import RoutingTreeService
+from app.services.routing_classification import RoutingClassificationOrchestrator
 from app.services.routing_schemas import (
     RoutingDecision, Candidate,
 )
 from app.schemas.bucket import RoutingNodeCreate
 from app.models.bucket import Bucket
+from app.models.asset import Asset
 from tests.conftest import TEST_USER_ID
 
 
@@ -23,6 +27,54 @@ def _make_decision(bucket_id: str, path: str, confidence: float = 0.9, review: b
         disposition="keep",
         review_required=review,
         auto_apply=auto,
+    )
+
+
+def _make_asset(db, asset_id: str, immich_id: str) -> Asset:
+    asset = Asset(
+        id=asset_id,
+        user_id=TEST_USER_ID,
+        immich_id=immich_id,
+        original_filename=f"{immich_id}.jpg",
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+class _DummyProvider:
+    provider_name = "dummy"
+
+
+def _make_asset(db, immich_id: str) -> Asset:
+    asset = Asset(
+        id=str(uuid.uuid4()),
+        user_id=TEST_USER_ID,
+        immich_id=immich_id,
+        original_filename=f"{immich_id}.jpg",
+        synced_at=datetime.utcnow(),
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+class _FakeProvider:
+    provider_name = "fake"
+    model = "fake-model"
+
+    def classify_routing(self, messages, image_payload):
+        raise AssertionError("Provider should not be called by _load_assets tests")
+
+
+def _make_orchestrator(db) -> RoutingClassificationOrchestrator:
+    return RoutingClassificationOrchestrator(
+        db,
+        _FakeProvider(),
+        user_id=TEST_USER_ID,
+        immich_client=object(),
     )
 
 

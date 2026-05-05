@@ -268,14 +268,11 @@ export default function Dashboard() {
 
   const syncMutation = useMutation({
     mutationFn: (params: { scope: SyncScope; album_ids?: string[]; runRoutingAfter: boolean }) =>
-      startSyncJob({ scope: params.scope, album_ids: params.album_ids }).then(
-        (job) => {
-          if (params.runRoutingAfter) {
-            routeMutation.mutate();
-          }
-          return job;
-        }
-      ),
+      startSyncJob({
+        scope: params.scope,
+        album_ids: params.album_ids,
+        run_routing_after: params.runRoutingAfter,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["asset-count"] });

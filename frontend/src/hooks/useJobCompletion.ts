@@ -35,11 +35,9 @@ export function useJobCompletion() {
         const prevStatus = seen.current.get(job.id);
 
         if (TERMINAL.has(job.status) && prevStatus !== job.status) {
-          // Only cascade on a genuine completion (not already-terminal jobs
-          // that we saw when the page first loaded).
-          const isNewlyTerminal = prevStatus !== undefined && prevStatus !== job.status;
-
-          if (isNewlyTerminal && job.status === "completed") {
+          // Cascade once per completed job. This also covers fast jobs that are
+          // first observed after completion.
+          if (job.status === "completed") {
             if (job.job_type === "asset_sync") {
               qc.invalidateQueries({ queryKey: ["assets"] });
               qc.invalidateQueries({ queryKey: ["asset-count"] });
