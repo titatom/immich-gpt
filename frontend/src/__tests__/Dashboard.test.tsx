@@ -63,9 +63,8 @@ describe("Dashboard workflow", () => {
     renderDashboard();
 
     await screen.findByText("Run Workflow");
-    const runButton = screen.getAllByRole("button", { name: /sync \+ route/i }).at(-1);
-    expect(runButton).toBeTruthy();
-    fireEvent.click(runButton!);
+    const syncRouteButtons = screen.getAllByRole("button", { name: /sync \+ route/i });
+    fireEvent.click(syncRouteButtons[syncRouteButtons.length - 1]);
 
     await waitFor(() => {
       expect(mocks.startSyncJob).toHaveBeenCalledWith({
