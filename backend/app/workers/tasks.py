@@ -64,7 +64,7 @@ def run_asset_sync(
         )
 
         def progress_cb(msg: str):
-            job_svc.update_progress(job_id, log_line=msg)
+            job_svc.update_progress(job_id, log_line=msg, flush=False)
 
         def should_stop() -> bool:
             db.expire_all()
@@ -91,6 +91,8 @@ def run_asset_sync(
                 should_stop=should_stop,
             )
 
+        job_svc.flush()
+        db.expire_all()
         j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
         if j and j.status not in ("paused", "cancelled"):
             job_svc.complete_job(

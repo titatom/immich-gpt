@@ -2,8 +2,9 @@
 JobProgressService: manages job state, progress updates, and log lines.
 """
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Iterator, Optional, List
 
 
 def _now() -> datetime:
@@ -15,6 +16,33 @@ from ..models.job_run import JobRun
 class JobProgressService:
     def __init__(self, db: Session):
         self.db = db
+        self._defer_depth = 0
+        self._dirty_job_ids: set[str] = set()
+
+    @contextmanager
+    def defer_commits(self) -> Iterator[None]:
+        """Batch progress writes within a worker scope.
+
+        Status reads and external API calls can produce many progress ticks.
+        Deferring those commits lets long-running jobs persist a coherent final
+        state without taking a SQLite write lock for every log line.
+        """
+        self._defer_depth += 1
+        try:
+            yield
+            self.flush()
+        except Exception:
+            self.db.rollback()
+            self._dirty_job_ids.clear()
+            raise
+        finally:
+            self._defer_depth -= 1
+
+    def flush(self) -> None:
+        if not self._dirty_job_ids:
+            return
+        self.db.commit()
+        self._dirty_job_ids.clear()
 
     def create_job(
         self,
@@ -58,6 +86,7 @@ class JobProgressService:
         error_delta: int = 0,
         message: Optional[str] = None,
         log_line: Optional[str] = None,
+        flush: bool = False,
     ) -> None:
         job = self._get(job_id)
         if status:
@@ -83,9 +112,14 @@ class JobProgressService:
             # Keep last 500 lines
             job.log_lines_json = lines[-500:]
         job.updated_at = _now()
-        self.db.commit()
+        if flush:
+            self._dirty_job_ids.add(job_id)
+            self.flush()
+        else:
+            self._commit_or_defer(job_id)
 
     def complete_job(self, job_id: str, message: Optional[str] = None) -> None:
+        self.flush()
         job = self._get(job_id)
         job.status = "completed"
         job.progress_percent = 100.0
@@ -96,6 +130,7 @@ class JobProgressService:
         self.db.commit()
 
     def fail_job(self, job_id: str, message: str) -> None:
+        self.flush()
         job = self._get(job_id)
         job.status = "failed"
         job.message = message
@@ -104,6 +139,7 @@ class JobProgressService:
         self.db.commit()
 
     def reset_for_retry(self, job_id: str) -> None:
+        self.flush()
         """Reset a failed job back to queued so it can be re-enqueued by RQ retry."""
         job = self._get(job_id)
         job.status = "queued"
@@ -122,6 +158,7 @@ class JobProgressService:
         self.db.commit()
 
     def cancel_job(self, job_id: str) -> None:
+        self.flush()
         job = self._get(job_id)
         job.status = "cancelled"
         job.completed_at = _now()
@@ -129,18 +166,21 @@ class JobProgressService:
         self.db.commit()
 
     def pause_job(self, job_id: str) -> None:
+        self.flush()
         job = self._get(job_id)
         job.status = "paused"
         job.updated_at = _now()
         self.db.commit()
 
     def resume_job(self, job_id: str) -> None:
+        self.flush()
         job = self._get(job_id)
         job.status = "queued"
         job.updated_at = _now()
         self.db.commit()
 
     def delete_job(self, job_id: str) -> None:
+        self.flush()
         job = self._get(job_id)
         self.db.delete(job)
         self.db.commit()
@@ -169,3 +209,9 @@ class JobProgressService:
         if not job:
             raise ValueError(f"Job {job_id} not found")
         return job
+
+    def _commit_or_defer(self, job_id: str) -> None:
+        if self._defer_depth:
+            self._dirty_job_ids.add(job_id)
+        else:
+            self.db.commit()

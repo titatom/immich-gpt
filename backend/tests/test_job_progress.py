@@ -1,4 +1,6 @@
 """Test 8: job progress state transitions."""
+from unittest.mock import patch
+
 import pytest
 from app.services.job_progress import JobProgressService
 
@@ -87,6 +89,34 @@ def test_log_lines_appended(db):
     assert len(lines) == 2
     assert any("Step 1 started" in l for l in lines)
     assert any("Step 2 running" in l for l in lines)
+
+
+def test_defer_commits_batches_progress(db):
+    svc = JobProgressService(db)
+    job = svc.create_job("classification")
+
+    with patch.object(db, "commit", wraps=db.commit) as commit:
+        with svc.defer_commits():
+            svc.update_progress(job.id, processed=1, total=3, log_line="Step 1")
+            svc.update_progress(job.id, processed=2, total=3, log_line="Step 2")
+        assert commit.call_count == 1
+
+    db.refresh(job)
+    assert job.processed_count == 2
+    assert job.progress_percent == 66.7
+    assert len(job.log_lines_json) == 2
+
+
+def test_flush_persists_deferred_progress_immediately(db):
+    svc = JobProgressService(db)
+    job = svc.create_job("classification")
+
+    with patch.object(db, "commit", wraps=db.commit) as commit:
+        with svc.defer_commits():
+            svc.update_progress(job.id, processed=1, total=2, log_line="Step 1")
+            svc.update_progress(job.id, processed=1, total=2, log_line="Checkpoint", flush=True)
+            svc.update_progress(job.id, processed=2, total=2, log_line="Step 2")
+        assert commit.call_count == 2
 
 
 def test_list_jobs(db):

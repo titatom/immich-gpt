@@ -105,34 +105,37 @@ class RoutingClassificationOrchestrator:
         self.job_service.update_progress(job_id, total=total,
                                          log_line=f"Found {total} assets to process")
 
-        for idx, asset in enumerate(assets):
-            current = self.job_service.get_job(job_id)
-            if current and current.status == "paused":
+        with self.job_service.defer_commits():
+            for idx, asset in enumerate(assets):
+                current = self.job_service.get_job(job_id)
+                if current and current.status == "paused":
+                    self.job_service.update_progress(
+                        job_id,
+                        log_line=f"Job paused at asset {idx + 1}/{total}",
+                    )
+                    self.job_service.flush()
+                    return plan.id
+                if current and current.status == "cancelled":
+                    self.job_service.flush()
+                    return plan.id
+
                 self.job_service.update_progress(
                     job_id,
-                    log_line=f"Job paused at asset {idx + 1}/{total}",
+                    status="classifying_ai",
+                    processed=idx,
+                    log_line=f"Routing asset {idx + 1}/{total}: {asset.immich_id}",
                 )
-                return plan.id
-            if current and current.status == "cancelled":
-                return plan.id
-
-            self.job_service.update_progress(
-                job_id,
-                status="classifying_ai",
-                processed=idx,
-                log_line=f"Routing asset {idx + 1}/{total}: {asset.immich_id}",
-            )
-            try:
-                self._process_asset(asset, leaves, plan, job_id)
-                self.job_service.update_progress(
-                    job_id, processed=idx + 1, success_delta=1,
-                    log_line=f"\u2713 Asset {asset.immich_id} routed",
-                )
-            except Exception as e:  # pragma: no cover - defensive
-                self.job_service.update_progress(
-                    job_id, processed=idx + 1, error_delta=1,
-                    log_line=f"\u2717 Routing error for {asset.immich_id}: {str(e)[:200]}",
-                )
+                try:
+                    self._process_asset(asset, leaves, plan, job_id)
+                    self.job_service.update_progress(
+                        job_id, processed=idx + 1, success_delta=1,
+                        log_line=f"\u2713 Asset {asset.immich_id} routed",
+                    )
+                except Exception as e:  # pragma: no cover - defensive
+                    self.job_service.update_progress(
+                        job_id, processed=idx + 1, error_delta=1,
+                        log_line=f"\u2717 Routing error for {asset.immich_id}: {str(e)[:200]}",
+                    )
 
         plan.status = "ready"
         self.db.commit()

@@ -6,7 +6,8 @@ get_current_user / require_active_user dependencies, so the full authentication
 code-path (authenticate_user, session creation, cookie setting) is exercised.
 """
 import pytest
-from unittest.mock import patch
+from datetime import timedelta
+from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,6 +19,7 @@ import app.models.session  # noqa
 from app.database import Base, get_db
 from app.main import app
 from app.models.user import User
+from app.services import auth_service
 from app.services.auth_service import hash_password
 
 
@@ -147,6 +149,49 @@ def test_login_sets_session_cookie(raw_client):
     assert "session_id" in resp.cookies or any(
         "session" in k.lower() for k in resp.cookies
     )
+
+
+def test_get_session_skips_refresh_inside_throttle_window(auth_db):
+    session = auth_service.create_session(auth_db, "auth-test-user-id")
+    original_last_seen = session.last_seen_at
+    original_expires = session.expires_at
+
+    original_commit = auth_db.commit
+    commit = MagicMock(wraps=original_commit)
+    auth_db.commit = commit
+    try:
+        loaded = auth_service.get_session(auth_db, session.id)
+    finally:
+        auth_db.commit = original_commit
+
+    assert loaded is not None
+    assert commit.call_count == 0
+    assert loaded.last_seen_at == original_last_seen
+    assert loaded.expires_at == original_expires
+
+
+def test_get_session_refreshes_after_throttle_window(auth_db):
+    session = auth_service.create_session(auth_db, "auth-test-user-id")
+    old_seen = session.last_seen_at - timedelta(
+        seconds=auth_service.SESSION_REFRESH_INTERVAL_SECONDS + 1
+    )
+    session.last_seen_at = old_seen
+    session.expires_at = old_seen + timedelta(seconds=auth_service.SESSION_IDLE_SECONDS)
+    old_expires = session.expires_at
+    auth_db.commit()
+
+    original_commit = auth_db.commit
+    commit = MagicMock(wraps=original_commit)
+    auth_db.commit = commit
+    try:
+        loaded = auth_service.get_session(auth_db, session.id)
+    finally:
+        auth_db.commit = original_commit
+
+    assert loaded is not None
+    assert commit.call_count == 1
+    assert loaded.last_seen_at > old_seen
+    assert loaded.expires_at > old_expires
 
 
 # ---------------------------------------------------------------------------
