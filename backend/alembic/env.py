@@ -14,14 +14,12 @@ from app.database import Base  # noqa: E402
 # Import all models so Alembic can detect them for autogenerate
 import app.models.asset  # noqa: F401
 import app.models.bucket  # noqa: F401
-import app.models.prompt_template  # noqa: F401
 import app.models.prompt_run  # noqa: F401
-import app.models.suggested_classification  # noqa: F401
-import app.models.suggested_metadata  # noqa: F401
-import app.models.review_decision  # noqa: F401
 import app.models.job_run  # noqa: F401
 import app.models.audit_log  # noqa: F401
 import app.models.provider_config  # noqa: F401
+import app.models.routing_example  # noqa: F401
+import app.models.routing_plan  # noqa: F401
 
 config = context.config
 

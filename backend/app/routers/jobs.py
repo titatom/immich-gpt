@@ -9,7 +9,6 @@ from typing import List, Optional
 from ..database import get_db, SessionLocal
 from ..dependencies import require_active_user, get_current_user
 from ..models.job_run import JobRun
-from ..models.bucket import Bucket
 from ..schemas.job import JobRunOut, JobStartResponse, SyncJobRequest
 from ..services.job_progress import JobProgressService
 from ..config import settings
@@ -171,44 +170,17 @@ def start_sync_job(
 ):
     from ..workers.tasks import run_asset_sync
     req = body or SyncJobRequest()
-    if req.bucket_id:
-        bucket = db.query(Bucket).filter(
-            Bucket.id == req.bucket_id,
-            Bucket.user_id == current_user.id,
-        ).first()
-        if not bucket:
-            raise HTTPException(status_code=404, detail="Bucket not found")
 
     svc = JobProgressService(db)
     job = svc.create_job(
         "asset_sync",
-        params={"scope": req.scope, "album_ids": req.album_ids, "bucket_id": req.bucket_id},
+        params={"scope": req.scope, "album_ids": req.album_ids},
         user_id=current_user.id,
     )
 
-    _enqueue(run_asset_sync, job.id, req.scope, req.album_ids, current_user.id, req.bucket_id)
+    _enqueue(run_asset_sync, job.id, req.scope, req.album_ids, current_user.id)
 
     return JobStartResponse(job_id=job.id, status="queued", message="Sync job started")
-
-
-@router.post("/classify", response_model=JobStartResponse)
-def start_classify_job(
-    asset_ids: Optional[List[str]] = None,
-    limit: Optional[int] = None,
-    force: bool = False,
-    db: Session = Depends(get_db),
-    current_user=Depends(require_active_user),
-):
-    from ..workers.tasks import run_classification
-    svc = JobProgressService(db)
-    job = svc.create_job(
-        "classification",
-        params={"asset_ids": asset_ids, "limit": limit, "force": force},
-        user_id=current_user.id,
-    )
-
-    _enqueue(run_classification, job.id, asset_ids, limit, force, current_user.id)
-    return JobStartResponse(job_id=job.id, status="queued", message="Classification job started")
 
 
 @router.post("/{job_id}/cancel")
@@ -288,9 +260,16 @@ def _resume_job_task(job_id: str) -> None:
         user_id = j.user_id
         if j.job_type == "asset_sync":
             from ..workers.tasks import run_asset_sync
-            run_asset_sync(job_id, params.get("scope", "all"), params.get("album_ids"), user_id, params.get("bucket_id"))
-        elif j.job_type == "classification":
-            from ..workers.tasks import run_classification
-            run_classification(job_id, params.get("asset_ids"), params.get("limit"), params.get("force", False), user_id)
+            run_asset_sync(job_id, params.get("scope", "all"), params.get("album_ids"), user_id)
+        elif j.job_type == "routing_classification":
+            from ..workers.tasks import run_routing_classification
+            run_routing_classification(
+                job_id,
+                params.get("plan_id"),
+                params.get("asset_ids"),
+                params.get("limit"),
+                params.get("force", False),
+                user_id,
+            )
     finally:
         db.close()

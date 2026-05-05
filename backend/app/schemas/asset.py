@@ -22,9 +22,6 @@ class AssetOut(BaseModel):
     is_external_library: bool
     synced_at: Optional[datetime]
     created_at: datetime
-    # Classification summary (populated on list endpoints for grid display)
-    classification_bucket: Optional[str] = None
-    classification_status: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

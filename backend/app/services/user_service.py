@@ -113,12 +113,10 @@ def delete_user(db: Session, user_id: str) -> bool:
     from ..models.asset import Asset
     from ..models.job_run import JobRun
     from ..models.bucket import Bucket
-    from ..models.prompt_template import PromptTemplate
-    from ..models.review_decision import ReviewDecision
-    from ..models.suggested_classification import SuggestedClassification
-    from ..models.suggested_metadata import SuggestedMetadata
     from ..models.audit_log import AuditLog
     from ..models.session import UserSession, PasswordResetToken
+    from ..models.routing_example import RoutingExample
+    from ..models.routing_plan import RoutingPlan, RoutingPlanItem
 
     user = get_user_by_id(db, user_id)
     if not user:
@@ -128,24 +126,19 @@ def delete_user(db: Session, user_id: str) -> bool:
     db.query(AuditLog).filter(AuditLog.user_id == user_id).update({"user_id": None})
 
     # Hard-delete all user-owned runtime data
-    asset_ids = [r[0] for r in db.query(Asset.id).filter(Asset.user_id == user_id).all()]
-    if asset_ids:
-        db.query(SuggestedClassification).filter(
-            SuggestedClassification.asset_id.in_(asset_ids)
-        ).delete(synchronize_session=False)
-        db.query(SuggestedMetadata).filter(
-            SuggestedMetadata.asset_id.in_(asset_ids)
-        ).delete(synchronize_session=False)
-        db.query(ReviewDecision).filter(
-            ReviewDecision.asset_id.in_(asset_ids)
-        ).delete(synchronize_session=False)
+    db.query(RoutingPlanItem).filter(
+        RoutingPlanItem.user_id == user_id
+    ).delete(synchronize_session=False)
+    db.query(RoutingPlan).filter(
+        RoutingPlan.user_id == user_id
+    ).delete(synchronize_session=False)
+    db.query(RoutingExample).filter(
+        RoutingExample.user_id == user_id
+    ).delete(synchronize_session=False)
 
     db.query(Asset).filter(Asset.user_id == user_id).delete(synchronize_session=False)
     db.query(JobRun).filter(JobRun.user_id == user_id).delete(synchronize_session=False)
     db.query(Bucket).filter(Bucket.user_id == user_id).delete(synchronize_session=False)
-    db.query(PromptTemplate).filter(
-        PromptTemplate.user_id == user_id
-    ).delete(synchronize_session=False)
     db.query(ProviderConfig).filter(
         ProviderConfig.user_id == user_id
     ).delete(synchronize_session=False)
@@ -161,31 +154,33 @@ def delete_user(db: Session, user_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Default seeding for new users
+# Default routing tree for new users
 # ---------------------------------------------------------------------------
 
-# Default routing tree.  These are NOT special-cased in code anywhere
-# — they are seeded leaves with normal generic settings.
-DEFAULT_BUCKETS = [
+# These leaves are NOT special-cased anywhere — they are normal routing
+# leaves with generic settings, used only as a starter tree.
+DEFAULT_LEAVES = [
     {
         "name": "Business",
-        "description": "Construction, renovation, work sites, tools, project documentation, invoices",
+        "description": "Construction, renovation, work sites, tools, project documentation, invoices.",
         "priority": 10,
-        "classification_prompt": (
-            "Business includes construction, handyman, renovation sites, tools, materials, "
-            "estimates, invoices, work progress, finished work, and project documentation."
-        ),
         "destination_type": "virtual",
+        "positive_criteria": [
+            "construction or renovation site",
+            "tools, materials, work progress, finished work",
+            "estimates, invoices, project documentation",
+        ],
     },
     {
         "name": "Documents",
-        "description": "Receipts, invoices, contracts, scans, screenshots, notes, paper",
+        "description": "Receipts, invoices, contracts, scans, screenshots, notes, paper.",
         "priority": 5,
-        "classification_prompt": (
-            "Documents include receipts, invoices, forms, scans, contracts, screenshots of "
-            "emails, notes, whiteboards, and photos of paper."
-        ),
         "destination_type": "virtual",
+        "positive_criteria": [
+            "receipt, invoice, form, scan, contract",
+            "screenshot of emails, notes, whiteboard",
+            "photo of paper",
+        ],
         "privacy_rules": {
             "documents_visible": "allow",
             "address_visible": "review",
@@ -193,70 +188,38 @@ DEFAULT_BUCKETS = [
     },
     {
         "name": "Personal",
-        "description": "Family, social events, travel, everyday life",
+        "description": "Family, social events, travel, everyday life.",
         "priority": 20,
-        "classification_prompt": (
-            "Personal includes family photos, selfies, social events, travel, food, pets, "
-            "hobbies, and everyday life moments."
-        ),
         "destination_type": "virtual",
+        "positive_criteria": [
+            "family photo, selfie, group photo",
+            "social event, travel, food, pets, hobby",
+            "everyday life moments",
+        ],
     },
     {
         "name": "Trash",
-        "description": "Blurry, accidental, duplicates, test shots, no value",
+        "description": "Blurry, accidental, duplicates, test shots — items with no value.",
         "priority": 100,
-        "classification_prompt": (
-            "Trash includes blurry photos, accidental shots, duplicates, test shots, "
-            "completely dark or overexposed images with no value. "
-            "When in doubt, do NOT classify as Trash — prefer another bucket."
-        ),
         "destination_type": "virtual",
         "auto_apply_enabled": False,
-    },
-]
-
-DEFAULT_PROMPTS = [
-    {
-        "prompt_type": "global_classification",
-        "name": "Global Classification",
-        "content": (
-            "Classify this asset into the most appropriate Bucket using both image content "
-            "and metadata. Be conservative when uncertain."
-        ),
-    },
-    {
-        "prompt_type": "description_generation",
-        "name": "Description Generation",
-        "content": (
-            "Generate a concise, useful description that improves future search and review."
-        ),
-    },
-    {
-        "prompt_type": "tags_generation",
-        "name": "Tags Generation",
-        "content": (
-            "Generate 3 to 8 practical, search-friendly tags. "
-            "Prefer concrete terms over vague words."
-        ),
-    },
-    {
-        "prompt_type": "review_guidance",
-        "name": "Review Guidance",
-        "content": (
-            "When reviewing AI suggestions, consider whether the bucket assignment matches "
-            "the visible content. Override if the confidence is low or the explanation "
-            "does not match what you see."
-        ),
+        "negative_criteria": [
+            "valuable memories",
+            "anything you might want to keep",
+        ],
+        "positive_criteria": [
+            "blurry, dark, or overexposed shots with no value",
+            "accidental, duplicate, or test shots",
+        ],
     },
 ]
 
 
 def _seed_user_defaults(db: Session, user_id: str) -> None:
-    """Copy app-level default buckets and prompts into user ownership."""
+    """Seed a starter routing tree for a new user."""
     from ..models.bucket import Bucket
-    from ..models.prompt_template import PromptTemplate
 
-    for b in DEFAULT_BUCKETS:
+    for b in DEFAULT_LEAVES:
         db.add(Bucket(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -266,22 +229,11 @@ def _seed_user_defaults(db: Session, user_id: str) -> None:
             description=b["description"],
             enabled=True,
             priority=b["priority"],
-            mapping_mode="virtual",
             destination_type=b.get("destination_type", "virtual"),
-            classification_prompt=b["classification_prompt"],
+            positive_criteria_json=b.get("positive_criteria"),
+            negative_criteria_json=b.get("negative_criteria"),
             privacy_rules_json=b.get("privacy_rules"),
             auto_apply_enabled=b.get("auto_apply_enabled", False),
-        ))
-
-    for p in DEFAULT_PROMPTS:
-        db.add(PromptTemplate(
-            id=str(uuid.uuid4()),
-            user_id=user_id,
-            prompt_type=p["prompt_type"],
-            name=p["name"],
-            content=p["content"],
-            enabled=True,
-            version=1,
         ))
 
     db.commit()

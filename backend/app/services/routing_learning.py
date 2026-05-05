@@ -15,10 +15,10 @@ from typing import Optional, List
 
 from sqlalchemy.orm import Session
 
-from ..models.bucket import Bucket
+from ..models.app_setting import AppSetting
+from ..models.bucket import Bucket  # noqa: F401  (used implicitly via FK)
 from ..models.routing_example import RoutingExample
 from ..models.asset import Asset
-from .settings_utils import get_behaviour_setting
 
 
 LEARN_SETTING_KEY = "routing_learn_from_corrections"
@@ -30,9 +30,17 @@ class RoutingLearningService:
         self.user_id = user_id
 
     def is_enabled(self) -> bool:
-        return get_behaviour_setting(
-            self.db, LEARN_SETTING_KEY, default=False, user_id=self.user_id
+        row = (
+            self.db.query(AppSetting)
+            .filter(
+                AppSetting.user_id == self.user_id,
+                AppSetting.key == LEARN_SETTING_KEY,
+            )
+            .first()
         )
+        if row is None:
+            return False
+        return str(row.value).strip().lower() in ("1", "true", "yes", "on")
 
     def record_correction(
         self,

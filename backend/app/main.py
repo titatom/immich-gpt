@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from .database import init_db
 from .limiter import limiter
 from .routers import (
-    settings, buckets, prompts, assets, jobs, review,
+    settings, assets, jobs,
     thumbnails, albums, audit_logs, routing,
 )
 from .routers.auth import router as auth_router
@@ -124,11 +124,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(settings.router)
-app.include_router(buckets.router)
-app.include_router(prompts.router)
 app.include_router(assets.router)
 app.include_router(jobs.router)
-app.include_router(review.router)
 app.include_router(thumbnails.router)
 app.include_router(albums.router)
 app.include_router(audit_logs.router)
