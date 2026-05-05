@@ -13,7 +13,7 @@ immich-gpt is a self-hosted web app with a Python/FastAPI backend and React/Type
 | Backend API | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000` | 8000 | Set `DATABASE_URL=sqlite:///./data/immich_gpt.db` and `REDIS_URL=redis://localhost:6379/0` |
 | Frontend dev | `cd frontend && npx vite --host 0.0.0.0 --port 3000` | 3000 | Proxies `/api` to backend at port 8000 |
 | Redis | `redis-server --daemonize yes` | 6379 | Must be running before starting backend/worker |
-| RQ Worker | `cd backend && python3 -m app.workers.rq_worker` | — | Executes background jobs; requires Redis |
+| RQ Worker (optional) | `cd backend && python3 -m app.workers.rq_worker` | — | Standalone worker process; requires Redis. Not normally needed — the FastAPI process auto-starts an in-process RQ worker when `REDIS_URL` is set. |
 
 ### Running tests
 
@@ -66,7 +66,7 @@ cd frontend && npx vite build
 - The `pip install` bin directory (`~/.local/bin`) must be on `PATH` for `uvicorn`, `pytest`, `alembic`, etc. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile.
 - **`SECRET_KEY` is required and validated at startup.** The app refuses to start without a non-empty, non-placeholder key of at least 32 characters. Generate one with: `python -c "import secrets; print(secrets.token_hex(32))"`. Tests inject this automatically via `backend/conftest.py`.
 - **Session cookies default to `secure=True` and `samesite=strict`.** Set `SESSION_COOKIE_SECURE=false` only when running behind a plain HTTP reverse proxy in a non-Internet-exposed environment (e.g. local dev).
-- Redis is **optional**. Set `REDIS_URL=""` (or leave unset) and jobs run in-process via `ThreadPoolExecutor`. Only set `REDIS_URL` when using the full multi-container stack.
+- Redis is **optional**. Set `REDIS_URL=""` (or leave unset) and jobs run in-process via `ThreadPoolExecutor`. When `REDIS_URL` *is* set, the FastAPI process auto-starts an in-process RQ worker thread (one per `WORKER_CONCURRENCY` slot) so the same single container drains its queue. Run `python -m app.workers.rq_worker` only when you want extra worker processes for horizontal scaling.
 - The backend `config.py` reads `.env` from CWD, so run the backend from `backend/` directory.
 - External services (Immich server, OpenAI API) require secrets (`IMMICH_URL`, `IMMICH_API_KEY`, `OPENAI_API_KEY`) but are not needed for tests or basic UI development.
 - Frontend devDependencies now include `eslint`, `@typescript-eslint/*`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, and `jsdom`.

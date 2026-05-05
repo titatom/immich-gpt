@@ -85,8 +85,8 @@ These variables are primarily used by `.env.example` and `docker-compose.yml`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_URL` | empty | Optional Redis connection string for RQ mode |
-| `WORKER_CONCURRENCY` | `2` | Thread count for built-in background jobs; ignored when `REDIS_URL` is set |
+| `REDIS_URL` | empty | Optional Redis connection string for RQ mode. When set, the FastAPI process auto-starts an in-process RQ worker thread so the same single container drains the queue. |
+| `WORKER_CONCURRENCY` | `2` | Thread count. In default mode this sizes the in-process `ThreadPoolExecutor`. In RQ mode it sizes the in-process RQ worker pool (one `SimpleWorker` thread per slot). |
 
 ## Image-processing variables
 

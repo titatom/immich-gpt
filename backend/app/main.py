@@ -59,7 +59,26 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     init_db()
     _cleanup_expired_tokens()
+    _start_background_workers()
     yield
+
+
+def _start_background_workers() -> None:
+    """Start in-process RQ worker thread(s) when ``REDIS_URL`` is set.
+
+    When Redis is configured, jobs enqueued from the API would otherwise
+    sit in the queue forever in single-container deployments because no
+    separate worker process is started.  Booting the worker inside the
+    FastAPI process keeps the default Docker / Unraid layout
+    self-contained.
+    """
+    try:
+        from .workers.rq_inline_worker import start_inline_workers
+        n = start_inline_workers()
+        if n:
+            logger.info("Inline RQ worker started with %d thread(s)", n)
+    except Exception:
+        logger.exception("Failed to start inline RQ worker")
 
 
 def _cleanup_expired_tokens() -> None:
