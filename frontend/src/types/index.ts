@@ -1,31 +1,3 @@
-export interface Bucket {
-  id: string;
-  name: string;
-  description?: string;
-  enabled: boolean;
-  priority: number;
-  mapping_mode: string;
-  immich_album_id?: string;
-  classification_prompt?: string;
-  examples?: string[];
-  negative_examples?: string[];
-  confidence_threshold?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PromptTemplate {
-  id: string;
-  prompt_type: string;
-  name: string;
-  content: string;
-  enabled: boolean;
-  version: number;
-  bucket_id?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Asset {
   id: string;
   immich_id: string;
@@ -45,81 +17,6 @@ export interface Asset {
   is_external_library: boolean;
   synced_at?: string;
   created_at: string;
-  classification_bucket?: string | null;
-  classification_status?: string | null;
-}
-
-export interface AssetClassification {
-  id: string;
-  suggested_bucket_id?: string;
-  suggested_bucket_name?: string;
-  confidence?: number;
-  explanation?: string;
-  subalbum_suggestion?: string;
-  status?: string;
-  provider_name?: string;
-  override_bucket_id?: string;
-  override_bucket_name?: string;
-  created_at: string;
-}
-
-export interface AssetMetadataSuggestion {
-  id: string;
-  description_suggestion?: string;
-  tags?: string[];
-  location_suggestion?: LocationSuggestion | null;
-  approved_description?: string;
-  approved_tags?: string[];
-  approved_location?: LocationSuggestion | null;
-  writeback_status?: string;
-  provider_name?: string;
-}
-
-export interface LocationSuggestion {
-  place_name?: string | null;
-  city?: string | null;
-  region?: string | null;
-  country?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  radius_meters: number;
-  confidence: number;
-  evidence: string;
-  uncertainty_reason?: string | null;
-}
-
-export interface AssetDetail extends Asset {
-  classification?: AssetClassification;
-  metadata_suggestion?: AssetMetadataSuggestion;
-}
-
-export interface ReviewItem {
-  asset_id: string;
-  immich_id: string;
-  original_filename?: string;
-  file_created_at?: string;
-  asset_type?: string;
-  mime_type?: string;
-  city?: string;
-  country?: string;
-  camera_make?: string;
-  camera_model?: string;
-  current_description?: string;
-  current_tags?: string[];
-  classification_id?: string;
-  suggested_bucket_id?: string;
-  suggested_bucket_name?: string;
-  confidence?: number;
-  explanation?: string;
-  subalbum_suggestion?: string;
-  review_recommended: boolean;
-  classification_status: string;
-  metadata_id?: string;
-  description_suggestion?: string;
-  tags_suggestion?: string[];
-  location_suggestion?: LocationSuggestion | null;
-  provider_name?: string;
-  prompt_run_id?: string;
 }
 
 export interface JobRun {
@@ -164,7 +61,6 @@ export type SyncScope = "all" | "favorites" | "albums";
 export interface SyncJobRequest {
   scope: SyncScope;
   album_ids?: string[];
-  bucket_id?: string;
 }
 
 export interface ImmichAlbum {
@@ -184,13 +80,6 @@ export interface AuditLog {
   details_json?: Record<string, unknown>;
   error_message?: string;
   created_at: string;
-}
-
-export interface BucketStat {
-  bucket_name: string;
-  bucket_id?: string;
-  total: number;
-  by_status: Record<string, number>;
 }
 
 // --- Routing tree ---
