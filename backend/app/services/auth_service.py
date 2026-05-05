@@ -18,6 +18,7 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SESSION_IDLE_SECONDS = 24 * 3600       # 24 h without activity → expires
 SESSION_HARD_MAX_SECONDS = 7 * 24 * 3600  # 7 days absolute ceiling
+SESSION_REFRESH_INTERVAL_SECONDS = 15 * 60  # Avoid a DB write on every request
 RESET_TOKEN_TTL_SECONDS = 3600         # 1 h for password-reset tokens
 
 
@@ -80,10 +81,13 @@ def get_session(db: Session, session_id: str) -> Optional[UserSession]:
         db.delete(session)
         db.commit()
         return None
-    # Slide the expiry window
-    session.expires_at = now + timedelta(seconds=SESSION_IDLE_SECONDS)
-    session.last_seen_at = now
-    db.commit()
+    last_seen = session.last_seen_at or created
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    if now - last_seen >= timedelta(seconds=SESSION_REFRESH_INTERVAL_SECONDS):
+        session.expires_at = now + timedelta(seconds=SESSION_IDLE_SECONDS)
+        session.last_seen_at = now
+        db.commit()
     return session
 
 
