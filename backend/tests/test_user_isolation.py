@@ -10,7 +10,6 @@ from app.models.user import User
 from app.models.bucket import Bucket
 from app.models.asset import Asset
 from app.models.job_run import JobRun
-from app.models.prompt_template import PromptTemplate
 from app.models.provider_config import ProviderConfig
 from app.models.app_setting import AppSetting
 from app.services.auth_service import hash_password
@@ -51,7 +50,8 @@ def isolation_db(db):
     # User A data
     db.add(Bucket(
         id=str(uuid.uuid4()), user_id=USER_A_ID, name="BucketA",
-        enabled=True, priority=1, mapping_mode="virtual",
+        path="BucketA", is_leaf=True,
+        enabled=True, priority=1, destination_type="virtual",
     ))
     db.add(Asset(
         id="asset-a-1", user_id=USER_A_ID, immich_id="immich-a-1",
@@ -61,10 +61,6 @@ def isolation_db(db):
         id="job-a-1", user_id=USER_A_ID, job_type="asset_sync", status="queued",
         processed_count=0, total_count=0, success_count=0, error_count=0,
         progress_percent=0.0, log_lines_json=[],
-    ))
-    db.add(PromptTemplate(
-        id=str(uuid.uuid4()), user_id=USER_A_ID, prompt_type="global_classification",
-        name="PromptA", content="User A prompt", enabled=True, version=1,
     ))
     db.add(ProviderConfig(
         id=str(uuid.uuid4()), user_id=USER_A_ID, provider_name="openai",
@@ -77,7 +73,8 @@ def isolation_db(db):
     # User B data
     db.add(Bucket(
         id=str(uuid.uuid4()), user_id=USER_B_ID, name="BucketB",
-        enabled=True, priority=1, mapping_mode="virtual",
+        path="BucketB", is_leaf=True,
+        enabled=True, priority=1, destination_type="virtual",
     ))
     db.add(Asset(
         id="asset-b-1", user_id=USER_B_ID, immich_id="immich-b-1",
@@ -111,8 +108,8 @@ def _make_client_for_user(app, db, user_obj):
 # Buckets isolation
 # ---------------------------------------------------------------------------
 
-class TestBucketIsolation:
-    def test_user_sees_only_own_buckets(self, isolation_db):
+class TestRoutingNodeIsolation:
+    def test_user_sees_only_own_nodes(self, isolation_db):
         from app.main import app
         from fastapi.testclient import TestClient
         user_a = isolation_db.query(User).filter(User.id == USER_A_ID).first()
@@ -120,7 +117,7 @@ class TestBucketIsolation:
 
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                r = c.get("/api/buckets")
+                r = c.get("/api/routing/nodes")
 
         app.dependency_overrides.clear()
         assert r.status_code == 200
@@ -128,7 +125,7 @@ class TestBucketIsolation:
         assert "BucketA" in names
         assert "BucketB" not in names
 
-    def test_user_cannot_get_other_users_bucket(self, isolation_db):
+    def test_user_cannot_get_other_users_node(self, isolation_db):
         from app.main import app
         from fastapi.testclient import TestClient
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
@@ -137,12 +134,12 @@ class TestBucketIsolation:
 
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                r = c.get(f"/api/buckets/{bucket_a.id}")
+                r = c.get(f"/api/routing/nodes/{bucket_a.id}")
 
         app.dependency_overrides.clear()
         assert r.status_code == 404
 
-    def test_user_cannot_update_other_users_bucket(self, isolation_db):
+    def test_user_cannot_update_other_users_node(self, isolation_db):
         from app.main import app
         from fastapi.testclient import TestClient
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
@@ -151,12 +148,16 @@ class TestBucketIsolation:
 
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                r = c.patch(f"/api/buckets/{bucket_a.id}", json={"description": "hacked"})
+                r = c.patch(f"/api/routing/nodes/{bucket_a.id}", json={"description": "hacked"})
 
         app.dependency_overrides.clear()
-        assert r.status_code == 404
+        assert r.status_code == 400
+        # Node A must still exist with original description
+        node_a = isolation_db.query(Bucket).filter(Bucket.id == bucket_a.id).first()
+        assert node_a is not None
+        assert node_a.description != "hacked"
 
-    def test_user_cannot_delete_other_users_bucket(self, isolation_db):
+    def test_user_cannot_delete_other_users_node(self, isolation_db):
         from app.main import app
         from fastapi.testclient import TestClient
         user_b = isolation_db.query(User).filter(User.id == USER_B_ID).first()
@@ -165,10 +166,10 @@ class TestBucketIsolation:
 
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                r = c.delete(f"/api/buckets/{bucket_a.id}")
+                r = c.delete(f"/api/routing/nodes/{bucket_a.id}")
 
         app.dependency_overrides.clear()
-        assert r.status_code == 404
+        assert r.status_code == 400
         # Bucket A must still exist
         assert isolation_db.query(Bucket).filter(Bucket.id == bucket_a.id).first() is not None
 

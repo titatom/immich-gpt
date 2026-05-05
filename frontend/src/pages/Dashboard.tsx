@@ -1,16 +1,20 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
-  getImmichSettings, getAssetCount, getReviewCount, getJobs,
-  getBucketStats, getAlbums, startSyncJob, startClassifyJob, clearTerminalJobs, getBuckets,
+  getImmichSettings, getAssetCount, getJobs,
+  getAlbums, startSyncJob, startRoutingClassify, clearTerminalJobs,
+  listRoutingPlans, listRoutingNodes,
 } from "../services/api";
-import type { BucketStat, SyncScope, ImmichAlbum, Bucket } from "../types";
+import type {
+  SyncScope, ImmichAlbum, RoutingNode, RoutingPlan,
+} from "../types";
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
 import {
-  Database, Eye, Play, RefreshCw, AlertTriangle, CheckCircle,
+  Database, Play, RefreshCw, AlertTriangle, CheckCircle,
   Star, FolderOpen, ChevronDown, ChevronUp, Trash2, Layers,
+  Network, GitBranch,
 } from "lucide-react";
 import styles from "./Dashboard.module.css";
 
@@ -34,31 +38,26 @@ const SCOPE_OPTIONS: { value: SyncScope; label: string; desc: string; icon: Reac
   { value: "albums",    label: "Specific Albums",      desc: "Choose one or more albums",                icon: <FolderOpen size={14} /> },
 ];
 
-type WorkflowMode = "sync" | "sync_ai" | "ai";
+type WorkflowMode = "sync" | "sync_route" | "route";
 
-function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disabled }: {
-  onSync: (scope: SyncScope, albumIds: string[] | undefined, runAI: boolean, bucketId?: string) => void;
-  onClassify: () => void;
-  isSyncLoading: boolean;
-  isClassifyLoading: boolean;
+function WorkflowPanel({
+  onSync, onRoute, isLoading, disabled,
+}: {
+  onSync: (scope: SyncScope, albumIds: string[] | undefined, runRoutingAfter: boolean) => void;
+  onRoute: () => void;
+  isLoading: boolean;
   disabled: boolean;
 }) {
   const [scope, setScope] = useState<SyncScope>("all");
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
   const [albumSearch, setAlbumSearch] = useState("");
-  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>("sync_ai");
-  const [selectedBucketId, setSelectedBucketId] = useState("");
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>("sync_route");
 
   const { data: albums = [] } = useQuery<ImmichAlbum[]>({
     queryKey: ["albums"],
     queryFn: getAlbums,
     enabled: scope === "albums",
-  });
-
-  const { data: buckets = [] } = useQuery<Bucket[]>({
-    queryKey: ["buckets"],
-    queryFn: getBuckets,
   });
 
   const filtered = albums.filter((a) => a.albumName.toLowerCase().includes(albumSearch.toLowerCase()));
@@ -70,50 +69,47 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
   });
 
   const scopeValid = scope !== "albums" || selectedAlbumIds.size > 0;
-  const isLoading = isSyncLoading || isClassifyLoading;
-  const canRun = !disabled && !isLoading && (workflowMode === "ai" || scopeValid);
+  const canRun = !disabled && !isLoading && (workflowMode === "route" || scopeValid);
 
   const WORKFLOW_OPTIONS: { value: WorkflowMode; label: string; desc: string; icon: React.ReactNode }[] = [
     {
       value: "sync",
       label: "Sync Only",
-      desc: "Pull new assets from Immich into immich-gpt. No AI processing.",
+      desc: "Pull new assets from Immich into immich-gpt. No routing.",
       icon: <RefreshCw size={14} />,
     },
     {
-      value: "sync_ai",
-      label: "Sync + AI",
-      desc: "Pull new assets from Immich, then immediately run AI classification on all unclassified assets.",
+      value: "sync_route",
+      label: "Sync + Route",
+      desc: "Pull new assets, then immediately classify them through your routing tree.",
       icon: <Layers size={14} />,
     },
     {
-      value: "ai",
-      label: "AI Only",
-      desc: "Run AI classification on assets already synced. No new assets are pulled from Immich.",
+      value: "route",
+      label: "Route Only",
+      desc: "Run routing classification on assets already synced. No new assets are pulled from Immich.",
       icon: <Play size={14} />,
     },
   ];
 
   function handleRun() {
-    if (workflowMode === "ai") {
-      onClassify();
+    if (workflowMode === "route") {
+      onRoute();
     } else {
       onSync(
         scope,
         scope === "albums" ? Array.from(selectedAlbumIds) : undefined,
-        workflowMode === "sync_ai",
-        selectedBucketId || undefined,
+        workflowMode === "sync_route",
       );
     }
   }
 
-  const showScopeSelector = workflowMode !== "ai";
+  const showScopeSelector = workflowMode !== "route";
 
   return (
     <div className={styles.syncPanel}>
       <div className={styles.syncPanelLabel}>Run Workflow</div>
 
-      {/* Workflow mode selector */}
       <div className={styles.scopeRow} style={{ marginBottom: 10 }}>
         {WORKFLOW_OPTIONS.map((opt) => (
           <button
@@ -130,7 +126,6 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
         {WORKFLOW_OPTIONS.find((o) => o.value === workflowMode)?.desc}
       </div>
 
-      {/* Scope selector — only shown when sync is involved */}
       {showScopeSelector && (
         <>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
@@ -197,26 +192,6 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
               )}
             </div>
           )}
-
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-              Assign synced assets to bucket
-            </label>
-            <select
-              value={selectedBucketId}
-              onChange={(e) => setSelectedBucketId(e.target.value)}
-              className={styles.albumSearchInput}
-              style={{ width: "100%" }}
-            >
-              <option value="">Do not assign a bucket</option>
-              {buckets.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            <div className={styles.scopeDesc} style={{ marginTop: 6, marginBottom: 0 }}>
-              Every asset pulled by this sync is marked as approved in the selected bucket.
-            </div>
-          </div>
         </>
       )}
 
@@ -227,16 +202,16 @@ function SyncPanel({ onSync, onClassify, isSyncLoading, isClassifyLoading, disab
         style={{
           padding: "9px 20px",
           marginTop: 4,
-          background: canRun ? (workflowMode === "ai" ? "var(--color-purple)" : undefined) : undefined,
+          background: canRun ? (workflowMode === "route" ? "var(--color-purple)" : undefined) : undefined,
         }}
       >
         {workflowMode === "sync" && <RefreshCw size={14} />}
-        {workflowMode === "sync_ai" && <Layers size={14} />}
-        {workflowMode === "ai" && <Play size={14} />}
+        {workflowMode === "sync_route" && <Layers size={14} />}
+        {workflowMode === "route" && <Play size={14} />}
         {isLoading ? "Starting…" : (
           workflowMode === "sync" ? "Start Sync" :
-          workflowMode === "sync_ai" ? "Sync + Classify" :
-          "Run AI Classification"
+          workflowMode === "sync_route" ? "Sync + Route" :
+          "Run Routing"
         )}
       </button>
     </div>
@@ -261,46 +236,49 @@ export default function Dashboard() {
     queryFn: () => getAssetCount(),
   });
 
-  const { data: reviewCount } = useQuery<{ count: number }>({
-    queryKey: ["review-count"],
-    queryFn: () => getReviewCount(),
-    refetchInterval: 10_000,
-  });
-
   const { data: jobs = [] } = useQuery({
     queryKey: ["jobs", { limit: 10 }],
     queryFn: () => getJobs({ limit: 10 }),
     refetchInterval: 3_000,
   });
 
-  const { data: bucketStats = [] } = useQuery({
-    queryKey: ["bucket-stats"],
-    queryFn: getBucketStats,
-    refetchInterval: 30_000,
-  });
-
-  const { data: buckets = [] } = useQuery<Bucket[]>({
-    queryKey: ["buckets"],
-    queryFn: getBuckets,
+  const { data: nodes = [] } = useQuery<RoutingNode[]>({
+    queryKey: ["routing-nodes-flat"],
+    queryFn: listRoutingNodes,
     refetchInterval: 60_000,
   });
 
-  const runAIAfterSyncRef = useRef(false);
+  const { data: plans = [] } = useQuery<RoutingPlan[]>({
+    queryKey: ["routing-plans"],
+    queryFn: () => listRoutingPlans(),
+    refetchInterval: 15_000,
+  });
 
-  const classifyMutation = useMutation({
-    mutationFn: () => startClassifyJob(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  const enabledLeaves = nodes.filter((n) => n.is_leaf && n.enabled);
+  const pendingPlans = plans.filter((p) => p.status === "ready" || p.status === "draft");
+  const pendingItems = pendingPlans.reduce((s, p) => s + p.item_count, 0);
+
+  const routeMutation = useMutation({
+    mutationFn: () => startRoutingClassify({}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["routing-plans"] });
+    },
   });
 
   const syncMutation = useMutation({
-    mutationFn: (params: { scope: SyncScope; album_ids?: string[]; bucket_id?: string }) => startSyncJob(params),
+    mutationFn: (params: { scope: SyncScope; album_ids?: string[]; runRoutingAfter: boolean }) =>
+      startSyncJob({ scope: params.scope, album_ids: params.album_ids }).then(
+        (job) => {
+          if (params.runRoutingAfter) {
+            routeMutation.mutate();
+          }
+          return job;
+        }
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["asset-count"] });
-      if (runAIAfterSyncRef.current) {
-        runAIAfterSyncRef.current = false;
-        classifyMutation.mutate();
-      }
     },
   });
 
@@ -320,7 +298,7 @@ export default function Dashboard() {
       <div className="pageHeader" style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Dashboard</h1>
         <p style={{ fontSize: "var(--text-md)", color: "var(--text-muted)", margin: "4px 0 0" }}>
-          AI-first metadata enrichment for Immich
+          AI-first photo routing for Immich
         </p>
       </div>
 
@@ -341,33 +319,44 @@ export default function Dashboard() {
       )}
 
       <div className={styles.statsRow}>
-        <StatCard label="Synced Assets" value={assetCount?.count?.toLocaleString() ?? "—"} icon={<Database size={16} color="var(--accent)" />} />
-        <StatCard label="Classified" value={bucketStats.reduce((s, b) => s + b.total, 0).toLocaleString()} icon={<Layers size={16} color="#a78bfa" />} />
-        <StatCard label="Pending Review" value={reviewCount?.count ?? "—"} color={reviewCount?.count ? "var(--color-warning)" : "var(--text-primary)"} icon={<Eye size={16} color="var(--color-warning)" />} />
+        <StatCard
+          label="Synced Assets"
+          value={assetCount?.count?.toLocaleString() ?? "—"}
+          icon={<Database size={16} color="var(--accent)" />}
+        />
+        <StatCard
+          label="Routing Leaves"
+          value={enabledLeaves.length}
+          icon={<Network size={16} color="#a78bfa" />}
+        />
+        <StatCard
+          label="Pending Plan Items"
+          value={pendingItems}
+          color={pendingItems ? "var(--color-warning)" : "var(--text-primary)"}
+          icon={<GitBranch size={16} color="var(--color-warning)" />}
+        />
       </div>
 
-      <SyncPanel
-        onSync={(scope, albumIds, runAI, bucketId) => {
-          runAIAfterSyncRef.current = runAI;
-          syncMutation.mutate({ scope, album_ids: albumIds, bucket_id: bucketId });
-        }}
-        onClassify={() => classifyMutation.mutate()}
-        isSyncLoading={syncMutation.isPending}
-        isClassifyLoading={classifyMutation.isPending}
+      <WorkflowPanel
+        onSync={(scope, albumIds, runRoutingAfter) =>
+          syncMutation.mutate({ scope, album_ids: albumIds, runRoutingAfter })
+        }
+        onRoute={() => routeMutation.mutate()}
+        isLoading={syncMutation.isPending || routeMutation.isPending}
         disabled={!!activeJob}
       />
 
-      {reviewCount?.count ? (
+      {pendingItems > 0 && (
         <div className={styles.actionsRow}>
-          <Link to="/review" style={{
+          <Link to="/routing/plans" style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "10px 20px", borderRadius: "var(--radius-md)",
             background: "#d97706", color: "white", fontSize: "var(--text-md)", fontWeight: 600, textDecoration: "none",
           }}>
-            <Eye size={15} /> Review {reviewCount.count} Suggestion{reviewCount.count !== 1 ? "s" : ""}
+            <GitBranch size={15} /> Review {pendingItems} pending item{pendingItems !== 1 ? "s" : ""}
           </Link>
         </div>
-      ) : null}
+      )}
 
       {activeJob && (
         <div className={styles.section}>
@@ -434,53 +423,6 @@ export default function Dashboard() {
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {(bucketStats.length > 0 || buckets.length > 0) && (
-        <div>
-          <h2 className={styles.sectionTitle} style={{ marginBottom: 12 }}>Classification by Bucket</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {(() => {
-              // Merge bucket stats with all configured buckets so every bucket appears,
-              // including trash and buckets with 0 classifications.
-              const statsMap = new Map(bucketStats.map((s) => [s.bucket_name, s]));
-              const allEntries: BucketStat[] = [...bucketStats];
-              for (const b of buckets) {
-                if (!statsMap.has(b.name)) {
-                  allEntries.push({ bucket_name: b.name, bucket_id: b.id, total: 0, by_status: {} });
-                }
-              }
-              return [...allEntries].sort((a, b) => b.total - a.total).map((stat: BucketStat) => {
-                const approved = stat.by_status["approved"] ?? 0;
-                const pending  = stat.by_status["pending_review"] ?? 0;
-                const rejected = stat.by_status["rejected"] ?? 0;
-                const total    = stat.total;
-                const bucket   = buckets.find((b) => b.name === stat.bucket_name || b.id === stat.bucket_id);
-                const isTrash  = bucket?.mapping_mode === "immich_trash";
-                return (
-                  <div key={stat.bucket_name} className={styles.bucketStatRow}>
-                    <span className={styles.bucketStatName} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      {isTrash && <Trash2 size={12} color="var(--text-muted)" />}
-                      {stat.bucket_name}
-                    </span>
-                    <div className={styles.bucketStatTrack}>
-                      {total === 0 && <div style={{ width: "100%", background: "var(--bg-raised)", opacity: 0.4 }} />}
-                      {approved > 0 && <div style={{ width: `${(approved/total)*100}%`, background: "var(--color-success)", transition: "width 0.4s" }} />}
-                      {pending  > 0 && <div style={{ width: `${(pending/total)*100}%`,  background: "var(--color-warning)", transition: "width 0.4s" }} />}
-                      {rejected > 0 && <div style={{ width: `${(rejected/total)*100}%`, background: "var(--text-faint)",   transition: "width 0.4s" }} />}
-                    </div>
-                    <span className={styles.bucketStatTotal}>{total}</span>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-          <div className={styles.legend}>
-            <span><span className={styles.legendDot} style={{ background: "var(--color-success)" }} /> Approved</span>
-            <span><span className={styles.legendDot} style={{ background: "var(--color-warning)" }} /> Pending</span>
-            <span><span className={styles.legendDot} style={{ background: "var(--text-faint)" }} /> Rejected</span>
           </div>
         </div>
       )}

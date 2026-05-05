@@ -11,31 +11,28 @@ class Bucket(Base):
     Routing tree node.
 
     A Bucket represents either an organizational parent node or a final
-    routing destination (leaf). All routing behavior is driven by the
-    settings on this row — no category-specific logic is allowed.
+    routing destination (leaf). All routing behaviour is driven by the
+    settings on this row — there is no category-specific logic.
     """
     __tablename__ = "buckets"
 
     id = Column(String, primary_key=True)
     user_id = Column(String, nullable=False, index=True)
 
-    # Hierarchical tree
+    # Hierarchy
     parent_id = Column(String, nullable=True, index=True)
-    path = Column(String, nullable=True, index=True)
+    path = Column(String, nullable=False, index=True)
     is_leaf = Column(Boolean, default=True, nullable=False)
 
     name = Column(String, nullable=False, index=True)
     description = Column(Text, nullable=True)
-    enabled = Column(Boolean, default=True)
-    priority = Column(Integer, default=100)
-
-    # Legacy/back-compat: still consulted by the older writeback path.
-    mapping_mode = Column(String, default="virtual")
-    immich_album_id = Column(String, nullable=True)
+    enabled = Column(Boolean, default=True, nullable=False)
+    priority = Column(Integer, default=100, nullable=False)
 
     # Routing destination
     # destination_type: "virtual", "immich_album", "immich_trash", "review_only"
     destination_type = Column(String, default="virtual", nullable=False)
+    immich_album_id = Column(String, nullable=True)
     immich_album_name = Column(String, nullable=True)
     create_album_if_missing = Column(Boolean, default=True, nullable=False)
 
@@ -55,7 +52,7 @@ class Bucket(Base):
     allow_screenshot = Column(Boolean, default=True, nullable=False)
     allow_duplicate = Column(Boolean, default=True, nullable=False)
 
-    # Metadata behavior
+    # Metadata behaviour
     suggest_description = Column(Boolean, default=True, nullable=False)
     suggest_tags = Column(Boolean, default=True, nullable=False)
     suggest_location = Column(Boolean, default=False, nullable=False)
@@ -67,20 +64,14 @@ class Bucket(Base):
     # AI prompt
     custom_prompt_enabled = Column(Boolean, default=False, nullable=False)
     custom_prompt = Column(Text, nullable=True)
-    classification_prompt = Column(Text, nullable=True)  # legacy
 
-    # Criteria + JSON rule blobs (stored as JSON-serialised text)
+    # JSON rule blobs (stored as JSON; validated at the service layer)
     positive_criteria_json = Column(JSON, nullable=True)
     negative_criteria_json = Column(JSON, nullable=True)
     privacy_rules_json = Column(JSON, nullable=True)
     quality_rules_json = Column(JSON, nullable=True)
     automation_rules_json = Column(JSON, nullable=True)
     metadata_rules_json = Column(JSON, nullable=True)
-
-    # Legacy example arrays (still usable by old prompt assembly)
-    examples_json = Column(JSON, nullable=True)
-    negative_examples_json = Column(JSON, nullable=True)
-    confidence_threshold = Column(Float, nullable=True)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -2,13 +2,11 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getJobs, cancelJob, pauseJob, resumeJob, deleteJob,
-  startSyncJob, startClassifyJob,
+  startSyncJob, startRoutingClassify,
 } from "../services/api";
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
-import SyncOptionsModal from "../components/SyncOptionsModal";
 import { RefreshCw, Play, XCircle, ChevronDown, ChevronUp, Pause, RotateCcw, Trash2 } from "lucide-react";
-import type { SyncJobRequest } from "../types";
 import styles from "./Jobs.module.css";
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
@@ -18,7 +16,6 @@ export default function Jobs() {
   const qc = useQueryClient();
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("");
-  const [showSyncModal, setShowSyncModal] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: jobs = [], isLoading } = useQuery({
@@ -28,12 +25,12 @@ export default function Jobs() {
   });
 
   const syncMut = useMutation({
-    mutationFn: (params: SyncJobRequest) => startSyncJob(params),
-    onSuccess: (d) => { setShowSyncModal(false); qc.invalidateQueries({ queryKey: ["jobs"] }); setExpandedJobId(d.job_id); },
+    mutationFn: () => startSyncJob({ scope: "all" }),
+    onSuccess: (d) => { qc.invalidateQueries({ queryKey: ["jobs"] }); setExpandedJobId(d.job_id); },
   });
 
-  const classifyMut = useMutation({
-    mutationFn: () => startClassifyJob(),
+  const routeMut = useMutation({
+    mutationFn: () => startRoutingClassify({}),
     onSuccess: (d) => { qc.invalidateQueries({ queryKey: ["jobs"] }); setExpandedJobId(d.job_id); },
   });
 
@@ -50,14 +47,14 @@ export default function Jobs() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Jobs</h1>
-          <p className={styles.subtitle}>Background sync and classification jobs</p>
+          <p className={styles.subtitle}>Background sync and routing classification jobs</p>
         </div>
         <div className={styles.actions}>
-          <button onClick={() => setShowSyncModal(true)} disabled={syncMut.isPending} className={[styles.btn, styles.btnBlue].join(" ")}>
-            <RefreshCw size={14} /> Sync Assets
+          <button onClick={() => syncMut.mutate()} disabled={syncMut.isPending} className={[styles.btn, styles.btnBlue].join(" ")}>
+            <RefreshCw size={14} /> Sync All
           </button>
-          <button onClick={() => classifyMut.mutate()} disabled={classifyMut.isPending} className={[styles.btn, styles.btnPurple].join(" ")}>
-            <Play size={14} /> Classify
+          <button onClick={() => routeMut.mutate()} disabled={routeMut.isPending} className={[styles.btn, styles.btnPurple].join(" ")}>
+            <Play size={14} /> Run Routing
           </button>
         </div>
       </div>
@@ -66,7 +63,7 @@ export default function Jobs() {
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={styles.filterSelect}>
           <option value="">All types</option>
           <option value="asset_sync">Asset Sync</option>
-          <option value="classification">Classification</option>
+          <option value="routing_classification">Routing Classification</option>
         </select>
       </div>
 
@@ -129,13 +126,6 @@ export default function Jobs() {
         </div>
       )}
 
-      {showSyncModal && (
-        <SyncOptionsModal
-          onClose={() => setShowSyncModal(false)}
-          onConfirm={(scope, albumIds, bucketId) => syncMut.mutate({ scope, album_ids: albumIds, bucket_id: bucketId })}
-          isLoading={syncMut.isPending}
-        />
-      )}
     </div>
   );
 }

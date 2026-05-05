@@ -133,56 +133,28 @@ def test_start_sync_job_creates_db_record(client, db):
     assert job.job_type == "asset_sync"
 
 
-def test_start_sync_job_accepts_bucket(client, db):
-    from app.models.bucket import Bucket
-
-    bucket = db.query(Bucket).filter(Bucket.name == "Personal").first()
-    with patch("app.routers.jobs._enqueue") as mock_enqueue:
-        r = client.post("/api/jobs/sync", json={"scope": "all", "bucket_id": bucket.id})
-    assert r.status_code == 200
-    job = db.query(JobRun).filter(JobRun.id == r.json()["job_id"]).first()
-    assert job.params_json["bucket_id"] == bucket.id
-    args = mock_enqueue.call_args.args
-    assert args[-1] == bucket.id
-
-
-def test_start_sync_job_rejects_unknown_bucket(client):
-    with patch("app.routers.jobs._enqueue") as mock_enqueue:
-        r = client.post("/api/jobs/sync", json={"scope": "all", "bucket_id": "missing"})
-    assert r.status_code == 404
-    mock_enqueue.assert_not_called()
-
-
 # ---------------------------------------------------------------------------
-# POST /api/jobs/classify
+# POST /api/routing/classify
 # ---------------------------------------------------------------------------
 
-def test_start_classify_job(client):
-    with patch("app.routers.jobs._enqueue") as mock_enqueue:
-        r = client.post("/api/jobs/classify")
+def test_start_routing_classify_job(client):
+    with patch("app.workers.executor.enqueue") as mock_enqueue:
+        r = client.post("/api/routing/classify", json={})
     assert r.status_code == 200
     data = r.json()
     assert "job_id" in data
+    assert "plan_id" in data
     assert data["status"] == "queued"
     mock_enqueue.assert_called_once()
 
 
-def test_start_classify_job_with_asset_ids(client):
-    with patch("app.routers.jobs._enqueue"):
-        r = client.post(
-            "/api/jobs/classify",
-            params={"asset_ids": ["id1", "id2"], "limit": 10},
-        )
-    assert r.status_code == 200
-
-
-def test_start_classify_job_creates_db_record(client, db):
-    with patch("app.routers.jobs._enqueue"):
-        r = client.post("/api/jobs/classify")
+def test_start_routing_classify_creates_db_record(client, db):
+    with patch("app.workers.executor.enqueue"):
+        r = client.post("/api/routing/classify", json={"limit": 10})
     job_id = r.json()["job_id"]
     job = db.query(JobRun).filter(JobRun.id == job_id).first()
     assert job is not None
-    assert job.job_type == "classification"
+    assert job.job_type == "routing_classification"
 
 
 # ---------------------------------------------------------------------------

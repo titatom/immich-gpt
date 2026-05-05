@@ -11,7 +11,7 @@ type BrandLogoProps = {
   style?: React.CSSProperties;
 };
 
-const DEFAULT_SUBTITLE = "Review-first AI library organization";
+const DEFAULT_SUBTITLE = "AI photo routing for Immich";
 
 function resolveSize(size: BrandLogoProps["size"]): string {
   if (typeof size === "number") {

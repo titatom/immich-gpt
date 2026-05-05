@@ -29,31 +29,22 @@ vi.mock("../services/api", async (importOriginal) => {
     upsertProvider: noop,
     deleteProvider: noop,
     testProvider: noop,
-    getBuckets: vi.fn().mockResolvedValue([]),
-    createBucket: noop,
-    updateBucket: noop,
-    deleteBucket: noop,
-    getPrompts: vi.fn().mockResolvedValue([]),
-    createPrompt: noop,
-    updatePrompt: noop,
-    deletePrompt: noop,
+    getRoutingPreferences: vi.fn().mockResolvedValue({ learn_from_corrections: false }),
+    saveRoutingPreferences: noop,
     getAssets: vi.fn().mockResolvedValue([]),
     getAssetCount: vi.fn().mockResolvedValue({ count: 0 }),
+    getAllAssetIds: vi.fn().mockResolvedValue({ ids: [] }),
     getJobs: vi.fn().mockResolvedValue([]),
     getJob: noop,
     startSyncJob: noop,
-    startClassifyJob: noop,
     cancelJob: noop,
-    getReviewQueue: vi.fn().mockResolvedValue([]),
-    getReviewCount: vi.fn().mockResolvedValue({ count: 0 }),
-    getReviewItem: noop,
-    approveAsset: noop,
-    rejectAsset: noop,
-    bulkReview: noop,
+    pauseJob: noop,
+    resumeJob: noop,
+    deleteJob: noop,
+    clearTerminalJobs: noop,
     getAlbums: vi.fn().mockResolvedValue([]),
     getAuditLogs: vi.fn().mockResolvedValue([]),
     getAuditLogCount: vi.fn().mockResolvedValue({ count: 0 }),
-    getBucketStats: vi.fn().mockResolvedValue([]),
     getProviderModels: vi.fn().mockResolvedValue([]),
     saveImmichSettings: noop,
     getThumbnailUrl: (id: string, size = "thumbnail") =>
@@ -92,7 +83,7 @@ function makeClient() {
 }
 
 vi.mock("../components/BrandLogo", () => ({
-  default: ({ subtitle = "Review-first AI library organization" }: { subtitle?: string }) => (
+  default: ({ subtitle = "AI photo routing for Immich" }: { subtitle?: string }) => (
     <div>
       <img src="/logo.png" alt="immich-gpt logo" />
       <div>Immich GPT</div>
@@ -125,10 +116,10 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    // Use getAllByText since nav + page heading may both match
     await waitFor(() => expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1));
-    expect(screen.getAllByText("Review").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Assets").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Routing").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Routing plans").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Logs").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1);
@@ -136,15 +127,6 @@ describe("App routing", () => {
       "href",
       expect.stringContaining("paypal.com"),
     );
-  });
-
-  it("renders AI metadata enrichment label", async () => {
-    render(
-      <Wrapper>
-        <App />
-      </Wrapper>
-    );
-    await waitFor(() => expect(screen.getByText("Review-first AI library organization")).toBeInTheDocument());
   });
 
   it("renders the shared logo image", async () => {
@@ -162,7 +144,6 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    // Multiple instances of "Dashboard" is expected (nav + page heading)
     await waitFor(() => expect(screen.getAllByText("Dashboard").length).toBeGreaterThanOrEqual(1));
   });
 
@@ -172,7 +153,6 @@ describe("App routing", () => {
         <App />
       </Wrapper>
     );
-    // At least the nav link must be present
     await waitFor(() => expect(screen.getAllByText("Jobs").length).toBeGreaterThanOrEqual(1));
   });
 
@@ -183,15 +163,6 @@ describe("App routing", () => {
       </Wrapper>
     );
     await waitFor(() => expect(screen.getAllByText("Settings").length).toBeGreaterThanOrEqual(1));
-  });
-
-  it("renders buckets page on /buckets route", async () => {
-    render(
-      <Wrapper path="/buckets">
-        <App />
-      </Wrapper>
-    );
-    await waitFor(() => expect(screen.getAllByText("Buckets").length).toBeGreaterThanOrEqual(1));
   });
 
   it("renders routing tree page on /routing route", async () => {

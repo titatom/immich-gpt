@@ -129,7 +129,6 @@ class RoutingTreeService:
             description=data.description,
             enabled=data.enabled,
             priority=data.priority,
-            mapping_mode=self._destination_to_mapping_mode(data.destination_type),
             destination_type=data.destination_type,
             immich_album_name=data.immich_album_name,
             create_album_if_missing=data.create_album_if_missing,
@@ -175,7 +174,6 @@ class RoutingTreeService:
         if data.destination_type is not None:
             self._validate_destination_type(data.destination_type)
             node.destination_type = data.destination_type
-            node.mapping_mode = self._destination_to_mapping_mode(data.destination_type)
 
         if data.minimum_quality is not None:
             self._validate_quality_level(data.minimum_quality)
@@ -313,7 +311,6 @@ class RoutingTreeService:
             description=node.description,
             enabled=node.enabled,
             priority=node.priority,
-            mapping_mode=node.mapping_mode,
             destination_type=node.destination_type,
             immich_album_name=node.immich_album_name,
             create_album_if_missing=node.create_album_if_missing,
@@ -493,12 +490,3 @@ class RoutingTreeService:
                 continue
             if not (0.0 <= float(val) <= 1.0):
                 raise RoutingTreeError(f"{label} must be between 0.0 and 1.0")
-
-    @staticmethod
-    def _destination_to_mapping_mode(destination_type: str) -> str:
-        return {
-            "virtual": "virtual",
-            "immich_album": "immich_album",
-            "immich_trash": "immich_trash",
-            "review_only": "review_only",
-        }.get(destination_type, "virtual")

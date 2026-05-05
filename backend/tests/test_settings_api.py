@@ -237,30 +237,14 @@ def test_test_provider_failure(client, db):
     assert "bad key" in r.json()["detail"]
 
 
-def test_behaviour_settings_include_suggestion_toggles(client):
-    r = client.get("/api/settings/behaviour")
+def test_routing_preferences_default_off(client):
+    r = client.get("/api/settings/routing")
     assert r.status_code == 200
-    data = r.json()
-    assert data["suggest_descriptions"] is True
-    assert data["suggest_tags"] is True
-    assert data["suggest_subalbums"] is True
-    assert data["suggest_locations"] is True
-    assert data["writeback_locations"] is False
+    assert r.json() == {"learn_from_corrections": False}
 
 
-def test_save_behaviour_settings_persists_suggestion_toggles(client):
-    payload = {
-        "allow_new_tags": False,
-        "allow_new_albums": True,
-        "suggest_descriptions": False,
-        "suggest_tags": True,
-        "suggest_subalbums": False,
-        "suggest_locations": False,
-        "writeback_locations": True,
-    }
-    r = client.post("/api/settings/behaviour", json=payload)
+def test_save_routing_preferences(client):
+    r = client.post("/api/settings/routing", json={"learn_from_corrections": True})
     assert r.status_code == 200
-    assert r.json() == payload
-
-    reread = client.get("/api/settings/behaviour")
-    assert reread.json() == payload
+    assert r.json() == {"learn_from_corrections": True}
+    assert client.get("/api/settings/routing").json() == {"learn_from_corrections": True}

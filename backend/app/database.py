@@ -48,9 +48,8 @@ def init_db():
     # attempt either the Alembic run or the create_all fallback.
     from .models import (  # noqa: F401
         User, UserSession, PasswordResetToken,
-        asset, bucket, prompt_template, prompt_run,
-        suggested_classification, suggested_metadata,
-        review_decision, job_run, audit_log, provider_config, app_setting,
+        asset, bucket, prompt_run,
+        job_run, audit_log, provider_config, app_setting,
         routing_example, routing_plan,
     )
 

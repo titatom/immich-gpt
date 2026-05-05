@@ -8,8 +8,8 @@ import {
   deleteProvider,
   testProvider,
   getProviderModels,
-  getBehaviourSettings,
-  saveBehaviourSettings,
+  getRoutingPreferences,
+  saveRoutingPreferences,
   getHealth,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
@@ -431,188 +431,64 @@ function ProvidersSection() {
   );
 }
 
-function BehaviourSection() {
+function RoutingPreferencesSection() {
   const qc = useQueryClient();
-  const { data: behaviour } = useQuery({
-    queryKey: ["behaviour-settings"],
-    queryFn: getBehaviourSettings,
+  const { data: prefs } = useQuery({
+    queryKey: ["routing-preferences"],
+    queryFn: getRoutingPreferences,
   });
 
-  const [allowNewTags, setAllowNewTags] = React.useState<boolean | undefined>(undefined);
-  const [allowNewAlbums, setAllowNewAlbums] = React.useState<boolean | undefined>(undefined);
-  const [suggestDescriptions, setSuggestDescriptions] = React.useState<boolean | undefined>(undefined);
-  const [suggestTags, setSuggestTags] = React.useState<boolean | undefined>(undefined);
-  const [suggestSubalbums, setSuggestSubalbums] = React.useState<boolean | undefined>(undefined);
-  const [suggestLocations, setSuggestLocations] = React.useState<boolean | undefined>(undefined);
-  const [writebackLocations, setWritebackLocations] = React.useState<boolean | undefined>(undefined);
+  const [learn, setLearn] = React.useState<boolean | undefined>(undefined);
   const [saved, setSaved] = React.useState(false);
 
   React.useEffect(() => {
-    if (behaviour) {
-      setAllowNewTags(behaviour.allow_new_tags);
-      setAllowNewAlbums(behaviour.allow_new_albums);
-      setSuggestDescriptions(behaviour.suggest_descriptions);
-      setSuggestTags(behaviour.suggest_tags);
-      setSuggestSubalbums(behaviour.suggest_subalbums);
-      setSuggestLocations(behaviour.suggest_locations);
-      setWritebackLocations(behaviour.writeback_locations);
-    }
-  }, [behaviour]);
+    if (prefs) setLearn(prefs.learn_from_corrections);
+  }, [prefs]);
 
   const saveMut = useMutation({
-    mutationFn: () => saveBehaviourSettings({
-      allow_new_tags: allowNewTags ?? true,
-      allow_new_albums: allowNewAlbums ?? true,
-      suggest_descriptions: suggestDescriptions ?? true,
-      suggest_tags: suggestTags ?? true,
-      suggest_subalbums: suggestSubalbums ?? true,
-      suggest_locations: suggestLocations ?? true,
-      writeback_locations: writebackLocations ?? false,
+    mutationFn: () => saveRoutingPreferences({
+      learn_from_corrections: learn ?? false,
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["behaviour-settings"] });
+      qc.invalidateQueries({ queryKey: ["routing-preferences"] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
   });
 
-  const effectiveTags = allowNewTags ?? behaviour?.allow_new_tags ?? true;
-  const effectiveAlbums = allowNewAlbums ?? behaviour?.allow_new_albums ?? true;
-  const effectiveSuggestDescriptions = suggestDescriptions ?? behaviour?.suggest_descriptions ?? true;
-  const effectiveSuggestTags = suggestTags ?? behaviour?.suggest_tags ?? true;
-  const effectiveSuggestSubalbums = suggestSubalbums ?? behaviour?.suggest_subalbums ?? true;
-  const effectiveSuggestLocations = suggestLocations ?? behaviour?.suggest_locations ?? true;
-  const effectiveWritebackLocations = writebackLocations ?? behaviour?.writeback_locations ?? false;
+  const effectiveLearn = learn ?? prefs?.learn_from_corrections ?? false;
 
   return (
-    <Section title="AI Behaviour">
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Suggestion Types</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {[
-              ["Descriptions", effectiveSuggestDescriptions, setSuggestDescriptions],
-              ["Tags", effectiveSuggestTags, setSuggestTags],
-              ["Subalbums", effectiveSuggestSubalbums, setSuggestSubalbums],
-              ["Locations", effectiveSuggestLocations, setSuggestLocations],
-            ].map(([label, checked, setter]) => (
-              <label key={label as string} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={checked as boolean}
-                  onChange={(e) => (setter as React.Dispatch<React.SetStateAction<boolean | undefined>>)(e.target.checked)}
-                />
-                <span style={{ fontSize: 13, color: "#94a3b8" }}>Suggest {String(label).toLowerCase()}</span>
-              </label>
-            ))}
-          </div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
-            Location suggestions are only requested for assets with no existing city, country, or GPS data.
-          </div>
+    <Section title="Routing Preferences">
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>
+          Per-leaf routing settings (auto-apply, privacy rules, quality
+          rules, metadata behaviour) live on each routing destination —
+          edit them on the <a href="/routing" style={{ color: "#38bdf8" }}>Routing tree</a> page.
         </div>
 
-        <div style={{ borderTop: "1px solid #334155" }} />
-
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Location Write-back</div>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={effectiveWritebackLocations}
-              onChange={(e) => setWritebackLocations(e.target.checked)}
-              style={{ marginTop: 2 }}
-            />
-            <div>
-              <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Write approved coordinates to Immich</div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                Approved broad location suggestions without coordinates stay stored in immich-gpt and are not written to Immich.
-              </div>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={effectiveLearn}
+            onChange={(e) => setLearn(e.target.checked)}
+            style={{ marginTop: 2 }}
+          />
+          <div>
+            <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>
+              Learn from corrections automatically
             </div>
-          </label>
-        </div>
-
-        <div style={{ borderTop: "1px solid #334155" }} />
-
-        {/* Tags behaviour */}
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Tag Creation</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="tag_mode"
-                checked={effectiveTags}
-                onChange={() => setAllowNewTags(true)}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Allow AI to create new tags</div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                  The AI can suggest any tag names, including ones that don't yet exist in Immich.
-                </div>
-              </div>
-            </label>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="tag_mode"
-                checked={!effectiveTags}
-                onChange={() => setAllowNewTags(false)}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Only use existing tags</div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                  The AI will only select from tags already present on the asset. No new tag names will be created.
-                </div>
-              </div>
-            </label>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+              When you move an item from leaf A to leaf B in a routing plan,
+              add a positive example to B and a negative example to A.
+            </div>
           </div>
-        </div>
-
-        <div style={{ borderTop: "1px solid #334155" }} />
-
-        {/* Album behaviour */}
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9", marginBottom: 8 }}>Album / Sub-album Creation</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="album_mode"
-                checked={effectiveAlbums}
-                onChange={() => setAllowNewAlbums(true)}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Allow AI to suggest new albums</div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                  The AI can suggest sub-album names freely, including creating new albums when writing back to Immich.
-                </div>
-              </div>
-            </label>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="album_mode"
-                checked={!effectiveAlbums}
-                onChange={() => setAllowNewAlbums(false)}
-                style={{ marginTop: 2 }}
-              />
-              <div>
-                <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 500 }}>Only use existing albums</div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                  The AI will only suggest sub-albums that already exist in Immich. New album names will not be used.
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
+        </label>
 
         <div>
           <button
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || allowNewTags === undefined}
+            disabled={saveMut.isPending || learn === undefined}
             style={{
               padding: "8px 20px", borderRadius: 8, border: "none",
               background: saved ? "#16a34a" : "#1e40af",
@@ -620,7 +496,7 @@ function BehaviourSection() {
               transition: "background 0.2s",
             }}
           >
-            {saveMut.isPending ? "Saving…" : saved ? "Saved!" : "Save Behaviour Settings"}
+            {saveMut.isPending ? "Saving…" : saved ? "Saved!" : "Save Preferences"}
           </button>
         </div>
       </div>
@@ -772,7 +648,7 @@ export default function Settings() {
       </div>
 
       <ImmichSection />
-      <BehaviourSection />
+      <RoutingPreferencesSection />
       <ProvidersSection />
       <AboutSection />
     </div>
