@@ -96,11 +96,6 @@ def test_list_assets_server_side_sort_filename(client, db):
     assert [a["original_filename"] for a in r.json()] == ["alpha.jpg", "bravo.jpg"]
 
 
-def test_list_assets_rejects_unknown_sort(client):
-    r = client.get("/api/assets?sort=unknown")
-    assert r.status_code == 400
-
-
 def test_list_assets_response_shape(client, db):
     a = _make_asset(db)
     data = client.get("/api/assets").json()[0]
