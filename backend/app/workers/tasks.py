@@ -2,6 +2,7 @@
 RQ background tasks.
 Decorated with rq.job so RQ can auto-retry on transient failures.
 """
+from contextlib import nullcontext
 from typing import Optional, List
 
 from ..database import SessionLocal
@@ -11,6 +12,13 @@ from ..services.immich_client import ImmichClient
 from ..services.routing_classification import RoutingClassificationOrchestrator
 from ..services.ai_provider import build_provider
 from ..models.provider_config import ProviderConfig
+
+
+def _immich_client_context(client):
+    """Use ImmichClient pooling when available while keeping simple test fakes valid."""
+    if hasattr(client, "__enter__") and hasattr(client, "__exit__"):
+        return client
+    return nullcontext(client)
 
 
 def _get_user_immich_client(db, user_id: Optional[str]) -> ImmichClient:
@@ -71,7 +79,7 @@ def run_asset_sync(
             j = db.query(_JobRun).filter(_JobRun.id == job_id).first()
             return j is not None and j.status in ("paused", "cancelled")
 
-        with _get_user_immich_client(db, user_id) as immich:
+        with _immich_client_context(_get_user_immich_client(db, user_id)) as immich:
             sync_svc = AssetSyncService(db, immich, user_id=user_id)
 
             if scope == "favorites":
@@ -157,7 +165,7 @@ def run_routing_classification(
                 cfg_dict.update(provider_cfg.extra_config_json)
             provider = build_provider(provider_cfg.provider_name, cfg_dict)
 
-        with _get_user_immich_client(db, user_id) as immich:
+        with _immich_client_context(_get_user_immich_client(db, user_id)) as immich:
             orch = RoutingClassificationOrchestrator(
                 db, provider, user_id=user_id, immich_client=immich,
             )
