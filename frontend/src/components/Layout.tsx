@@ -1,25 +1,19 @@
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getReviewCount } from "../services/api";
 import { useAuth } from "../contexts/useAuth";
 import { useJobCompletion } from "../hooks/useJobCompletion";
 import BrandLogo from "./BrandLogo";
 import {
-  LayoutDashboard, Eye, FolderKanban, MessageSquare,
-  Settings, Activity, Images, ClipboardList, Users, LogOut, Heart,
-  Network, GitBranch,
+  LayoutDashboard, Settings, Activity, Images, ClipboardList,
+  Users, LogOut, Heart, Network, GitBranch,
 } from "lucide-react";
 import styles from "./Layout.module.css";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { path: "/review", label: "Review", icon: Eye, badge: true },
   { path: "/assets", label: "Assets", icon: Images },
-  { path: "/buckets", label: "Buckets", icon: FolderKanban },
   { path: "/routing", label: "Routing", icon: Network },
   { path: "/routing/plans", label: "Routing plans", icon: GitBranch },
-  { path: "/prompts", label: "Prompts", icon: MessageSquare },
   { path: "/jobs", label: "Jobs", icon: Activity },
   { path: "/logs", label: "Logs", icon: ClipboardList },
   { path: "/settings", label: "Settings", icon: Settings },
@@ -31,11 +25,6 @@ const DONATE_URL =
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   useJobCompletion();
-  const { data: countData } = useQuery<{ count: number }>({
-    queryKey: ["review-count"],
-    queryFn: () => getReviewCount("pending_review"),
-    refetchInterval: 15_000,
-  });
 
   return (
     <div className={styles.root}>
@@ -45,7 +34,7 @@ export default function Layout() {
         </div>
 
         <div className={styles.nav}>
-          {navItems.map(({ path, label, icon: Icon, badge, exact }) => (
+          {navItems.map(({ path, label, icon: Icon, exact }) => (
             <NavLink
               key={path}
               to={path}
@@ -56,9 +45,6 @@ export default function Layout() {
             >
               <Icon size={16} />
               <span className={styles.navLabel}>{label}</span>
-              {badge && countData && countData.count > 0 && (
-                <span className={styles.navBadge}>{countData.count}</span>
-              )}
             </NavLink>
           ))}
 

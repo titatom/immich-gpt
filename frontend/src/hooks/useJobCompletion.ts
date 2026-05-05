@@ -43,13 +43,11 @@ export function useJobCompletion() {
             if (job.job_type === "asset_sync") {
               qc.invalidateQueries({ queryKey: ["assets"] });
               qc.invalidateQueries({ queryKey: ["asset-count"] });
-            } else if (job.job_type === "classification") {
+            } else if (job.job_type === "routing_classification") {
               qc.invalidateQueries({ queryKey: ["assets"] });
               qc.invalidateQueries({ queryKey: ["asset-count"] });
-              qc.invalidateQueries({ queryKey: ["bucket-stats"] });
-              qc.invalidateQueries({ queryKey: ["review-queue"] });
-              qc.invalidateQueries({ queryKey: ["review-count"] });
-              qc.invalidateQueries({ queryKey: ["asset-detail"] });
+              qc.invalidateQueries({ queryKey: ["routing-plans"] });
+              qc.invalidateQueries({ queryKey: ["routing-plan-summary"] });
             }
           }
 

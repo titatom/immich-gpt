@@ -1,17 +1,12 @@
 import axios from "axios";
 import type {
-  Bucket,
-  PromptTemplate,
   Asset,
-  AssetDetail,
-  ReviewItem,
   JobRun,
   ProviderConfig,
   ImmichSettings,
   SyncJobRequest,
   ImmichAlbum,
   AuditLog,
-  BucketStat,
   RoutingNode,
   RoutingExample,
   RoutingPlan,
@@ -106,20 +101,14 @@ export const getImmichSettings = (): Promise<ImmichSettings> =>
 export const saveImmichSettings = (url: string, apiKey: string): Promise<ImmichSettings> =>
   api.post("/settings/immich", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
 
-export interface BehaviourSettings {
-  allow_new_tags: boolean;
-  allow_new_albums: boolean;
-  suggest_descriptions: boolean;
-  suggest_tags: boolean;
-  suggest_subalbums: boolean;
-  suggest_locations: boolean;
-  writeback_locations: boolean;
+export interface RoutingPreferences {
+  learn_from_corrections: boolean;
 }
-export const getBehaviourSettings = (): Promise<BehaviourSettings> =>
-  api.get("/settings/behaviour").then((r) => r.data);
+export const getRoutingPreferences = (): Promise<RoutingPreferences> =>
+  api.get("/settings/routing").then((r) => r.data);
 
-export const saveBehaviourSettings = (data: BehaviourSettings): Promise<BehaviourSettings> =>
-  api.post("/settings/behaviour", data).then((r) => r.data);
+export const saveRoutingPreferences = (data: RoutingPreferences): Promise<RoutingPreferences> =>
+  api.post("/settings/routing", data).then((r) => r.data);
 
 export const testImmichConnection = (url: string, apiKey: string) =>
   api.post("/settings/immich/test", { immich_url: url, immich_api_key: apiKey }).then((r) => r.data);
@@ -145,66 +134,23 @@ export const testProvider = (name: string) =>
 export const getProviderModels = (name: string): Promise<Array<{ id: string; name: string }>> =>
   api.get(`/settings/providers/${name}/models`).then((r) => r.data);
 
-// --- Buckets ---
-export const getBuckets = (): Promise<Bucket[]> =>
-  api.get("/buckets").then((r) => r.data);
-
-export const createBucket = (data: Partial<Bucket>): Promise<Bucket> =>
-  api.post("/buckets", data).then((r) => r.data);
-
-export const updateBucket = (id: string, data: Partial<Bucket>): Promise<Bucket> =>
-  api.patch(`/buckets/${id}`, data).then((r) => r.data);
-
-export const deleteBucket = (id: string) =>
-  api.delete(`/buckets/${id}`).then((r) => r.data);
-
-// --- Prompts ---
-export const getPrompts = (params?: { prompt_type?: string; bucket_id?: string }): Promise<PromptTemplate[]> =>
-  api.get("/prompts", { params }).then((r) => r.data);
-
-export const createPrompt = (data: Partial<PromptTemplate>): Promise<PromptTemplate> =>
-  api.post("/prompts", data).then((r) => r.data);
-
-export const updatePrompt = (id: string, data: Partial<PromptTemplate>): Promise<PromptTemplate> =>
-  api.patch(`/prompts/${id}`, data).then((r) => r.data);
-
-export const deletePrompt = (id: string) =>
-  api.delete(`/prompts/${id}`).then((r) => r.data);
-
-// Sentinel value for filtering assets that have not been AI-scanned yet
-export const UNSCANNED_BUCKET_FILTER = "__unscanned__";
-
 // --- Assets ---
 export const getAssets = (params?: {
   page?: number;
   page_size?: number;
   asset_type?: string;
-  bucket_name?: string;
   q?: string;
 }) => api.get("/assets", { params }).then((r) => r.data as Asset[]);
 
 export const getAssetCount = (params?: {
   asset_type?: string;
-  bucket_name?: string;
   q?: string;
 }) => api.get("/assets/count", { params }).then((r) => r.data as { count: number });
 
 export const getAllAssetIds = (params?: {
   asset_type?: string;
-  bucket_name?: string;
   q?: string;
 }) => api.get("/assets/ids", { params }).then((r) => r.data as { ids: string[] });
-
-export const getAssetDetail = (id: string): Promise<AssetDetail> =>
-  api.get(`/assets/${id}/detail`).then((r) => r.data);
-
-export const reclassifyAssets = (asset_ids: string[], force = true) =>
-  api.post("/assets/reclassify", { asset_ids, force }).then((r) => r.data as { job_id: string; status: string; asset_count: number });
-
-export const assignAssetsToBucket = (asset_ids: string[], bucket_id: string) =>
-  api.post("/assets/assign-bucket", { asset_ids, bucket_id }).then(
-    (r) => r.data as { assigned: number; bucket_id: string; bucket_name: string },
-  );
 
 // --- Jobs ---
 export const getJobs = (params?: { job_type?: string; status?: string; limit?: number }): Promise<JobRun[]> =>
@@ -215,9 +161,6 @@ export const getJob = (id: string): Promise<JobRun> =>
 
 export const startSyncJob = (params?: SyncJobRequest) =>
   api.post("/jobs/sync", params ?? {}).then((r) => r.data as { job_id: string; status: string });
-
-export const startClassifyJob = (params?: { asset_ids?: string[]; limit?: number; force?: boolean }) =>
-  api.post("/jobs/classify", null, { params }).then((r) => r.data as { job_id: string; status: string });
 
 export const cancelJob = (id: string) =>
   api.post(`/jobs/${id}/cancel`).then((r) => r.data);
@@ -233,50 +176,6 @@ export const deleteJob = (id: string) =>
 
 export const clearTerminalJobs = () =>
   api.delete("/jobs").then((r) => r.data as { deleted: number });
-
-// --- Review ---
-export const getReviewQueue = (params?: {
-  status?: string;
-  bucket_id?: string;
-  page?: number;
-  page_size?: number;
-}): Promise<ReviewItem[]> =>
-  api.get("/review/queue", { params }).then((r) => r.data);
-
-export const getReviewQueueIds = (params?: {
-  status?: string;
-  bucket_id?: string;
-}) => api.get("/review/queue/ids", { params }).then((r) => r.data as { ids: string[] });
-
-export const getReviewCount = (status = "pending_review") =>
-  api.get("/review/queue/count", { params: { status } }).then((r) => r.data as { count: number });
-
-export const getReviewItem = (assetId: string): Promise<ReviewItem> =>
-  api.get(`/review/item/${assetId}`).then((r) => r.data);
-
-export const approveAsset = (
-  assetId: string,
-  data: {
-    approved_bucket_id?: string;
-    approved_bucket_name?: string;
-    approved_description?: string;
-    approved_tags?: string[];
-    approved_subalbum?: string;
-    subalbum_approved?: boolean;
-    approved_location?: ReviewItem["location_suggestion"];
-    location_approved?: boolean;
-    trigger_writeback?: boolean;
-  }
-) => api.post(`/review/item/${assetId}/approve`, data).then((r) => r.data);
-
-export const rejectAsset = (assetId: string) =>
-  api.post(`/review/item/${assetId}/reject`).then((r) => r.data);
-
-export const bulkReview = (data: {
-  asset_ids: string[];
-  action: "approve_all" | "reject_all";
-  trigger_writeback?: boolean;
-}) => api.post("/review/bulk", data).then((r) => r.data);
 
 // --- Albums ---
 export const getAlbums = () =>
@@ -303,10 +202,6 @@ export const getAuditLogCount = (params?: {
   level?: string;
 }) =>
   api.get("/audit-logs/count", { params }).then((r) => r.data as { count: number });
-
-// --- Bucket stats ---
-export const getBucketStats = (): Promise<BucketStat[]> =>
-  api.get("/buckets/stats").then((r) => r.data);
 
 // --- Routing tree ---
 export const getRoutingTree = (): Promise<{ nodes: RoutingNode[] }> =>
