@@ -177,6 +177,7 @@ def test_get_session_refreshes_after_throttle_window(auth_db):
     )
     session.last_seen_at = old_seen
     session.expires_at = old_seen + timedelta(seconds=auth_service.SESSION_IDLE_SECONDS)
+    old_expires = session.expires_at
     auth_db.commit()
 
     original_commit = auth_db.commit
@@ -190,7 +191,7 @@ def test_get_session_refreshes_after_throttle_window(auth_db):
     assert loaded is not None
     assert commit.call_count == 1
     assert loaded.last_seen_at > old_seen
-    assert loaded.expires_at > session.expires_at
+    assert loaded.expires_at > old_expires
 
 
 # ---------------------------------------------------------------------------
