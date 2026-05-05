@@ -75,14 +75,17 @@ def _parse_json_content(raw: str) -> Dict[str, Any]:
 
 
 class OpenAIProvider(AIProvider):
+    DEFAULT_TIMEOUT_SECONDS = 120.0
+
     def __init__(
         self,
         api_key: str,
         model: str = "gpt-4o",
         base_url: Optional[str] = None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ):
         from openai import OpenAI
-        kwargs: Dict[str, Any] = {"api_key": api_key}
+        kwargs: Dict[str, Any] = {"api_key": api_key, "timeout": timeout}
         if base_url:
             kwargs["base_url"] = base_url
         self._client = OpenAI(**kwargs)
@@ -267,6 +270,7 @@ def build_provider(provider_name: str, config: dict) -> AIProvider:
             api_key=config["api_key"],
             model=config.get("model_name", "gpt-4o"),
             base_url=config.get("base_url"),
+            timeout=float(config.get("timeout", OpenAIProvider.DEFAULT_TIMEOUT_SECONDS)),
         )
     elif provider_name == "ollama":
         return OllamaProvider(

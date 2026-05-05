@@ -3,7 +3,8 @@ ImmichClient: all Immich API communication.
 All Immich HTTP calls are isolated here.
 """
 import httpx
-from typing import Optional, List, Dict, Any
+from contextlib import contextmanager
+from typing import Optional, List, Dict, Any, Iterator
 from ..config import settings
 
 
@@ -21,6 +22,21 @@ class ImmichClient:
             "x-api-key": self.api_key,
             "Accept": "application/json",
         }
+        self._shared_client: Optional[httpx.Client] = None
+        self._album_assets_cache: Dict[str, List[Dict[str, Any]]] = {}
+
+    def __enter__(self) -> "ImmichClient":
+        if self._shared_client is None:
+            self._shared_client = self._client()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._shared_client is not None:
+            self._shared_client.close()
+            self._shared_client = None
 
     def _client(self) -> httpx.Client:
         return httpx.Client(
@@ -29,10 +45,18 @@ class ImmichClient:
             timeout=30,
         )
 
+    @contextmanager
+    def _client_context(self) -> Iterator[httpx.Client]:
+        if self._shared_client is not None:
+            yield self._shared_client
+            return
+        with self._client() as client:
+            yield client
+
     def check_connectivity(self) -> Dict[str, Any]:
         """Check if Immich is reachable and credentials are valid."""
         try:
-            with self._client() as client:
+            with self._client_context() as client:
                 r = client.get("/api/server/ping")
                 if r.status_code == 200:
                     info = client.get("/api/server/about")
@@ -44,7 +68,7 @@ class ImmichClient:
             raise ImmichError("Connection to Immich timed out")
 
     def get_asset_count(self) -> int:
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/assets/statistics")
             r.raise_for_status()
             data = r.json()
@@ -77,7 +101,7 @@ class ImmichClient:
         if is_archived is not None:
             body["isArchived"] = is_archived
 
-        with self._client() as client:
+        with self._client_context() as client:
             # Try POST /api/search/metadata (v1.106–v1.117)
             r = client.post("/api/search/metadata", json=body)
             if r.status_code == 404:
@@ -116,19 +140,23 @@ class ImmichClient:
         page_size: int = 100,
     ) -> List[Dict[str, Any]]:
         """List assets in a specific album with pagination."""
-        with self._client() as client:
-            r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": False})
-            if r.status_code != 200:
-                raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
-            data = r.json()
-            assets = data.get("assets", [])
-            # Return paginated slice
-            start = (page - 1) * page_size
-            return assets[start : start + page_size]
+        assets = self._album_assets_cache.get(album_id)
+        if assets is None:
+            with self._client_context() as client:
+                r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": False})
+                if r.status_code != 200:
+                    raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
+                data = r.json()
+                assets = data.get("assets", [])
+                self._album_assets_cache[album_id] = assets
+        # Immich's album endpoint returns the album assets in one payload; cache it
+        # for this client instance so sync pagination does not redownload it.
+        start = (page - 1) * page_size
+        return assets[start : start + page_size]
 
     def get_album_asset_count(self, album_id: str) -> int:
         """Get asset count for a specific album."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get(f"/api/albums/{album_id}", params={"withoutAssets": True})
             if r.status_code != 200:
                 raise ImmichError(f"Failed to get album {album_id}: {r.text}", r.status_code)
@@ -136,7 +164,7 @@ class ImmichClient:
 
     def get_asset(self, asset_id: str) -> Dict[str, Any]:
         """Get full asset metadata."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get(f"/api/assets/{asset_id}")
             if r.status_code != 200:
                 raise ImmichError(f"Asset {asset_id} not found", r.status_code)
@@ -148,7 +176,7 @@ class ImmichClient:
         size: "thumbnail" or "preview"
         Never returns a private URL to external callers.
         """
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get(
                 f"/api/assets/{asset_id}/thumbnail",
                 params={"size": size},
@@ -161,13 +189,13 @@ class ImmichClient:
             return r.content
 
     def list_albums(self) -> List[Dict[str, Any]]:
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/albums")
             r.raise_for_status()
             return r.json()
 
     def add_asset_to_album(self, album_id: str, asset_ids: List[str]) -> Dict[str, Any]:
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.put(
                 f"/api/albums/{album_id}/assets",
                 json={"ids": asset_ids},
@@ -181,7 +209,7 @@ class ImmichClient:
 
     def update_asset_description(self, asset_id: str, description: str) -> Dict[str, Any]:
         """Write description (exif info) back to Immich."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.put(
                 f"/api/assets/{asset_id}",
                 json={"description": description},
@@ -195,7 +223,7 @@ class ImmichClient:
 
     def update_asset_location(self, asset_id: str, latitude: float, longitude: float) -> Dict[str, Any]:
         """Write GPS coordinates back to Immich."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.put(
                 f"/api/assets/{asset_id}",
                 json={"latitude": latitude, "longitude": longitude},
@@ -212,7 +240,7 @@ class ImmichClient:
         Return only tags that already exist in Immich — never creates new ones.
         Silently skips tag names not found.
         """
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/tags")
             existing: Dict[str, Dict[str, Any]] = {}
             if r.status_code == 200:
@@ -223,7 +251,7 @@ class ImmichClient:
 
     def get_existing_album(self, album_name: str) -> Optional[Dict[str, Any]]:
         """Return an existing album by name, or None if it doesn't exist. Never creates."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/albums")
             if r.status_code == 200:
                 for album in r.json():
@@ -238,7 +266,7 @@ class ImmichClient:
         Fetches the full tag list once per call to minimise round-trips.
         Returns a list of tag dicts (with at least {"id": ..., "name": ...}).
         """
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/tags")
             existing: Dict[str, Dict[str, Any]] = {}
             if r.status_code == 200:
@@ -268,7 +296,7 @@ class ImmichClient:
 
     def tag_asset(self, asset_id: str, tag_ids: List[str]) -> None:
         """Apply tags to an asset."""
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.put(
                 "/api/tags/assets",
                 json={"assetIds": [asset_id], "tagIds": tag_ids},
@@ -283,7 +311,7 @@ class ImmichClient:
         Return an existing Immich album by name, or create it.
         Used for subalbum write-back when no explicit immich_album_id is set.
         """
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.get("/api/albums")
             if r.status_code == 200:
                 for album in r.json():
@@ -302,7 +330,7 @@ class ImmichClient:
         This moves assets to the Immich recycle bin (soft delete); Immich
         then handles permanent deletion according to its own retention policy.
         """
-        with self._client() as client:
+        with self._client_context() as client:
             r = client.request(
                 "DELETE",
                 "/api/assets",
