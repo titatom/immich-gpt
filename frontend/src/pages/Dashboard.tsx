@@ -11,6 +11,7 @@ import type {
 } from "../types";
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
+import { usePageVisible } from "../hooks/usePageVisible";
 import {
   Database, Play, RefreshCw, AlertTriangle, CheckCircle,
   Star, FolderOpen, ChevronDown, ChevronUp, Trash2, Layers,
@@ -219,16 +220,16 @@ function WorkflowPanel({
 }
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
-
 export default function Dashboard() {
   const qc = useQueryClient();
   const [confirmClear, setConfirmClear] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const pageVisible = usePageVisible();
 
   const { data: immich } = useQuery({
     queryKey: ["immich-settings"],
     queryFn: getImmichSettings,
-    refetchInterval: 30_000,
+    refetchInterval: pageVisible ? 120_000 : false,
   });
 
   const { data: assetCount } = useQuery<{ count: number }>({
@@ -239,19 +240,23 @@ export default function Dashboard() {
   const { data: jobs = [] } = useQuery({
     queryKey: ["jobs", { limit: 10 }],
     queryFn: () => getJobs({ limit: 10 }),
-    refetchInterval: 3_000,
+    refetchInterval: (query) => {
+      const currentJobs = (query.state.data ?? []) as typeof jobs;
+      const hasActiveJob = currentJobs.some((job) => !TERMINAL_STATUSES.has(job.status) && job.status !== "paused");
+      return pageVisible && hasActiveJob ? 3_000 : false;
+    },
   });
 
   const { data: nodes = [] } = useQuery<RoutingNode[]>({
     queryKey: ["routing-nodes-flat"],
     queryFn: listRoutingNodes,
-    refetchInterval: 60_000,
+    refetchInterval: false,
   });
 
   const { data: plans = [] } = useQuery<RoutingPlan[]>({
     queryKey: ["routing-plans"],
     queryFn: () => listRoutingPlans(),
-    refetchInterval: 15_000,
+    refetchInterval: pageVisible ? 60_000 : false,
   });
 
   const enabledLeaves = nodes.filter((n) => n.is_leaf && n.enabled);

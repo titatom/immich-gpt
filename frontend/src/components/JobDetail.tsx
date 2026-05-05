@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getJob } from "../services/api";
+import { usePageVisible } from "../hooks/usePageVisible";
 import LogPanel from "./LogPanel";
 import styles from "./JobDetail.module.css";
 
@@ -11,11 +12,13 @@ interface Props {
 }
 
 export default function JobDetail({ jobId }: Props) {
+  const isPageVisible = usePageVisible();
   const { data: job } = useQuery({
     queryKey: ["job", jobId],
     queryFn: () => getJob(jobId),
     refetchInterval: (q) => {
       const d = q.state.data;
+      if (!isPageVisible) return false;
       if (!d) return 2000;
       return TERMINAL.has(d.status) || d.status === "paused" ? false : 2000;
     },

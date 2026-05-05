@@ -108,6 +108,7 @@ function AssetDetailPanel({ asset, onClose }: { asset: Asset; onClose: () => voi
               <img
                 src={getThumbnailUrl(asset.id, "preview")}
                 alt={asset.original_filename || ""}
+                decoding="async"
                 onError={() => setImgError(true)}
                 style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
               />
@@ -202,6 +203,8 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
           <img
             src={getThumbnailUrl(asset.id)}
             alt={asset.original_filename || ""}
+            loading="lazy"
+            decoding="async"
             onError={() => setImgError(true)}
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />

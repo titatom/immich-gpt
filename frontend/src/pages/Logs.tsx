@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { getAuditLogs, getAuditLogCount, getJobs } from "../services/api";
 import LogPanel from "../components/LogPanel";
+import { usePageVisible } from "../hooks/usePageVisible";
 import type { AuditLog, JobRun } from "../types";
 import { CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, Search, Copy, Check } from "lucide-react";
 
 const PAGE_SIZE = 50;
+const ACTIVE_JOB_STATUSES = new Set(["queued", "starting", "syncing_assets", "preparing_image", "classifying_ai", "validating_result", "saving_suggestion", "writing_results"]);
 const sectionStyle: React.CSSProperties = {
   background: "#0f172a",
   border: "1px solid #1e293b",
@@ -289,6 +291,7 @@ function JobLogRow({
 
 export default function Logs() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const pageVisible = usePageVisible();
 
   const page = parseInt(searchParams.get("page") || "1", 10);
   const statusFilter = searchParams.get("status") || "";
@@ -332,7 +335,11 @@ export default function Logs() {
   const { data: recentJobs = [], isLoading: jobsLoading } = useQuery({
     queryKey: ["logs-page-jobs"],
     queryFn: () => getJobs({ limit: 8 }),
-    refetchInterval: 3_000,
+    refetchInterval: (query) => {
+      const jobs = (query.state.data as JobRun[] | undefined) ?? [];
+      const hasActiveJobs = jobs.some((job) => isActiveJobStatus(job.status));
+      return pageVisible && hasActiveJobs ? 3_000 : false;
+    },
   });
 
   const totalPages = countData ? Math.ceil(countData.count / PAGE_SIZE) : 1;
