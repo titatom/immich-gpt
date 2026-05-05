@@ -13,6 +13,7 @@ from ..schemas.provider import (
 from ..models.provider_config import ProviderConfig
 from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
+from ..services.secret_store import decrypt_secret, encrypt_secret, has_secret
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -26,6 +27,10 @@ def _get_setting(db: Session, user_id: str, key: str) -> Optional[str]:
         AppSetting.user_id == user_id, AppSetting.key == key
     ).first()
     return row.value if row else None
+
+
+def _get_secret_setting(db: Session, user_id: str, key: str) -> Optional[str]:
+    return decrypt_secret(_get_setting(db, user_id, key))
 
 
 def _set_setting(db: Session, user_id: str, key: str, value: str) -> None:
@@ -42,7 +47,7 @@ def _set_setting(db: Session, user_id: str, key: str, value: str) -> None:
 def _get_immich_credentials(db: Session, user_id: str):
     from ..config import settings
     url = _get_setting(db, user_id, _KEY_IMMICH_URL) or settings.IMMICH_URL
-    api_key = _get_setting(db, user_id, _KEY_IMMICH_API_KEY) or settings.IMMICH_API_KEY
+    api_key = _get_secret_setting(db, user_id, _KEY_IMMICH_API_KEY) or settings.IMMICH_API_KEY
     return url, api_key
 
 
@@ -71,7 +76,12 @@ def save_immich_settings(
 ):
     _set_setting(db, current_user.id, _KEY_IMMICH_URL, body.immich_url)
     if body.immich_api_key:
-        _set_setting(db, current_user.id, _KEY_IMMICH_API_KEY, body.immich_api_key)
+        _set_setting(
+            db,
+            current_user.id,
+            _KEY_IMMICH_API_KEY,
+            encrypt_secret(body.immich_api_key),
+        )
     # Re-read credentials so the connectivity test always uses the stored (possibly
     # previously saved) API key even when none was submitted in this request.
     _, effective_api_key = _get_immich_credentials(db, current_user.id)
@@ -129,7 +139,7 @@ def upsert_provider(
         existing.enabled = body.enabled
         existing.is_default = body.is_default
         if body.api_key:
-            existing.api_key_encrypted = body.api_key
+            existing.api_key_encrypted = encrypt_secret(body.api_key)
         if body.base_url is not None:
             existing.base_url = body.base_url
         if body.model_name is not None:
@@ -146,7 +156,7 @@ def upsert_provider(
             provider_name=body.provider_name,
             enabled=body.enabled,
             is_default=body.is_default,
-            api_key_encrypted=body.api_key,
+            api_key_encrypted=encrypt_secret(body.api_key),
             base_url=body.base_url,
             model_name=body.model_name,
             extra_config_json=body.extra_config,
@@ -189,7 +199,7 @@ def test_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
     try:
         p = build_provider(provider_name, {
-            "api_key": row.api_key_encrypted or "",
+            "api_key": decrypt_secret(row.api_key_encrypted) or "",
             "model_name": row.model_name,
             "base_url": row.base_url,
         })
@@ -218,7 +228,7 @@ def list_provider_models(
             import httpx
             r = httpx.get(
                 "https://openrouter.ai/api/v1/models",
-                headers={"Authorization": f"Bearer {row.api_key_encrypted or ''}"},
+                headers={"Authorization": f"Bearer {decrypt_secret(row.api_key_encrypted) or ''}"},
                 timeout=10,
             )
             r.raise_for_status()
@@ -274,7 +284,7 @@ def _provider_to_out(row: ProviderConfig) -> ProviderConfigOut:
         is_default=row.is_default,
         base_url=row.base_url,
         model_name=row.model_name,
-        has_api_key=bool(row.api_key_encrypted),
+        has_api_key=has_secret(row.api_key_encrypted),
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

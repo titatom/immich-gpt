@@ -11,6 +11,7 @@ from ..services.asset_sync import AssetSyncService
 from ..services.immich_client import ImmichClient
 from ..services.routing_classification import RoutingClassificationOrchestrator
 from ..services.ai_provider import build_provider
+from ..services.secret_store import decrypt_secret
 from ..models.provider_config import ProviderConfig
 
 
@@ -33,7 +34,8 @@ def _get_user_immich_client(db, user_id: Optional[str]) -> ImmichClient:
             AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
         ).first()
         url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
-        api_key = (key_row.value if key_row and key_row.value else None) or settings.IMMICH_API_KEY
+        stored_key = key_row.value if key_row and key_row.value else None
+        api_key = decrypt_secret(stored_key) if stored_key else settings.IMMICH_API_KEY
     else:
         url = settings.IMMICH_URL
         api_key = settings.IMMICH_API_KEY
@@ -159,7 +161,7 @@ def run_routing_classification(
                 )
         else:
             cfg_dict = {
-                "api_key": provider_cfg.api_key_encrypted or "",
+                "api_key": decrypt_secret(provider_cfg.api_key_encrypted) or "",
                 "model_name": provider_cfg.model_name,
                 "base_url": provider_cfg.base_url,
             }
