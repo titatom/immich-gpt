@@ -79,10 +79,20 @@ Check:
 If `REDIS_URL` is set:
 
 - confirm Redis is reachable from the app container
-- confirm the optional worker container is running if you use one
-- confirm the same `DATABASE_URL` and `REDIS_URL` are shared by the app and worker
+- the FastAPI process auto-starts an in-process RQ worker thread on
+  startup. Look for `Inline RQ worker started` in the app logs to
+  confirm. If that line is missing, jobs will queue but never run.
+- if you also run dedicated `python -m app.workers.rq_worker`
+  containers, confirm they share the same `REDIS_URL` and
+  `DATABASE_URL` as the app container
 
-If Redis enqueue fails, the app attempts to fall back to in-process execution.
+If Redis enqueue fails, the app falls back to in-process execution via
+the `ThreadPoolExecutor`.
+
+> Historical note: prior releases enqueued jobs to Redis but never spawned a
+> consumer in the single-container layout, leaving every job stuck in the
+> `queued` state.  Setting `REDIS_URL=""` (the default) was the only working
+> configuration.  The auto-spawned in-process worker fixes this.
 
 ## Real-time progress does not update behind a reverse proxy
 

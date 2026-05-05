@@ -56,7 +56,9 @@ If you already run Redis on your home lab and want to dispatch jobs through it i
 REDIS_URL=redis://192.168.1.x:6379/0
 ```
 
-When `REDIS_URL` is set, `WORKER_CONCURRENCY` is ignored because job execution moves to RQ.  You can optionally run a dedicated RQ worker in a second container of the same image:
+When `REDIS_URL` is set, the FastAPI process automatically starts an in-process RQ worker (one thread per `WORKER_CONCURRENCY` slot) so the same single container that enqueues jobs also drains the queue.  No separate worker container is required.
+
+For horizontal scaling you can additionally run one or more dedicated RQ worker containers off the same image:
 
 ```bash
 docker run -d \

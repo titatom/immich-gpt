@@ -101,10 +101,15 @@ This keeps the operational model simple for home labs and small servers.
 If `REDIS_URL` is set:
 
 - new jobs are dispatched through RQ
-- `WORKER_CONCURRENCY` is no longer used for execution
-- you can run one or more separate worker containers
+- the FastAPI process automatically starts an in-process RQ worker
+  thread on lifespan startup (one thread per `WORKER_CONCURRENCY`
+  slot) so the same single container that enqueues jobs also drains
+  the queue
+- you can additionally run one or more separate worker containers
+  (`python -m app.workers.rq_worker`) for horizontal scaling
 
-This is useful only if you already operate Redis and want a more distributed worker model.
+This is useful only if you already operate Redis and want a more
+distributed worker model.
 
 ## Request and data flow
 
