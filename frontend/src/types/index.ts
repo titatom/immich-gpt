@@ -61,6 +61,7 @@ export type SyncScope = "all" | "favorites" | "albums";
 export interface SyncJobRequest {
   scope: SyncScope;
   album_ids?: string[];
+  run_routing_after?: boolean;
 }
 
 export interface ImmichAlbum {

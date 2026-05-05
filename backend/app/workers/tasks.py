@@ -37,6 +37,7 @@ def run_asset_sync(
     scope: str = "all",
     album_ids: Optional[List[str]] = None,
     user_id: Optional[str] = None,
+    run_routing_after: bool = False,
 ) -> dict:
     db = SessionLocal()
     try:
@@ -99,6 +100,9 @@ def run_asset_sync(
                     f"Updated: {result['updated']}, Errors: {result['errors']}"
                 ),
             )
+            if run_routing_after:
+                from ..workers.executor import enqueue_routing_classification
+                enqueue_routing_classification(db, user_id=user_id, force=False)
         return result
 
     except Exception as e:

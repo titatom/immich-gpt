@@ -289,11 +289,8 @@ def list_plans(
 ):
     svc = RoutingPlanService(db, current_user.id)
     plans = svc.list_plans(status=status)
-    out = []
-    for p in plans:
-        items = svc.list_items(p.id)
-        out.append(_plan_to_out(p, len(items)))
-    return out
+    counts = svc.item_counts_by_plan([p.id for p in plans])
+    return [_plan_to_out(p, counts.get(p.id, 0)) for p in plans]
 
 
 @router.get("/plans/{plan_id}", response_model=RoutingPlanOut)

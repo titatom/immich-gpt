@@ -80,6 +80,13 @@ def enqueue_routing_classification(
         scope={"asset_ids": asset_ids, "limit": limit, "force": force},
         status="draft",
     )
+    job.params_json = {
+        "asset_ids": asset_ids,
+        "limit": limit,
+        "force": force,
+        "plan_id": plan.id,
+    }
+    db.commit()
     enqueue(
         run_routing_classification,
         job.id, plan.id, asset_ids, limit, force, user_id,

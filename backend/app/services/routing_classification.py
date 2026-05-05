@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..models.asset import Asset
 from ..models.bucket import Bucket
 from ..models.prompt_run import PromptRun
-from ..models.routing_plan import RoutingPlan
+from ..models.routing_plan import RoutingPlan, RoutingPlanItem
 from ..services.immich_client import ImmichClient
 from ..services.image_preparation import ImagePreparationService
 from ..services.ai_provider import AIProvider
@@ -100,7 +100,7 @@ class RoutingClassificationOrchestrator:
                 status="draft",
             )
 
-        assets = self._load_assets(asset_ids, limit, force=force)
+        assets = self._load_assets(asset_ids, limit, force=force, plan_id=plan.id)
         total = len(assets)
         self.job_service.update_progress(job_id, total=total,
                                          log_line=f"Found {total} assets to process")
@@ -197,7 +197,6 @@ class RoutingClassificationOrchestrator:
             ai_metadata=ai_result.metadata.model_dump(),
             raw_ai_response=ai_result.model_dump(),
         )
-        self.db.commit()
 
     # ------------------------------------------------------------------
     # Prompt assembly
@@ -291,10 +290,29 @@ class RoutingClassificationOrchestrator:
         asset_ids: Optional[List[str]],
         limit: Optional[int],
         force: bool = False,
+        plan_id: Optional[str] = None,
     ) -> List[Asset]:
         q = self.db.query(Asset).filter(Asset.user_id == self.user_id)
         if asset_ids:
             q = q.filter(Asset.id.in_(asset_ids))
+        if plan_id:
+            q = q.filter(
+                ~Asset.id.in_(
+                    self.db.query(RoutingPlanItem.asset_id).filter(
+                        RoutingPlanItem.user_id == self.user_id,
+                        RoutingPlanItem.plan_id == plan_id,
+                    )
+                )
+            )
+        if not force:
+            q = q.filter(
+                ~Asset.id.in_(
+                    self.db.query(RoutingPlanItem.asset_id).filter(
+                        RoutingPlanItem.user_id == self.user_id,
+                    )
+                )
+            )
+        q = q.order_by(Asset.created_at.asc(), Asset.id.asc())
         if limit:
             q = q.limit(limit)
         return q.all()

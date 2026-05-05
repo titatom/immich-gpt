@@ -40,3 +40,4 @@ class SyncJobRequest(BaseModel):
 
     scope: Literal["all", "favorites", "albums"] = "all"
     album_ids: Optional[List[str]] = None
+    run_routing_after: bool = False

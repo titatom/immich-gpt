@@ -133,6 +133,89 @@ def test_start_sync_job_creates_db_record(client, db):
     assert job.job_type == "asset_sync"
 
 
+def test_start_sync_job_persists_route_after_sync(client, db):
+    with patch("app.routers.jobs._enqueue") as mock_enqueue:
+        r = client.post("/api/jobs/sync", json={"scope": "all", "run_routing_after": True})
+    assert r.status_code == 200
+    job = db.query(JobRun).filter(JobRun.id == r.json()["job_id"]).first()
+    assert job.params_json["run_routing_after"] is True
+    assert mock_enqueue.call_args.args[-1] is True
+
+
+def test_run_asset_sync_enqueues_routing_after_success(db, monkeypatch):
+    from app.services.job_progress import JobProgressService
+    from app.workers.tasks import run_asset_sync
+    from tests.conftest import TEST_USER_ID
+
+    job = JobProgressService(db).create_job(
+        "asset_sync",
+        params={"scope": "all", "run_routing_after": True},
+        user_id=TEST_USER_ID,
+    )
+    enqueued = []
+
+    class FakeAssetSyncService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_all(self, **kwargs):
+            return {"synced": 1, "created": 1, "updated": 0, "errors": 0}
+
+    monkeypatch.setattr("app.workers.tasks.SessionLocal", lambda: db)
+    monkeypatch.setattr("app.workers.tasks._get_user_immich_client", lambda *args: object())
+    monkeypatch.setattr("app.workers.tasks.AssetSyncService", FakeAssetSyncService)
+    monkeypatch.setattr(
+        "app.workers.executor.enqueue_routing_classification",
+        lambda *args, **kwargs: enqueued.append((args, kwargs)),
+    )
+
+    job_id = job.id
+    run_asset_sync(job_id, user_id=TEST_USER_ID, run_routing_after=True)
+
+    refreshed = db.query(JobRun).filter(JobRun.id == job_id).first()
+    assert refreshed.status == "completed"
+    assert enqueued
+    assert enqueued[0][1]["user_id"] == TEST_USER_ID
+    assert enqueued[0][1]["force"] is False
+
+
+def test_run_asset_sync_does_not_enqueue_routing_when_paused(db, monkeypatch):
+    from app.services.job_progress import JobProgressService
+    from app.workers.tasks import run_asset_sync
+    from tests.conftest import TEST_USER_ID
+
+    job = JobProgressService(db).create_job(
+        "asset_sync",
+        params={"scope": "all", "run_routing_after": True},
+        user_id=TEST_USER_ID,
+    )
+    enqueued = []
+
+    class FakeAssetSyncService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def sync_all(self, **kwargs):
+            job.status = "paused"
+            db.commit()
+            return {"synced": 0, "created": 0, "updated": 0, "errors": 0}
+
+    monkeypatch.setattr("app.workers.tasks.SessionLocal", lambda: db)
+    monkeypatch.setattr("app.workers.tasks._get_user_immich_client", lambda *args: object())
+    monkeypatch.setattr("app.workers.tasks.AssetSyncService", FakeAssetSyncService)
+    monkeypatch.setattr(
+        "app.workers.executor.enqueue_routing_classification",
+        lambda *args, **kwargs: enqueued.append((args, kwargs)),
+    )
+
+    job_id = job.id
+    run_asset_sync(job_id, user_id=TEST_USER_ID, run_routing_after=True)
+
+    refreshed = db.query(JobRun).filter(JobRun.id == job_id).first()
+    assert refreshed.status == "paused"
+    assert enqueued == []
+
+
 # ---------------------------------------------------------------------------
 # POST /api/routing/classify
 # ---------------------------------------------------------------------------
@@ -155,6 +238,43 @@ def test_start_routing_classify_creates_db_record(client, db):
     job = db.query(JobRun).filter(JobRun.id == job_id).first()
     assert job is not None
     assert job.job_type == "routing_classification"
+
+
+def test_start_routing_classify_persists_plan_id(client, db):
+    with patch("app.workers.executor.enqueue"):
+        r = client.post("/api/routing/classify", json={"limit": 10})
+    job = db.query(JobRun).filter(JobRun.id == r.json()["job_id"]).first()
+    assert job.params_json["plan_id"] == r.json()["plan_id"]
+
+
+def test_resume_routing_classification_uses_original_plan(db, monkeypatch):
+    from app.routers.jobs import _resume_job_task
+    from app.services.job_progress import JobProgressService
+    from app.services.routing_plan_service import RoutingPlanService
+    from tests.conftest import TEST_USER_ID
+
+    job = JobProgressService(db).create_job(
+        "routing_classification",
+        params={"asset_ids": None, "limit": None, "force": False},
+        user_id=TEST_USER_ID,
+    )
+    plan = RoutingPlanService(db, TEST_USER_ID).create_plan(job_id=job.id)
+    plan_id = plan.id
+    job.params_json = {"asset_ids": None, "limit": None, "force": False, "plan_id": plan_id}
+    db.commit()
+    captured = []
+
+    monkeypatch.setattr("app.database.SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        "app.workers.tasks.run_routing_classification",
+        lambda *args: captured.append(args),
+    )
+
+    _resume_job_task(job.id)
+
+    assert captured
+    assert captured[0][0] == job.id
+    assert captured[0][1] == plan_id
 
 
 # ---------------------------------------------------------------------------
