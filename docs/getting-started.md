@@ -80,10 +80,9 @@ On the first visit, immich-gpt shows a setup screen when no users exist yet. The
 After login, the main navigation includes:
 
 - Dashboard
-- Review
 - Assets
-- Buckets
-- Prompts
+- Routing
+- Routing plans
 - Jobs
 - Logs
 - Settings
@@ -117,30 +116,33 @@ Set one provider as the default. You can add more later.
 Decide whether the AI is allowed to:
 
 - create new tags
-- create new album names under the buckets that support album suggestions
+- create new album names for routing destinations that write to Immich albums
 
-If you want maximum control for a first rollout, disable both until you trust the prompts and outputs.
+If you want maximum control for a first rollout, disable both until you trust the routing prompts and outputs.
 
-## Create buckets
+## Create a routing tree
 
-Buckets define how the AI should group assets and what approval means.
+Routing nodes define how the AI should group assets and what approval means. Use parent nodes for broad structure and leaf nodes for destinations the AI can choose.
 
-Common starter buckets:
+Common starter leaves:
 
-| Bucket | Mapping mode | Why it is useful |
-|--------|--------------|------------------|
-| Family | Parent Group | Lets AI suggest sub-albums such as trips or events |
-| Travel | Parent Group | Good for destinations and trip-based sub-albums |
-| Receipts | Virtual | Keeps document-like photos grouped without touching Immich albums |
+| Destination | Type | Why it is useful |
+|-------------|------|------------------|
+| Family / Events | Virtual or Immich Album | Groups family moments or writes them to a known album |
+| Travel / Trips | Virtual or Immich Album | Good for destinations and trip-based organization |
+| Documents / Receipts | Virtual | Keeps document-like photos grouped without touching Immich albums |
 | Favourites Archive | Immich Album | Routes approved items into one existing album |
-| Trash | Immich Trash | Creates a review-first cleanup lane |
+| Trash candidates | Immich Trash | Creates a review-first cleanup lane |
 
-Useful bucket settings:
+Useful routing-leaf settings:
 
 - priority
-- confidence threshold
-- bucket-specific prompt hints
+- confidence and review thresholds
+- destination type
+- custom prompt hints
 - examples and negative examples
+- metadata write-back options
+- auto-apply rules
 
 ## Run your first workflow
 
@@ -152,39 +154,39 @@ Go to **Dashboard** and choose:
   - **Specific Albums**
 - workflow:
   - **Sync Only**
-  - **Sync + AI**
-  - **AI Only**
+  - **Sync + Route**
+  - **Route Only**
 
 Recommended first run:
 
 1. choose **Favourites Only** or **Specific Albums**
-2. choose **Sync + AI**
+2. choose **Sync + Route**
 3. wait for the job to complete
-4. review the results carefully
+4. review the resulting routing plan carefully
 
-## Review and approve
+## Review and apply
 
-The **Review** page is where immich-gpt becomes safe to use at scale.
+The **Routing plans** page is where immich-gpt becomes safe to use at scale.
 
-For each item, you can:
+Plan results are grouped into states such as:
 
-- change the bucket
-- edit the description
-- add or remove tags
-- accept or replace the album suggestion
-- approve
-- reject
+- auto-applied
+- ready to approve
+- needs review
+- trash candidates
+- rejected by rules
+- failed
 
-Nothing is written back until you approve.
+You can approve or reject grouped items, then use **Apply approved items** to write approved metadata, album placements, or trash actions back to Immich. Nothing is written back until an item is approved and the plan is applied.
 
 ## A safe rollout plan
 
 Use a gradual rollout instead of processing the whole library on day one.
 
 1. Start with a small, high-signal subset of assets
-2. Keep the bucket set small and obvious
-3. Review every result from the first few jobs
-4. Tune prompts and thresholds
+2. Keep the routing tree small and obvious
+3. Review every plan from the first few jobs
+4. Tune criteria, prompts, thresholds, and automation rules
 5. Expand the scope once the outputs are consistent
 
 ## Where to go next

@@ -138,11 +138,11 @@ If model browsing still fails, you can type a model name manually in the provide
 
 Start small and tune incrementally:
 
-1. define a few clear buckets first
-2. keep bucket descriptions specific
-3. adjust per-bucket prompts and examples
+1. define a small routing tree first
+2. keep leaf descriptions and criteria specific
+3. adjust per-leaf prompts and examples
 4. test on favourites or one album instead of the full library
-5. review suggestions before broad rollout
+5. review routing plans before broad rollout
 
 Also check the behaviour settings:
 
@@ -155,7 +155,7 @@ Disabling them constrains the model to existing entities and can improve consist
 
 Some assets may come from external libraries or have Immich-side restrictions. In those cases, description or tag writes can be limited.
 
-Review the app logs and audit logs to see whether the write-back partially succeeded or was skipped with a warning.
+Review the app logs and audit logs to see whether the routing plan write-back partially succeeded or was skipped with a warning.
 
 ## Password reset expectations do not match the UI
 

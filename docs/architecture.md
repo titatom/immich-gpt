@@ -21,10 +21,10 @@ In production, the frontend is built into static assets and served by FastAPI fr
 │  React SPA  │    │                      │    │   Server   │
 └─────────────┘    │  auth                │    └────────────┘
                    │  settings            │
-                   │  buckets + prompts   │
+                   │  routing tree        │
                    │  sync jobs           │
                    │  AI classification   │───▶ AI provider
-                   │  review + write-back │     (OpenAI /
+                   │  plans + write-back  │     (OpenAI /
                    │  audit logs          │      OpenRouter /
                    └──────────────────────┘      Ollama)
                           │
@@ -40,18 +40,17 @@ The frontend provides:
 
 - first-run setup and login
 - dashboard workflows
-- assets, review queue, and jobs
-- bucket and prompt management
+- assets, routing plans, and jobs
+- routing tree and prompt management
 - logs and settings
 - admin user management
 
 The main navigation includes:
 
 - Dashboard
-- Review
 - Assets
-- Buckets
-- Prompts
+- Routing
+- Routing plans
 - Jobs
 - Logs
 - Settings
@@ -65,9 +64,9 @@ The FastAPI backend handles:
 - first-user bootstrap
 - user and admin APIs
 - Immich connectivity and album access
-- bucket, prompt, and provider configuration
+- routing tree, prompt, and provider configuration
 - sync and classification jobs
-- review decisions and write-back
+- routing plan decisions and write-back
 - audit logging
 
 ### Database
@@ -78,8 +77,8 @@ SQLite stores:
 - password reset tokens
 - application settings
 - provider definitions
-- buckets and prompts
-- synced assets and AI suggestions
+- routing nodes, examples, and plans
+- synced assets and AI routing output
 - job runs and job logs
 - audit trail records
 
@@ -143,33 +142,33 @@ Supported sync scopes:
 
 When a user starts AI classification:
 
-1. the orchestrator loads enabled buckets and prompt templates
+1. the routing service loads enabled routing-tree leaves and their prompt guidance
 2. behavior settings are resolved, such as whether new tags or albums are allowed
 3. the backend prepares a thumbnail and metadata context for each asset
 4. the selected provider is called
-5. the structured response is validated
-6. suggestions are stored in the database
+5. the structured response is validated against routing schemas
+6. routing plan items are stored in the database
 7. progress updates are streamed to the UI
 
 Important safety property:
 
 - providers receive prepared image data and metadata, not raw private Immich URLs
 
-## 4. Review and write-back flow
+## 4. Routing plan and write-back flow
 
 immich-gpt is intentionally review-first.
 
-1. suggestions enter the review queue
-2. the user edits or approves them
-3. the review service decides what should be written back
+1. AI output enters a routing plan
+2. the plan groups items into auto-applied, ready-to-approve, needs-review, trash-candidate, rejected, and failed states
+3. the user approves or rejects plan items
 4. Immich receives approved metadata or album changes
 5. audit logs capture important actions and errors
 
-Nothing is written back automatically before approval.
+Nothing is written back until a plan item is approved and the approved items are applied.
 
-## Buckets and mapping modes
+## Routing tree and destination modes
 
-Buckets are central to how immich-gpt thinks about organization.
+The routing tree is central to how immich-gpt thinks about organization. Parent nodes provide structure; leaf nodes define selectable destinations and write-back behavior.
 
 Supported modes:
 
@@ -177,26 +176,29 @@ Supported modes:
 |------|---------|
 | `virtual` | Keep the classification inside immich-gpt only |
 | `immich_album` | Map approved assets into a specific Immich album |
-| `parent_group` | Let AI suggest sub-albums under a broader category |
+| `review_only` | Require review without writing to Immich |
 | `immich_trash` | Send approved assets into Immich trash as part of a review-first cleanup flow |
 
-Each bucket can also influence:
+Each routing leaf can also influence:
 
 - priority
-- confidence threshold
-- prompt instructions
+- confidence and review thresholds
+- prompt instructions and preview text
 - positive and negative examples
+- metadata suggestions and write-back options
+- auto-apply rules
 
 ## Prompting model
 
 Prompt assembly combines:
 
-- global prompt templates
-- per-bucket prompt guidance
+- routing-tree structure
+- per-leaf prompt guidance
+- positive and negative examples
 - effective behavior settings
 - known tags and album constraints when the user disallows new ones
 
-This keeps prompts flexible without requiring source-code changes for normal tuning.
+This keeps routing prompts flexible without requiring source-code changes for normal tuning.
 
 ## Job lifecycle
 

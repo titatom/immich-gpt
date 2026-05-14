@@ -6,7 +6,7 @@
 
 **AI metadata enrichment and album organization for Immich.**
 
-immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and bucket/album placement, and lets you approve every change before it is written back.
+immich-gpt is a self-hosted web app that connects to your Immich library, pulls thumbnails and metadata, asks an AI model for descriptions, tags, and routing destinations, and lets you approve every write-back before it reaches Immich.
 
 ## Key highlights
 
@@ -43,28 +43,29 @@ immich-gpt helps you enrich and organize large photo libraries without giving up
 
 For each synced asset, immich-gpt can suggest:
 
-- a bucket or category
+- a routing destination
 - a natural-language description
 - search-friendly tags
-- an album or sub-album 
+- an album or cleanup action
 
 ### Smarter organization
 
-Buckets let you control what approval means for each kind of asset:
+The routing tree lets you control what approval means for each kind of asset:
 
 - **Virtual**: keep the classification inside immich-gpt only
 - **Immich Album**: map approved assets into a specific Immich album
-- **Parent Group**: let AI suggest sub-albums under a broader bucket
+- **Review only**: flag items for manual review without writing to Immich
 - **Immich Trash**: build a review-first cleanup workflow
 
-### Review before write-back
+### Routing plans before write-back
 
-The review queue lets you:
+Routing plans let you:
 
 - approve as-is
-- edit the bucket, description, tags, or album suggestion
+- review grouped destinations by confidence and rule outcome
+- apply approved metadata, tags, albums, or trash actions
 - reject the suggestion
-- re-run AI analysis when you want another pass
+- run a fresh plan when you want another pass
 
 ## Documentation map
 
@@ -115,9 +116,9 @@ The fastest path is Docker Compose.
    - your preferred AI provider
    - whether new tags and new album names may be created
 
-7. Go to **Dashboard** and run **Sync + AI**.
+7. Go to **Dashboard** and run **Sync + Route**.
 
-8. Open **Review** and approve, edit, or reject each suggestion.
+8. Open **Routing plans**, review the grouped decisions, approve or reject items, then apply the approved changes.
 
 If you are serving the app behind HTTPS, set `SESSION_COOKIE_SECURE=true`. If you are running on a plain HTTP LAN, leave it `false`.
 
@@ -135,17 +136,17 @@ In **Settings**, save your Immich URL and API key, then add an AI provider:
 
 Immich settings saved in the UI are stored in the database and override `IMMICH_URL` and `IMMICH_API_KEY` environment values for that user.
 
-### 2. Create a few buckets
+### 2. Create a routing tree
 
 A simple starter set is:
 
-- **Family** -> Parent Group
-- **Travel** -> Parent Group
-- **Receipts** -> Virtual
-- **Favourites Archive** -> Immich Album
-- **Trash** -> Immich Trash
+- **Family** with child leaves for common people or events
+- **Travel** with child leaves for destinations or trip types
+- **Receipts** as a virtual destination
+- **Favourites Archive** as an Immich album destination
+- **Trash candidates** as an Immich trash destination
 
-Each bucket can define its own prompt guidance, priority, and confidence threshold.
+Each routing leaf can define its own criteria, custom prompt guidance, priority, destination, confidence thresholds, and automation rules.
 
 ### 3. Pick a sync scope
 
@@ -158,29 +159,28 @@ From **Dashboard**, choose:
 Then choose a workflow:
 
 - **Sync Only**
-- **Sync + AI**
-- **AI Only**
+- **Sync + Route**
+- **Route Only**
 
-For a first run, **Sync + AI** is usually the easiest option.
+For a first run, **Sync + Route** is usually the easiest option.
 
-### 4. Review and approve
+### 4. Review and apply a routing plan
 
-In **Review**, you can:
+In **Routing plans**, results are grouped as auto-applied, ready to approve, needs review, trash candidates, rejected by rules, or failed. You can:
 
-- change the bucket
-- rewrite the description
-- add or remove tags
-- accept or replace the album suggestion
-- approve or reject the result
+- approve or reject grouped items
+- inspect destination paths and counts
+- apply approved items to Immich
+- run a new plan when routing rules change
 
 ### 5. Roll out gradually
 
 A safe rollout looks like this:
 
-1. start with a few clear buckets
+1. start with a small routing tree
 2. run on favourites or specific albums first
-3. review the early results closely
-4. refine prompts and bucket rules
+3. review the early routing plans closely
+4. refine criteria, prompts, thresholds, and automation rules
 5. expand to more of the library
 
 ## Features
@@ -197,18 +197,20 @@ A safe rollout looks like this:
 - images are converted to base64 data URLs before being sent to providers
 - private Immich URLs are never passed directly to external AI services
 
-### Prompt system
+### Routing tree
 
-- global prompts for classification, descriptions, and tags
-- per-bucket prompts for tighter control
-- prompts are stored in the database and editable in the UI
+- nested destinations for broad categories and specific leaves
+- per-leaf positive and negative criteria
+- destination-specific metadata and write-back options
+- optional custom prompt guidance and prompt preview
 
-### Review workflow
+### Routing plan workflow
 
-- thumbnails for each item
-- edit-before-approve controls
-- bulk approve and reject actions
-- large preview on thumbnail click
+- recent plan history with status and item counts
+- grouped result states for review
+- grouped approve and reject actions
+- auto-apply for high-confidence results
+- apply approved items to Immich
 
 ### Jobs and progress
 
@@ -277,11 +279,9 @@ Core API areas include:
 
 - `/api/auth`
 - `/api/settings`
-- `/api/buckets`
-- `/api/prompts`
+- `/api/routing`
 - `/api/assets`
 - `/api/jobs`
-- `/api/review`
 - `/api/albums`
 - `/api/thumbnails`
 
@@ -293,16 +293,17 @@ Core API areas include:
 │  React SPA  │    │                      │    │   Server   │
 └─────────────┘    │  auth + settings     │    └────────────┘
                    │  sync + job control  │
-                   │  prompt assembly     │
-                   │  review + write-back │───▶ AI provider
-                   └──────────────────────┘     (OpenAI /
-                          │                     OpenRouter /
-                          ▼                     Ollama)
+                   │  AI classification   │───▶ AI provider
+                   │  routing plans       │
+                   │  approved write-back │     (OpenAI /
+                   └──────────────────────┘      OpenRouter /
+                          │                      Ollama)
+                          ▼
                      SQLite DB
                 (persistent volume)
 ```
 
-FastAPI serves the API and, in production, the built React frontend from `backend/static`. SQLite stores users, settings, prompts, synced assets, suggestions, jobs, and audit logs. Optional Redis can be added when you want RQ workers.
+FastAPI serves the API and, in production, the built React frontend from `backend/static`. SQLite stores users, settings, routing nodes, routing plans, synced assets, jobs, and audit logs. Optional Redis can be added when you want RQ workers.
 
 For a deeper architecture walkthrough, see [`docs/architecture.md`](docs/architecture.md).
 
