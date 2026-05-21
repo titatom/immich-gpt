@@ -53,7 +53,7 @@ These variables are primarily used by `.env.example` and `docker-compose.yml`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATA_DIR` | `/mnt/user/appdata/immich-gpt` | Host path mounted to `/data` for the SQLite database, settings, job history, prompts, and generated secret |
+| `DATA_DIR` | `/mnt/user/appdata/immich-gpt` | Host path mounted to `/data` for the SQLite database, settings, job history, routing data, and generated secret |
 | `LOG_DIR` | unset | Optional host path mounted to `/logs` for persistent rotating logs |
 | `APP_PORT` | `8000` | Host port mapped to container port `8000` |
 | `IMMICH_GPT_IMAGE` | `ghcr.io/titatom/immich-gpt:latest` | Image tag used by `docker-compose.yml` |
@@ -183,9 +183,9 @@ The Settings UI exposes two important toggles:
 | Setting | Default | Effect |
 |---------|---------|--------|
 | `allow_new_tags` | `true` | Lets AI propose tags that do not already exist |
-| `allow_new_albums` | `true` | Lets AI propose new album names where the selected bucket mode allows it |
+| `allow_new_albums` | `true` | Lets AI propose new album names where the selected routing destination allows it |
 
-When disabled, prompts and review logic become more restrictive and lean toward existing tags and albums.
+When disabled, routing prompts and plan review logic become more restrictive and lean toward existing tags and albums.
 
 ## Database paths
 

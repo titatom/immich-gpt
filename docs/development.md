@@ -125,7 +125,7 @@ npx tsc --noEmit
 2. Complete the first-run setup wizard.
 3. Configure Immich and an AI provider in **Settings**.
 4. Use **Dashboard** to sync assets and run classification.
-5. Review and approve results from **Review**.
+5. Review and approve routing decisions from **Routing plans**.
 6. Inspect **Jobs** and **Logs** when debugging.
 
 ## Common contributor pitfalls

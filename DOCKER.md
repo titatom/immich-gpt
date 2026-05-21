@@ -103,7 +103,7 @@ DATA_DIR=/mnt/user/appdata/immich-gpt   # Unraid default
 # DATA_DIR=/opt/immich-gpt/data         # Linux example
 ```
 
-**Back up `DATA_DIR`.**  It contains your bucket config, prompt templates, all AI suggestions, review decisions, and user accounts.
+**Back up `DATA_DIR`.**  It contains your routing tree, routing plans, settings, job history, AI output, and user accounts.
 
 ---
 
