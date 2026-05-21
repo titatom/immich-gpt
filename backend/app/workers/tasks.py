@@ -26,19 +26,17 @@ def _get_user_immich_client(db, user_id: Optional[str]) -> ImmichClient:
     """Resolve Immich credentials for a specific user."""
     from ..models.app_setting import AppSetting
     from ..config import settings
-    if user_id:
-        url_row = db.query(AppSetting).filter(
-            AppSetting.user_id == user_id, AppSetting.key == "immich_url"
-        ).first()
-        key_row = db.query(AppSetting).filter(
-            AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
-        ).first()
-        url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
-        stored_key = key_row.value if key_row and key_row.value else None
-        api_key = decrypt_secret(stored_key) if stored_key else settings.IMMICH_API_KEY
-    else:
-        url = settings.IMMICH_URL
-        api_key = settings.IMMICH_API_KEY
+    if not user_id:
+        raise ValueError("Job is missing an owner")
+    url_row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == "immich_url"
+    ).first()
+    key_row = db.query(AppSetting).filter(
+        AppSetting.user_id == user_id, AppSetting.key == "immich_api_key"
+    ).first()
+    url = (url_row.value if url_row and url_row.value else None) or settings.IMMICH_URL
+    stored_key = key_row.value if key_row and key_row.value else None
+    api_key = decrypt_secret(stored_key) if stored_key else settings.IMMICH_API_KEY
     return ImmichClient(url, api_key)
 
 
@@ -139,9 +137,10 @@ def run_routing_classification(
     """Background task: classify assets against the user's routing tree."""
     db = SessionLocal()
     try:
+        if not user_id:
+            raise ValueError("Job is missing an owner")
         q = db.query(ProviderConfig)
-        if user_id:
-            q = q.filter(ProviderConfig.user_id == user_id)
+        q = q.filter(ProviderConfig.user_id == user_id)
         provider_cfg = q.filter(
             ProviderConfig.is_default == True,
             ProviderConfig.enabled == True,

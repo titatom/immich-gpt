@@ -50,7 +50,10 @@ class RoutingWritebackService:
 
     def apply_item(self, item: RoutingPlanItem) -> RoutingWritebackResult:
         result = RoutingWritebackResult(item.id)
-        asset = self.db.query(Asset).filter(Asset.id == item.asset_id).first()
+        asset = self.db.query(Asset).filter(
+            Asset.id == item.asset_id,
+            Asset.user_id == self.user_id,
+        ).first()
         if not asset:
             result.errors.append("Asset not found")
             return result

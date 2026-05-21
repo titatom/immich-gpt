@@ -10,7 +10,6 @@ import {
 } from "../services/api";
 import type { RoutingNode } from "../types";
 import RoutingLeafEditor from "../components/RoutingLeafEditor";
-import {
   Plus,
   Trash2,
   Copy,
@@ -66,8 +65,7 @@ function NodeRow({
           display: "flex",
           alignItems: "center",
           gap: 8,
-          paddingLeft: depth * 16 + 4,
-          padding: "6px 8px 6px 4px",
+          padding: `6px 8px 6px ${depth * 16 + 4}px`,
           borderRadius: 6,
           background: isSelected ? "rgba(59,130,246,0.12)" : "transparent",
           cursor: "pointer",

@@ -5,7 +5,6 @@ import {
   getAssets, getAssetCount, getThumbnailUrl,
 } from "../services/api";
 import type { Asset } from "../types";
-import {
   Search, Image as ImageIcon, ArrowUp, ArrowDown, ArrowUpDown,
   X, Star, Archive, ExternalLink, Camera, MapPin, Tag, Calendar, Clock,
 } from "lucide-react";
@@ -220,6 +219,7 @@ export default function Assets() {
   const sortKey = (searchParams.get("sort") as SortKey) || "date";
   const sortDir = (searchParams.get("dir") as SortDir) || "desc";
   const [searchInput, setSearchInput] = React.useState(search);
+  React.useEffect(() => { setSearchInput(search); }, [search]);
 
   function setParam(key: string, value: string) {
     setSearchParams((prev) => {
@@ -261,7 +261,7 @@ export default function Assets() {
     q: search || undefined,
   };
 
-  const { data: assets = [], isLoading } = useQuery<Asset[]>({
+  const { data: assets = [], isLoading, isError: assetsError } = useQuery<Asset[]>({
     queryKey: ["assets", queryParams],
     queryFn: () => getAssets(queryParams),
   });
@@ -319,6 +319,8 @@ export default function Assets() {
 
       {isLoading ? (
         <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Loading assets…</div>
+      ) : assetsError ? (
+        <div style={{ padding: 60, textAlign: "center", color: "#fca5a5", fontSize: 13 }}>Failed to load assets.</div>
       ) : assets.length === 0 ? (
         <div style={{ padding: 60, textAlign: "center", color: "#64748b", fontSize: 13 }}>
           No assets match the current filter. Sync your Immich library from the dashboard.

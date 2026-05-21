@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
 import { getSetupStatus } from "../services/api";
+import { formatApiError } from "../utils/apiError";
 import BrandLogo from "../components/BrandLogo";
 import styles from "./Login.module.css";
 
@@ -37,10 +38,7 @@ export default function Login() {
       await login(username, password);
       navigate("/", { replace: true });
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : null;
-      setError(msg || "Invalid username or password");
+      setError(formatApiError(err, "Invalid username or password"));
     } finally {
       setSubmitting(false);
     }
@@ -91,9 +89,9 @@ export default function Login() {
           </button>
         </form>
 
-        <a href="/forgot-password" className={styles.forgotLink}>
+        <Link to="/forgot-password" className={styles.forgotLink}>
           Forgot password?
-        </a>
+        </Link>
       </div>
     </div>
   );

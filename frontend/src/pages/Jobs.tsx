@@ -30,6 +30,7 @@ export default function Jobs() {
         : false;
     },
   });
+  const hasActiveJob = jobs.some((job) => ACTIVE.has(job.status) || job.status === "paused");
 
   const syncMut = useMutation({
     mutationFn: () => startSyncJob({ scope: "all" }),
@@ -57,10 +58,10 @@ export default function Jobs() {
           <p className={styles.subtitle}>Background sync and routing classification jobs</p>
         </div>
         <div className={styles.actions}>
-          <button onClick={() => syncMut.mutate()} disabled={syncMut.isPending} className={[styles.btn, styles.btnBlue].join(" ")}>
+          <button onClick={() => syncMut.mutate()} disabled={syncMut.isPending || hasActiveJob} className={[styles.btn, styles.btnBlue].join(" ")}>
             <RefreshCw size={14} /> Sync All
           </button>
-          <button onClick={() => routeMut.mutate()} disabled={routeMut.isPending} className={[styles.btn, styles.btnPurple].join(" ")}>
+          <button onClick={() => routeMut.mutate()} disabled={routeMut.isPending || hasActiveJob} className={[styles.btn, styles.btnPurple].join(" ")}>
             <Play size={14} /> Run Routing
           </button>
         </div>

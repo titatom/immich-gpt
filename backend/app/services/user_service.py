@@ -6,7 +6,11 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from ..models.user import User
-from ..services.auth_service import hash_password, delete_all_user_sessions
+from ..services.auth_service import (
+    delete_all_user_sessions,
+    delete_other_user_sessions,
+    hash_password,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +95,7 @@ def change_password(
     user_id: str,
     new_password: str,
     clear_force_flag: bool = True,
+    keep_session_id: Optional[str] = None,
 ) -> Optional[User]:
     user = get_user_by_id(db, user_id)
     if not user:
@@ -99,6 +104,10 @@ def change_password(
     if clear_force_flag:
         user.force_password_change = False
     db.commit()
+    if keep_session_id:
+        delete_other_user_sessions(db, user_id, keep_session_id)
+    else:
+        delete_all_user_sessions(db, user_id)
     db.refresh(user)
     return user
 

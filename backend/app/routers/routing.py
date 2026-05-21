@@ -179,6 +179,13 @@ def add_example(
         raise HTTPException(status_code=404, detail=str(e))
     if body.example_type not in ("positive", "negative"):
         raise HTTPException(status_code=400, detail="example_type must be 'positive' or 'negative'")
+    if body.asset_id:
+        asset = db.query(Asset).filter(
+            Asset.id == body.asset_id,
+            Asset.user_id == current_user.id,
+        ).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
     example = RoutingExample(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
@@ -379,7 +386,7 @@ def plan_approve(
     if not item_ids and not body.bucket_id:
         items = svc.list_items(plan_id, status="pending")
         item_ids = [i.id for i in items]
-    count = svc.approve_items(item_ids)
+    count = svc.approve_items(item_ids, plan_id=plan_id)
     return {"approved": count}
 
 
@@ -400,7 +407,7 @@ def plan_reject(
     if not item_ids:
         items = svc.list_items(plan_id, status="pending")
         item_ids = [i.id for i in items]
-    count = svc.reject_items(item_ids)
+    count = svc.reject_items(item_ids, plan_id=plan_id)
     return {"rejected": count}
 
 
@@ -415,7 +422,7 @@ def plan_move(
     if not svc.get_plan(plan_id):
         raise HTTPException(status_code=404, detail="Plan not found")
     try:
-        count = svc.move_items(body.item_ids, body.target_bucket_id)
+        count = svc.move_items(body.item_ids, body.target_bucket_id, plan_id=plan_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"moved": count}

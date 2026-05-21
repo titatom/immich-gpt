@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getCurrentUser, login as apiLogin, logout as apiLogout } from "../services/api";
 import { AuthContext, type AuthUser } from "./authContextDef";
 
@@ -6,6 +7,7 @@ export { AuthContext } from "./authContextDef";
 export type { AuthUser } from "./authContextDef";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -51,9 +53,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await apiLogout();
-    setUser(null);
-  }, []);
+    try {
+      await apiLogout();
+    } finally {
+      setUser(null);
+      queryClient.clear();
+    }
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, refresh, isAdmin: user?.role === "admin" }}>

@@ -13,7 +13,12 @@ from ..schemas.provider import (
 from ..models.provider_config import ProviderConfig
 from ..models.app_setting import AppSetting
 from ..services.immich_client import ImmichClient, ImmichError
-from ..services.secret_store import decrypt_secret, encrypt_secret, has_secret
+from ..services.secret_store import (
+    decrypt_secret,
+    encrypt_secret,
+    has_secret,
+    is_encrypted_secret,
+)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -30,7 +35,11 @@ def _get_setting(db: Session, user_id: str, key: str) -> Optional[str]:
 
 
 def _get_secret_setting(db: Session, user_id: str, key: str) -> Optional[str]:
-    return decrypt_secret(_get_setting(db, user_id, key))
+    raw = _get_setting(db, user_id, key)
+    value = decrypt_secret(raw)
+    if value and not is_encrypted_secret(raw):
+        _set_setting(db, user_id, key, encrypt_secret(value))
+    return value
 
 
 def _set_setting(db: Session, user_id: str, key: str, value: str) -> None:

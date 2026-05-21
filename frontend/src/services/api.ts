@@ -21,7 +21,7 @@ const api = axios.create({
 });
 
 // Public paths where a 401 is expected and must not trigger a redirect.
-const PUBLIC_PATHS = ["/login", "/setup", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/setup", "/forgot-password", "/reset-password", "/change-password"];
 
 // Redirect to login on 401, but only when the user is on a protected page.
 // Cancelled requests (AbortController) are silently ignored.

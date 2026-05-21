@@ -1,8 +1,10 @@
 import os
+import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from .config import settings
 
+logger = logging.getLogger(__name__)
 _db_url = settings.DATABASE_URL
 
 # Ensure the data directory exists before SQLite tries to create the file.
@@ -69,7 +71,10 @@ def init_db():
             command.upgrade(alembic_cfg, "head")
             return
     except Exception:
-        pass
+        if str(engine.url) not in {"sqlite:///:memory:", "sqlite://"}:
+            logger.exception("Database migration failed")
+            raise
+        logger.exception("Database migration failed; falling back to create_all for in-memory test DB")
 
     # Fallback: plain create_all (used for in-memory SQLite in tests).
     Base.metadata.create_all(bind=engine)

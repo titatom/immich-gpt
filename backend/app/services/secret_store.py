@@ -43,5 +43,9 @@ def decrypt_secret(value: Optional[str]) -> Optional[str]:
         raise ValueError("Stored secret could not be decrypted with the configured SECRET_KEY") from exc
 
 
+def is_encrypted_secret(value: Optional[str]) -> bool:
+    return bool(value and value.startswith(_PREFIX))
+
+
 def has_secret(value: Optional[str]) -> bool:
     return bool(decrypt_secret(value))

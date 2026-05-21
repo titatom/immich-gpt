@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 import { getSetupStatus, setupCreateAdmin } from "../services/api";
 import { useAuth } from "../contexts/useAuth";
+import { formatApiError } from "../utils/apiError";
 import BrandLogo from "../components/BrandLogo";
 
 export default function Setup() {
@@ -51,12 +52,7 @@ export default function Setup() {
       await refresh();
       navigate("/", { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data
-              ?.detail
-          : null;
-      setError(msg || "Setup failed. Please try again.");
+      setError(formatApiError(err, "Setup failed. Please try again."));
     } finally {
       setSubmitting(false);
     }

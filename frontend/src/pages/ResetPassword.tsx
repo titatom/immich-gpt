@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resetPassword } from "../services/api";
+import { formatApiError } from "../utils/apiError";
 import BrandLogo from "../components/BrandLogo";
 
 export default function ResetPassword() {
@@ -27,10 +28,7 @@ export default function ResetPassword() {
       await resetPassword(token, newPassword);
       navigate("/login", { replace: true, state: { message: "Password reset successfully. Please sign in." } });
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : null;
-      setError(msg || "Reset failed. The token may have expired.");
+      setError(formatApiError(err, "Reset failed. The token may have expired."));
     } finally {
       setSubmitting(false);
     }

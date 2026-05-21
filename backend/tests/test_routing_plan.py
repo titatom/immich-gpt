@@ -134,6 +134,31 @@ def test_approve_and_reject_groups(db):
     assert items[2].status == "rejected"
 
 
+def test_plan_approve_does_not_mutate_items_from_other_plan(client, db):
+    _clean(db)
+    svc = RoutingTreeService(db, TEST_USER_ID)
+    a = svc.create_node(RoutingNodeCreate(name="A"))
+    plan_svc = RoutingPlanService(db, TEST_USER_ID)
+    plan_a = plan_svc.create_plan()
+    plan_b = plan_svc.create_plan()
+    item_b = plan_svc.add_item(
+        plan_b,
+        asset_id="foreign-plan-asset",
+        decision=_make_decision(a.id, "A", review=True),
+        ai_metadata={},
+    )
+
+    resp = client.post(
+        f"/api/routing/plans/{plan_a.id}/approve",
+        json={"item_ids": [item_b.id]},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["approved"] == 0
+    db.refresh(item_b)
+    assert item_b.status == "pending"
+
+
 def test_move_items_to_new_leaf(db):
     _clean(db)
     svc = RoutingTreeService(db, TEST_USER_ID)
@@ -225,3 +250,23 @@ def test_examples_lifecycle(client, db):
     assert any(e["id"] == ex_id for e in listed.json())
     deleted = client.delete(f"/api/routing/examples/{ex_id}")
     assert deleted.status_code == 200
+
+
+def test_add_example_rejects_other_users_asset(client, db):
+    _clean(db)
+    create = client.post("/api/routing/nodes", json={"name": "Lake"})
+    node_id = create.json()["id"]
+    db.add(Asset(
+        id="other-user-asset",
+        user_id="other-user",
+        immich_id="other-immich-id",
+        original_filename="other.jpg",
+    ))
+    db.commit()
+
+    resp = client.post(f"/api/routing/nodes/{node_id}/examples", json={
+        "asset_id": "other-user-asset",
+        "example_type": "positive",
+    })
+
+    assert resp.status_code == 404

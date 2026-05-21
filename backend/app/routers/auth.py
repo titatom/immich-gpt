@@ -52,7 +52,7 @@ def _set_session_cookie(response: Response, session_id: str) -> None:
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=_COOKIE, path="/")
+    response.delete_cookie(key=_COOKIE, path="/", secure=_SECURE, samesite=_SAMESITE)
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +140,7 @@ def me(current_user=Depends(get_current_user)):
 @router.post("/change-password")
 def change_password_endpoint(
     body: ChangePasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -147,7 +148,13 @@ def change_password_endpoint(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     if len(body.new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
-    change_password(db, current_user.id, body.new_password, clear_force_flag=True)
+    change_password(
+        db,
+        current_user.id,
+        body.new_password,
+        clear_force_flag=True,
+        keep_session_id=request.cookies.get(_COOKIE),
+    )
     return {"changed": True}
 
 

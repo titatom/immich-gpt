@@ -36,6 +36,25 @@ def _make_job(db, job_type="asset_sync", status="queued") -> JobRun:
     return job
 
 
+def _make_legacy_job(db, job_type="asset_sync", status="queued") -> JobRun:
+    job = JobRun(
+        id=str(uuid.uuid4()),
+        user_id=None,
+        job_type=job_type,
+        status=status,
+        processed_count=0,
+        total_count=0,
+        success_count=0,
+        error_count=0,
+        progress_percent=0.0,
+        log_lines_json=[],
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
 # ---------------------------------------------------------------------------
 # GET /api/jobs
 # ---------------------------------------------------------------------------
@@ -98,6 +117,12 @@ def test_get_job(client, db):
 
 def test_get_job_not_found(client):
     r = client.get("/api/jobs/nonexistent-id")
+    assert r.status_code == 404
+
+
+def test_get_legacy_unowned_job_not_found(client, db):
+    job = _make_legacy_job(db)
+    r = client.get(f"/api/jobs/{job.id}")
     assert r.status_code == 404
 
 
@@ -277,6 +302,19 @@ def test_resume_routing_classification_uses_original_plan(db, monkeypatch):
     assert captured[0][1] == plan_id
 
 
+def test_resume_legacy_job_without_owner_fails(db, monkeypatch):
+    from app.routers.jobs import _resume_job_task
+
+    job = _make_legacy_job(db, job_type="routing_classification", status="queued")
+    monkeypatch.setattr("app.database.SessionLocal", lambda: db)
+
+    _resume_job_task(job.id)
+
+    refreshed = db.query(JobRun).filter(JobRun.id == job.id).first()
+    assert refreshed.status == "failed"
+    assert "missing an owner" in refreshed.message
+
+
 # ---------------------------------------------------------------------------
 # POST /api/jobs/{job_id}/cancel
 # ---------------------------------------------------------------------------
@@ -290,6 +328,12 @@ def test_cancel_job(client, db):
 
 def test_cancel_job_not_found(client):
     r = client.post("/api/jobs/nonexistent/cancel")
+    assert r.status_code == 404
+
+
+def test_cancel_legacy_unowned_job_not_found(client, db):
+    job = _make_legacy_job(db)
+    r = client.post(f"/api/jobs/{job.id}/cancel")
     assert r.status_code == 404
 
 
