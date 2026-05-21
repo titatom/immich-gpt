@@ -12,6 +12,7 @@ import type {
 import JobProgressBar from "../components/JobProgressBar";
 import JobDetail from "../components/JobDetail";
 import { usePageVisible } from "../hooks/usePageVisible";
+import {
   Database, Play, RefreshCw, AlertTriangle, CheckCircle,
   Star, FolderOpen, ChevronDown, ChevronUp, Trash2, Layers,
   Network, GitBranch,

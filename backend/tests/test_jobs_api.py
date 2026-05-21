@@ -306,11 +306,23 @@ def test_resume_legacy_job_without_owner_fails(db, monkeypatch):
     from app.routers.jobs import _resume_job_task
 
     job = _make_legacy_job(db, job_type="routing_classification", status="queued")
-    monkeypatch.setattr("app.database.SessionLocal", lambda: db)
+    job_id = job.id
 
-    _resume_job_task(job.id)
+    class NonClosingSession:
+        def __init__(self, wrapped):
+            self._wrapped = wrapped
 
-    refreshed = db.query(JobRun).filter(JobRun.id == job.id).first()
+        def __getattr__(self, name):
+            return getattr(self._wrapped, name)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("app.database.SessionLocal", lambda: NonClosingSession(db))
+
+    _resume_job_task(job_id)
+
+    refreshed = db.query(JobRun).filter(JobRun.id == job_id).first()
     assert refreshed.status == "failed"
     assert "missing an owner" in refreshed.message
 

@@ -229,6 +229,8 @@ class TestChangePassword:
         user = _make_user(db, email="multi-session@test.com", password="oldpass123")
         keep = create_session(db, user.id)
         revoke = create_session(db, user.id)
+        keep_id = keep.id
+        revoke_id = revoke.id
 
         def override_get_db():
             yield db
@@ -236,7 +238,7 @@ class TestChangePassword:
         app.dependency_overrides[get_db] = override_get_db
         with patch("app.main.init_db"):
             with TestClient(app) as c:
-                c.cookies.set("session_id", keep.id)
+                c.cookies.set("session_id", keep_id)
                 r = c.post(
                     "/api/auth/change-password",
                     json={"current_password": "oldpass123", "new_password": "newpass123"},
@@ -244,8 +246,8 @@ class TestChangePassword:
 
         app.dependency_overrides.clear()
         assert r.status_code == 200
-        assert db.query(UserSession).filter(UserSession.id == keep.id).first() is not None
-        assert db.query(UserSession).filter(UserSession.id == revoke.id).first() is None
+        assert db.query(UserSession).filter(UserSession.id == keep_id).first() is not None
+        assert db.query(UserSession).filter(UserSession.id == revoke_id).first() is None
 
 
 # ---------------------------------------------------------------------------

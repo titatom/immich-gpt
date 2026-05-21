@@ -5,6 +5,7 @@ import {
   getAssets, getAssetCount, getThumbnailUrl,
 } from "../services/api";
 import type { Asset } from "../types";
+import {
   Search, Image as ImageIcon, ArrowUp, ArrowDown, ArrowUpDown,
   X, Star, Archive, ExternalLink, Camera, MapPin, Tag, Calendar, Clock,
 } from "lucide-react";
