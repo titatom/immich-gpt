@@ -8,6 +8,7 @@ import {
   adminDeleteUser,
 } from "../services/api";
 import { copySecretToClipboard } from "../utils/clipboard";
+import { formatApiError } from "../utils/apiError";
 import { UserPlus, RefreshCw, Trash2, ShieldCheck, UserX, User, Key } from "lucide-react";
 
 interface AdminUser {
@@ -41,10 +42,7 @@ export default function AdminUsers() {
       setCreateError("");
     },
     onError: (err: unknown) => {
-      const msg = err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : "Failed to create user";
-      setCreateError(msg || "Failed to create user");
+      setCreateError(formatApiError(err, "Failed to create user"));
     },
   });
 

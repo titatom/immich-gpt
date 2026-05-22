@@ -1,18 +1,35 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/useAuth";
 import { changePassword } from "../services/api";
+import { formatApiError } from "../utils/apiError";
 import { Lock } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
 
 export default function ForcePasswordChange() {
-  const { refresh } = useAuth();
+  const { user, loading, refresh } = useAuth();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 14 }}>
+        Loading…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user.force_password_change) {
+    return <Navigate to="/" replace />;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,10 +48,7 @@ export default function ForcePasswordChange() {
       await refresh();
       navigate("/", { replace: true });
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "response" in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : null;
-      setError(msg || "Password change failed");
+      setError(formatApiError(err, "Password change failed"));
     } finally {
       setSubmitting(false);
     }

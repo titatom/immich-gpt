@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import patch
 
 from app.models.user import User
+from app.models.session import UserSession
 from app.services.auth_service import hash_password, create_session
 from tests.conftest import TEST_USER_ID, TEST_ADMIN_ID
 
@@ -220,6 +221,34 @@ class TestChangePassword:
         )
         assert r.status_code == 400
 
+    def test_change_password_revokes_other_sessions(self, db):
+        from app.main import app
+        from app.database import get_db
+        from fastapi.testclient import TestClient
+
+        user = _make_user(db, email="multi-session@test.com", password="oldpass123")
+        keep = create_session(db, user.id)
+        revoke = create_session(db, user.id)
+        keep_id = keep.id
+        revoke_id = revoke.id
+
+        def override_get_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_get_db
+        with patch("app.main.init_db"):
+            with TestClient(app) as c:
+                c.cookies.set("session_id", keep_id)
+                r = c.post(
+                    "/api/auth/change-password",
+                    json={"current_password": "oldpass123", "new_password": "newpass123"},
+                )
+
+        app.dependency_overrides.clear()
+        assert r.status_code == 200
+        assert db.query(UserSession).filter(UserSession.id == keep_id).first() is not None
+        assert db.query(UserSession).filter(UserSession.id == revoke_id).first() is None
+
 
 # ---------------------------------------------------------------------------
 # force_password_change gate
@@ -382,6 +411,32 @@ class TestPasswordReset:
         db.refresh(user)
         from app.services.auth_service import verify_password
         assert verify_password("brandnewpass", user.hashed_password)
+
+    def test_reset_password_revokes_all_sessions(self, db):
+        from app.main import app
+        from app.database import get_db
+        from app.services.auth_service import create_reset_token
+        from fastapi.testclient import TestClient
+
+        user = _make_user(db, email="tokenreset-sessions@test.com", password="oldpass")
+        create_session(db, user.id)
+        create_session(db, user.id)
+        raw_token = create_reset_token(db, user.id)
+
+        def override_get_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_get_db
+        with patch("app.main.init_db"):
+            with TestClient(app) as c:
+                r = c.post(
+                    "/api/auth/reset-password",
+                    json={"token": raw_token, "new_password": "brandnewpass"},
+                )
+
+        app.dependency_overrides.clear()
+        assert r.status_code == 200
+        assert db.query(UserSession).filter(UserSession.user_id == user.id).count() == 0
 
     def test_reset_password_invalid_token(self, db):
         from app.main import app

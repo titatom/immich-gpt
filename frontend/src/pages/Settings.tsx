@@ -13,6 +13,7 @@ import {
   getHealth,
 } from "../services/api";
 import type { ProviderConfig } from "../types";
+import { formatApiError } from "../utils/apiError";
 import { CheckCircle, AlertTriangle, Plus, Trash2, Pencil, Heart, Github, Scale } from "lucide-react";
 
 const inputStyle: React.CSSProperties = {
@@ -43,11 +44,6 @@ interface TestResult {
   error?: string;
 }
 
-interface AxiosLikeError {
-  response?: { data?: { detail?: string } };
-  message: string;
-}
-
 function ImmichSection() {
   const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ["immich-settings"], queryFn: getImmichSettings });
@@ -67,7 +63,7 @@ function ImmichSection() {
       setSaveResult(data);
       qc.invalidateQueries({ queryKey: ["immich-settings"] });
     },
-    onError: (e: AxiosLikeError) => setSaveResult({ error: e.response?.data?.detail || e.message }),
+    onError: (e: unknown) => setSaveResult({ error: formatApiError(e, "Connection failed") }),
   });
 
   return (
@@ -339,7 +335,7 @@ function ProvidersSection() {
   const testMut = useMutation({
     mutationFn: testProvider,
     onSuccess: (data, name) => setTestResults((r) => ({ ...r, [name]: data })),
-    onError: (e: AxiosLikeError, name) => setTestResults((r) => ({ ...r, [name]: { error: e.message } })),
+    onError: (e: unknown, name) => setTestResults((r) => ({ ...r, [name]: { error: formatApiError(e, "Provider test failed") } })),
   });
 
   const isEditing = editingName !== null;

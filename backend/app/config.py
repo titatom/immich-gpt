@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     IMMICH_URL: str = ""
     IMMICH_API_KEY: str = ""
 
+    # Server-side upstream URL safety.  Keep false for Internet-exposed installs.
+    # Set true only when Immich/Ollama intentionally live on a trusted LAN or host.
+    ALLOW_PRIVATE_SERVICE_URLS: bool = False
+
     # OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"

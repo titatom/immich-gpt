@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { getAuditLogs, getAuditLogCount, getJobs } from "../services/api";
@@ -302,6 +302,7 @@ export default function Logs() {
   const jobId = searchParams.get("job_run_id") || "";
   const textSearch = searchParams.get("q") || "";
   const [searchInput, setSearchInput] = useState(textSearch);
+  useEffect(() => { setSearchInput(textSearch); }, [textSearch]);
 
   function setParam(key: string, value: string) {
     setSearchParams((prev) => {
@@ -323,7 +324,7 @@ export default function Logs() {
     q: textSearch || undefined,
   };
 
-  const { data: logs = [], isLoading } = useQuery({
+  const { data: logs = [], isLoading, isError: logsError } = useQuery({
     queryKey: ["audit-logs", params],
     queryFn: () => getAuditLogs(params),
   });
@@ -440,6 +441,8 @@ export default function Logs() {
 
         {isLoading ? (
           <div style={{ color: "#64748b", textAlign: "center", padding: 64 }}>Loading…</div>
+        ) : logsError ? (
+          <div style={{ textAlign: "center", padding: 64, color: "#fca5a5" }}>Failed to load activity entries.</div>
         ) : logs.length === 0 ? (
           <div style={{ textAlign: "center", padding: 64, color: "#64748b" }}>No activity entries.</div>
         ) : (

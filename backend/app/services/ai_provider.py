@@ -8,6 +8,8 @@ routing schema is done in the orchestrator with `AIRoutingResult`.
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
+from .url_validation import validate_service_url
+
 
 class AIProvider(ABC):
     @abstractmethod
@@ -87,7 +89,7 @@ class OpenAIProvider(AIProvider):
         from openai import OpenAI
         kwargs: Dict[str, Any] = {"api_key": api_key, "timeout": timeout}
         if base_url:
-            kwargs["base_url"] = base_url
+            kwargs["base_url"] = validate_service_url(base_url, field_name="Provider base URL")
         self._client = OpenAI(**kwargs)
         self.model = model
 
@@ -123,7 +125,7 @@ class OllamaProvider(AIProvider):
     """Ollama via the OpenAI-compatible /v1 endpoint (>= 0.1.24)."""
 
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "llava"):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = validate_service_url(base_url, field_name="Ollama URL")
         self.model = model
 
     @property

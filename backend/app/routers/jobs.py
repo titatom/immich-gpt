@@ -114,9 +114,11 @@ async def stream_job(job_id: str, request: Request):
     db_check = SessionLocal()
     try:
         user = get_current_user(request, db_check)
+        if user.force_password_change:
+            raise HTTPException(status_code=403, detail="Password change required before continuing")
         # Verify job ownership
         j = db_check.query(JobRun).filter(JobRun.id == job_id).first()
-        if not j or (j.user_id is not None and j.user_id != user.id):
+        if not j or j.user_id != user.id:
             return StreamingResponse(
                 iter([f"event: error\ndata: {json.dumps({'detail': 'Job not found'})}\n\n"]),
                 media_type="text/event-stream",
@@ -133,6 +135,8 @@ async def stream_job(job_id: str, request: Request):
     async def _event_generator():
         last_updated_at = None
         while True:
+            if await request.is_disconnected():
+                return
             db = SessionLocal()
             try:
                 j = db.query(JobRun).filter(JobRun.id == job_id).first()
@@ -203,7 +207,7 @@ def cancel_job(
 ):
     svc = JobProgressService(db)
     j = svc.get_job(job_id)
-    if not j or (j.user_id is not None and j.user_id != current_user.id):
+    if not j or j.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job not found")
     if j.status in _TERMINAL:
         raise HTTPException(status_code=400, detail=f"Job already in terminal state: {j.status}")
@@ -219,7 +223,7 @@ def pause_job(
 ):
     svc = JobProgressService(db)
     j = svc.get_job(job_id)
-    if not j or (j.user_id is not None and j.user_id != current_user.id):
+    if not j or j.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job not found")
     if j.status in _TERMINAL or j.status == "paused":
         raise HTTPException(status_code=400, detail=f"Cannot pause job in state: {j.status}")
@@ -235,7 +239,7 @@ def resume_job(
 ):
     svc = JobProgressService(db)
     j = svc.get_job(job_id)
-    if not j or (j.user_id is not None and j.user_id != current_user.id):
+    if not j or j.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job not found")
     if j.status != "paused":
         raise HTTPException(status_code=400, detail=f"Job is not paused (status: {j.status})")
@@ -252,7 +256,7 @@ def delete_job(
 ):
     svc = JobProgressService(db)
     j = svc.get_job(job_id)
-    if not j or (j.user_id is not None and j.user_id != current_user.id):
+    if not j or j.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Job not found")
     if j.status not in _TERMINAL:
         raise HTTPException(status_code=400, detail="Can only delete completed, failed, or cancelled jobs")
@@ -270,6 +274,9 @@ def _resume_job_task(job_id: str) -> None:
             return
         params = j.params_json or {}
         user_id = j.user_id
+        if not user_id:
+            JobProgressService(db).fail_job(job_id, "Job is missing an owner and cannot be resumed")
+            return
         if j.job_type == "asset_sync":
             from ..workers.tasks import run_asset_sync
             run_asset_sync(

@@ -195,8 +195,8 @@ class RoutingPlanService:
     # Item actions
     # ------------------------------------------------------------------
 
-    def approve_items(self, item_ids: List[str]) -> int:
-        items = self._items_by_ids(item_ids)
+    def approve_items(self, item_ids: List[str], plan_id: Optional[str] = None) -> int:
+        items = self._items_by_ids(item_ids, plan_id=plan_id)
         count = 0
         for item in items:
             if item.status in ("pending",):
@@ -205,8 +205,8 @@ class RoutingPlanService:
         self.db.commit()
         return count
 
-    def reject_items(self, item_ids: List[str]) -> int:
-        items = self._items_by_ids(item_ids)
+    def reject_items(self, item_ids: List[str], plan_id: Optional[str] = None) -> int:
+        items = self._items_by_ids(item_ids, plan_id=plan_id)
         count = 0
         for item in items:
             if item.status not in ("applied", "failed"):
@@ -215,7 +215,12 @@ class RoutingPlanService:
         self.db.commit()
         return count
 
-    def move_items(self, item_ids: List[str], target_bucket_id: str) -> int:
+    def move_items(
+        self,
+        item_ids: List[str],
+        target_bucket_id: str,
+        plan_id: Optional[str] = None,
+    ) -> int:
         target = (
             self.db.query(Bucket)
             .filter(Bucket.id == target_bucket_id, Bucket.user_id == self.user_id)
@@ -223,7 +228,7 @@ class RoutingPlanService:
         )
         if not target:
             raise ValueError(f"Target bucket {target_bucket_id} not found")
-        items = self._items_by_ids(item_ids)
+        items = self._items_by_ids(item_ids, plan_id=plan_id)
         count = 0
         from .routing_learning import RoutingLearningService
         learner = RoutingLearningService(self.db, self.user_id)
@@ -253,17 +258,20 @@ class RoutingPlanService:
             item.error_message = error
         self.db.commit()
 
-    def _items_by_ids(self, item_ids: List[str]) -> List[RoutingPlanItem]:
+    def _items_by_ids(
+        self,
+        item_ids: List[str],
+        plan_id: Optional[str] = None,
+    ) -> List[RoutingPlanItem]:
         if not item_ids:
             return []
-        return (
-            self.db.query(RoutingPlanItem)
-            .filter(
-                RoutingPlanItem.user_id == self.user_id,
-                RoutingPlanItem.id.in_(item_ids),
-            )
-            .all()
+        query = self.db.query(RoutingPlanItem).filter(
+            RoutingPlanItem.user_id == self.user_id,
+            RoutingPlanItem.id.in_(item_ids),
         )
+        if plan_id is not None:
+            query = query.filter(RoutingPlanItem.plan_id == plan_id)
+        return query.all()
 
     def mark_plan_applied(self, plan_id: str) -> None:
         plan = self.get_plan(plan_id)

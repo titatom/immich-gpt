@@ -6,6 +6,7 @@ import httpx
 from contextlib import contextmanager
 from typing import Optional, List, Dict, Any, Iterator
 from ..config import settings
+from .url_validation import ServiceUrlError, validate_service_url
 
 
 class ImmichError(Exception):
@@ -16,7 +17,11 @@ class ImmichError(Exception):
 
 class ImmichClient:
     def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
-        self.base_url = (base_url or settings.IMMICH_URL).rstrip("/")
+        raw_base_url = base_url or settings.IMMICH_URL
+        try:
+            self.base_url = validate_service_url(raw_base_url, field_name="Immich URL")
+        except ServiceUrlError as exc:
+            raise ImmichError(str(exc)) from exc
         self.api_key = api_key or settings.IMMICH_API_KEY
         self._headers = {
             "x-api-key": self.api_key,

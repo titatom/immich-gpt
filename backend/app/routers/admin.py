@@ -20,8 +20,18 @@ from ..services.user_service import (
     delete_user,
 )
 from ..services.auth_service import create_reset_token
+from ..models.user import User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _active_admin_count(db: Session) -> int:
+    return db.query(User).filter(User.role == "admin", User.is_active == True).count()
+
+
+def _would_remove_last_active_admin(db: Session, user_id: str) -> bool:
+    user = get_user_by_id(db, user_id)
+    return bool(user and user.role == "admin" and user.is_active and _active_admin_count(db) <= 1)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +133,8 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     if body.is_active is not None:
+        if body.is_active is False and _would_remove_last_active_admin(db, user_id):
+            raise HTTPException(status_code=400, detail="Cannot disable the last active admin")
         user = set_user_active(db, user_id, body.is_active)
     if body.force_password_change is not None:
         user = set_force_password_change(db, user_id, body.force_password_change)
@@ -176,6 +188,8 @@ def delete_user_endpoint(
     _admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    if _would_remove_last_active_admin(db, user_id):
+        raise HTTPException(status_code=400, detail="Cannot delete the last active admin")
     deleted = delete_user(db, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")

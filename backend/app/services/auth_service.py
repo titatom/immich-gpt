@@ -103,6 +103,14 @@ def delete_all_user_sessions(db: Session, user_id: str) -> None:
     db.commit()
 
 
+def delete_other_user_sessions(db: Session, user_id: str, keep_session_id: str) -> None:
+    db.query(UserSession).filter(
+        UserSession.user_id == user_id,
+        UserSession.id != keep_session_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+
+
 # ---------------------------------------------------------------------------
 # Password reset tokens
 # ---------------------------------------------------------------------------

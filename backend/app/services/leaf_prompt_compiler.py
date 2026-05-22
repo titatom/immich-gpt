@@ -158,7 +158,10 @@ class LeafPromptCompiler:
     def _asset_label(self, asset_id: Optional[str]) -> Optional[str]:
         if not asset_id:
             return None
-        a = self.db.query(Asset).filter(Asset.id == asset_id).first()
+        a = self.db.query(Asset).filter(
+            Asset.id == asset_id,
+            Asset.user_id == self.user_id,
+        ).first()
         if not a:
             return None
         return a.original_filename or a.immich_id

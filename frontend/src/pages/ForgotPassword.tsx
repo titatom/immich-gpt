@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import BrandLogo from "../components/BrandLogo";
 import { forgotPassword } from "../services/api";
+import { formatApiError } from "../utils/apiError";
 import { copySecretToClipboard } from "../utils/clipboard";
 import styles from "./Login.module.css";
 
@@ -24,8 +25,7 @@ export default function ForgotPassword() {
         setCopyStatus(copied ? "copied" : "manual");
       }
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(detail || "Something went wrong. Please try again.");
+      setError(formatApiError(err, "Something went wrong. Please try again."));
     } finally {
       setSubmitting(false);
     }
